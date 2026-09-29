@@ -1,0 +1,231 @@
+/anthropic-skills:senior-fullstack-developer
+
+You are working on our AI Candidate Sourcing and Recruitment Management System (Next.js + Supabase + OpenAI + SerpApi + Apify). This brief has six parts, roughly in priority order. Inspect the current codebase before changing anything in each part — do not guess at existing structure.
+
+====================================================
+PART 1 — STRONGER DUPLICATE DETECTION & HARD DATA-QUALITY RESTRICTIONS
+====================================================
+
+When we run a candidate search and retrieve results, duplicate candidates and low-quality ("dirty") records are getting through. I want a genuinely powerful, hard-enforced system here, not a light patch.
+
+First inspect:
+- `src/lib/candidates/dedupe.ts` (current logic: matches on profile_url, then normalized name + company)
+- `src/lib/candidates/normalize.ts` and `src/lib/candidates/persist.ts` (how normalized candidates are merged/persisted, including the existing idempotency behavior on re-running the same search)
+- How duplicates are currently handled ACROSS different search runs and different jobs for the same user/team, not just within one run
+- `SerpApiProvider.ts`'s `NON_INDIVIDUAL_URL_PATTERNS` filter (the existing first line of defense against non-candidate results)
+
+Then design and implement:
+
+1. Stronger identity matching beyond exact profile_url / exact name+company (e.g. normalizing LinkedIn slugs the way `extractLinkedInSlug` already does in the Apify enrichment code, fuzzy/near-match name+company comparison, matching across www vs country-subdomain LinkedIn URLs).
+2. Cross-search-run and cross-job duplicate detection where appropriate, not just within a single run.
+3. A HARD backstop, not just application logic: add a database-level unique constraint on the real identity key (e.g. `(user_id, normalized_profile_url)`), so even if a bug slips past the application-side dedup check, the database itself refuses a second insert of the same person.
+4. A minimum-data-quality gate before persistence: reject a result outright if it has neither a `name` nor a `profile_url` (nothing to identify a real person by), or if its URL matches `NON_INDIVIDUAL_URL_PATTERNS` but somehow still reached persistence (defense in depth, not reliance on one filter point alone).
+5. Log every hard-rejected record (reason + source data) rather than silently dropping it, so "why did this candidate not show up" stays answerable.
+6. Keep the existing rule that a false-positive merge (two different people merged into one) is worse than a missed duplicate — do not loosen matching to the point of merging distinct people. Never fabricate or guess a field while merging duplicates; keep the existing "null stays null" discipline.
+
+Provide before/after examples of what now gets correctly deduplicated or rejected that didn't before.
+
+====================================================
+PART 2 — DASHBOARD: "TODAY'S SEARCHED CANDIDATES"
+====================================================
+
+Add a new section to the dashboard page (`src/app/dashboard/page.tsx`) showing candidates sourced/searched TODAY.
+
+First inspect the existing dashboard stat cards, the recent search runs monitor, and how `search_runs` / candidates are timestamped, so this reuses existing data-fetching patterns rather than introducing a new one-off query style.
+
+Requirements:
+- Show today's sourced candidates (count and/or a short list) scoped to the logged-in user (and later, per Part 6, correctly scoped to team/role visibility once that lands)
+- Pull from real database data, no hardcoded/mock numbers
+- Should fit visually with the existing dashboard card/table patterns — follow the current design system, don't introduce a new visual style
+
+====================================================
+PART 3 — DATA ACCURACY: API RESPONSE VALIDATION
+(Location, Company, Experience)
+====================================================
+
+3A. Location defaulting to "Cairo, Egypt"
+
+We're now sourcing for roles outside Egypt, but candidate/job location is showing "Cairo, Egypt" when it shouldn't.
+
+Already ruled out during investigation: the only hardcoded "Cairo, Egypt" string in the codebase is in `MockSearchProvider.ts` (dev fixture data), and it is NOT the active provider — `.env.local` has `SEARCH_PROVIDER=serpapi`. The real `SerpApiProvider.ts` never sets a `location` field on results, `normalize.ts` correctly falls back to `null` when no location is given, and the candidate list UI correctly renders an empty state (not a hardcoded value) when location is null.
+
+So this needs live investigation, not a known constant to delete. Specifically check:
+- Whether the OpenAI job-analysis step (`src/lib/ai/prompts/job-analysis.ts`) or the `RequirementsEditor` UI is inferring or defaulting location to "Cairo, Egypt" when a job description doesn't explicitly state one
+- Whether recruiters are leaving a stale/placeholder location value in the job form that then gets used as SerpApi's geo-bias parameter (`params.location` in `SerpApiProvider.searchCandidates`), which would skew search results toward Egypt even for jobs meant to source internationally — this is a plausible root cause worth checking first
+- Whether any existing job or candidate rows in the database have "Cairo, Egypt" persisted incorrectly from before this behavior was noticed, requiring a data cleanup in addition to a code fix
+
+3B. Company and Experience showing wrong data (e.g. our own company name)
+
+Candidate profiles are showing Company and Experience values that are clearly wrong — specifically, values that match our own recruiting company ("G Developments") rather than the actual candidate. The API (SerpApi + Apify enrichment) is not returning accurate data for these two fields, and I want a restriction layer added so bad data never reaches a candidate profile.
+
+A concrete, likely root cause found during inspection: in `ApifyLinkedInProvider.ts`, enriched profiles are stored in a map keyed by `item.publicIdentifier?.toLowerCase()`, falling back to a URL-slug (`extractLinkedInSlug`) only when `publicIdentifier` is absent (around line 290). But in `src/app/api/jobs/[id]/search/route.ts`, when merging enrichment back onto a candidate, the lookup is always done by URL-slug (`extractLinkedInSlug(result.profile_url)`, around line 119) — never by `publicIdentifier`. Whenever Apify's `publicIdentifier` differs from the slug in the profile URL, this mismatch means enrichment either silently fails to attach, or — the more dangerous case — a stale/incorrect map entry ends up matched to the wrong candidate, letting one profile's real data (or leftover data from testing) leak onto a different candidate's company/experience fields.
+
+Required fix:
+1. Make the enrichment store/lookup use ONE consistent key (slug, derived the same way on both sides) instead of mixing `publicIdentifier` and slug. Verify with a test that two candidates with different `publicIdentifier` values but the same URL slug (or vice versa) never cross-contaminate.
+2. On top of the matching fix, add a defensive validation/"restriction" layer before accepting `company` or `experience` from any API response (SerpApi title-parsing or Apify enrichment): reject/null out a value if it implausibly matches our own recruiting company name or the job's own "Company Name" field, rather than displaying it. Follow the existing codebase rule of leaving a field `null` rather than guessing or accepting untrustworthy data — do not fabricate a replacement value.
+3. Double-check there is no place in the codebase where a candidate's `company` or `experience_years` field is accidentally populated from the job's own fields (e.g. a copy-paste bug using `job.company` instead of `candidate.company`) — inspect `mapToMatchingInput.ts`, the candidates API route, and any place job and candidate data are joined for display.
+4. Add a test case: run the search/enrichment pipeline against fixture data that includes a mismatched `publicIdentifier`/slug pair, and confirm the wrong data never appears on the wrong candidate.
+
+====================================================
+PART 4 — EGYPT-ONLY SOURCING: QUERY SCOPING & LOCATION VERIFICATION
+====================================================
+
+4A. Nationwide Egypt search scoping
+
+Sourcing needs to reliably cover ALL of Egypt (every governorate/city), not just Cairo, without errors, and without needlessly multiplying duplicate candidates.
+
+Do NOT loop one query per governorate — that multiplies SerpApi usage (we're on a 250-search/month free tier, tracked separately) and multiplies duplicate risk, since the same candidate can surface under more than one city-specific search.
+
+Instead, use SerpApi's country-level targeting in a single query:
+- `location=Egypt` — SerpApi's canonicalized location string at country granularity (a real value in Google's location database, so it won't error the way an overly narrow or malformed string might).
+- `gl=eg` — Google's country-restriction parameter (two-letter country code); this does most of the actual work of biasing results to Egypt as a whole.
+- Optionally `google_domain=google.com.eg` for the Egypt-localized Google domain.
+
+Implementation: when a job's location isn't a specific city the recruiter explicitly typed, pass `location=Egypt` and `gl=eg` to `SerpApiProvider.searchCandidates` instead of defaulting to or inferring a specific city. This also directly fixes Part 3A's "always Cairo" symptom by replacing a city-level default with genuine country-level coverage. Duplicates across the 2-4 query variants this can still produce are handled by Part 1's dedup work — that doesn't go away.
+
+4B. AI + deterministic location verification (exclude non-Egypt candidates)
+
+Add a step that confirms a candidate is actually based in Egypt before they're shown, since location data from SerpApi/Apify isn't always reliable. Do this in two tiers — don't fire an AI call per candidate as the first line of defense, since that adds real OpenAI cost for something a free string check resolves most of the time.
+
+Tier 1 — deterministic, free, runs first:
+Maintain a constant list of Egypt's 27 governorates (Cairo, Giza, Alexandria, Qalyubia, Port Said, Suez, Dakahlia, Sharqia, Gharbia, Monufia, Beheira, Kafr El Sheikh, Damietta, Ismailia, Faiyum, Beni Suef, Minya, Asyut, Sohag, Qena, Luxor, Aswan, Red Sea, New Valley, Matrouh, North Sinai, South Sinai), plus "Egypt"/"EG". If `candidate.location` is present: match against this list -> `in_egypt = true`; present but matches no Egypt term at all -> `in_egypt = false` (exclude); absent -> fall through to Tier 2.
+
+Tier 2 — AI fallback, only when location is missing but headline/summary might imply a country. Add a new prompt module (following the existing pattern in `src/lib/ai/prompts/`), e.g. `location-verification.ts`:
+
+System instruction:
+"You are verifying whether a sourced candidate is genuinely based in Egypt, using ONLY the text provided. Never infer a country from a name, ethnicity, language, or the recruiting company's location. Respond only from an explicit or clearly implied location in the given text. If the text gives no such signal, respond null — never guess. Respond with raw JSON only."
+
+Prompt template:
+"Candidate headline: {headline}
+Candidate summary: {summary}
+Candidate current company: {current_company}
+
+Determine whether this candidate is currently based in Egypt, using only the text above. Respond as JSON matching exactly this shape:
+{ "in_egypt": true | false | null, "evidence": string }
+- true: an Egyptian city, governorate, or 'Egypt' is explicitly stated or unambiguous from the text.
+- false: a city or country outside Egypt is explicitly stated.
+- null: there is not enough information — do not guess."
+
+Zod schema: `z.object({ in_egypt: z.boolean().nullable(), evidence: z.string() })`
+
+Business rule (confirm this with me before finalizing — it changes how strict the funnel is): exclude a candidate only when `in_egypt` resolves to `false` (deterministic or AI-confirmed non-Egypt). Do NOT exclude on `null`/unknown by default — location is frequently missing entirely (Apify enrichment is optional and capped at 10 profiles/run on the free tier). Treating "unknown" as "reject" would silently gut most of the funnel. Instead, surface `null` candidates in the UI as "location unverified" rather than hiding them, unless the stricter behavior is explicitly wanted.
+
+Run this check in `search/route.ts` right after the enrichment merge step and before persistence, so excluded candidates never reach the database at all.
+
+====================================================
+PART 5 — NON-REPEATING QUERY GENERATION
+====================================================
+
+Currently `src/lib/ai/prompts/search-query-generation.ts` has no memory of past runs — for the same job with the same inputs, clicking "Generate Queries" again produces the same or near-identical output every time (temperature 0.4, no variation signal), which drives repeat-heavy sourcing results.
+
+Fix:
+1. Before generating, fetch this job's previously generated queries from the existing `search_queries` table (`id, job_id, query, provider, created_at` — already tracked).
+2. Pass them into the prompt explicitly, appended to the existing job fields:
+"Previously generated queries for this job (do NOT repeat these or trivially reword them — use different skill/keyword combinations and different title-synonym groupings than every query below):
+{list of prior queries, or '(none yet)'}"
+3. Add a hard backstop matching Part 1's philosophy: after the AI responds, compare each new query string (normalized) against the stored history — if any exact or near-duplicate slipped through anyway, drop it and regenerate that one slot rather than showing a repeat.
+4. Leave temperature as-is or nudge it slightly (e.g. 0.5) — the prior-queries context does the real work; temperature alone doesn't reliably guarantee non-repetition.
+
+====================================================
+PART 6 — HR ORGANIZATIONAL STRUCTURE & ROLE-BASED PERMISSIONS
+====================================================
+
+I want to introduce a proper HR organizational structure and permission system.
+
+The current system is primarily user-based. Each user has their own account, files, sourcing runs, candidates, and activities. I now want to evolve the system into a team-based HR management platform where an HR Manager manages a team of HR users, on top of a system-wide Admin tier.
+
+Note on role naming: use Admin (system-wide) -> HR Manager (team-level) -> HR User (individual) as the working names below; if you've also heard this called "Super Admin / Admin / HR", treat that as the same three tiers with different labels — confirm final role-label wording before finalizing UI copy.
+
+The goal is to improve HR team visibility, accountability, reporting, collaboration, and management while preserving individual user ownership. Do not rebuild the existing system from scratch.
+
+First inspect the current codebase, database models, authentication system, user model, file ownership, sourcing runs, candidate relationships, activity tracking, dashboard, and existing permissions. Then design and implement this feature using the existing architecture wherever possible.
+
+--- 1. NEW ORGANIZATIONAL STRUCTURE ---
+Introduce an HR hierarchy: HR Manager -> HR Team Members -> Jobs / Sourcing Files / Candidates / Activities. Each HR user belongs to an HR team. An HR Manager manages one or more HR users. Each HR user keeps their own account and personal workspace. The HR Manager gets management-level visibility over their team.
+
+--- 2. USER ROLES ---
+Support at minimum: Admin, HR Manager, HR User.
+
+Admin can: view all users, HR managers, HR teams; create HR managers and HR users; assign HR users to managers; move users between teams; view all jobs, sourcing files, candidates, activities, reports; access system-wide analytics.
+
+HR Manager can: view their team, team member profiles, team member activity, team member sourcing files/jobs/candidates/pipeline, team performance and sourcing performance, team reports; compare team activity and output; access files created by their team members; review candidate sourcing results created by their team members. HR Manager should NOT automatically have access to unrelated teams.
+
+HR User can: access their own account; create/manage their own jobs, sourcing files, candidates; view their own sourcing activity; update candidate statuses; run candidate searches; generate sourcing files; access features allowed by their role. HR User should not automatically see another HR user's private files unless the system explicitly allows sharing.
+
+--- 3. TEAM OWNERSHIP ---
+Add team ownership to the system. Each HR User belongs to an HR Manager. First inspect the existing User model and adapt the structure to the current architecture rather than blindly adding fields — consider whether a separate Team entity (id, name, managerId, members, createdAt, updatedAt) makes more sense than fields directly on User (managerId, teamId, etc.). Use proper database relationships rather than duplicating team information unnecessarily.
+
+--- 4. FILE OWNERSHIP ---
+Every sourcing file needs a clear owner. The original HR user remains the owner; the HR Manager gets management-level access because the user belongs to their team — do NOT transfer ownership to the manager. The system should distinguish between Created By, Owned By, Accessed By, and Managed By — this distinction matters for reporting and accountability.
+
+--- 5. HR MANAGER DASHBOARD ---
+Build a manager-level dashboard with real (never hardcoded) metrics: total/active team members, total jobs, active sourcing runs, total/shortlisted/contacted/rejected/unseen candidates, average match quality, completed/running sourcing runs.
+
+--- 6. TEAM ACTIVITY ---
+The HR Manager should see activity across their team (e.g. "Zeyad created a sourcing file", "Sara shortlisted 8 candidates"). The activity system should record user, action, entity type, entity ID, description, timestamp, related job/sourcing file/candidate, and IP/device info only if existing security requirements justify it. Use the existing activity system if one exists; otherwise introduce a centralized audit/activity log.
+
+--- 7. AUDIT LOG ---
+Record important actions across authentication (login/logout/failed login), jobs (created/updated/deleted/accessed), sourcing (run created/started/completed/failed, file created/accessed), candidates (viewed/shortlisted/contacted/rejected/status changed/notes updated), team management (user created/assigned/removed/role changed), and reports (generated/viewed/exported). The log must be immutable from the normal application interface — users should not be able to modify or delete their historical activity.
+
+--- 8. MANAGER VIEW OF A TEAM MEMBER ---
+The HR Manager should be able to open a detailed employee activity page for a team member showing: performance overview (jobs created, sourcing runs, total/shortlisted/contacted/rejected candidates, average match quality, active jobs, completed sourcing runs), recent activity (recent actions, last login/activity, recently accessed/created files), and candidate pipeline breakdown (New/Reviewed/Shortlisted/Contacted/Rejected) — scoped only to that employee, not unrelated users.
+
+--- 9. TEAM SOURCING FILE VIEW ---
+A manager-level view of team sourcing files showing job title, sourcing status, total/shortlisted/unseen candidates, created by, last accessed by, last activity time, match quality, and actions — building on the existing dashboard table patterns. Filterable by team member, job title, sourcing status, date range, match quality, and candidate count.
+
+--- 10. TEAM REPORTING ---
+HR Managers can generate reports for their team: Team Performance (jobs/runs/candidates/shortlisted/contacted/rejected per user, average match quality per user, active/completed sourcing files), Activity Report (user/login/candidate/file/job/sourcing activity), Recruitment Pipeline Report (total/new/reviewed/shortlisted/contacted/rejected), Sourcing Quality Report (match quality by file/job/user/team average). Support date filters: Today, Last 7 days, Last 30 days, Last 90 days, Custom range.
+
+--- 11. REPORT EXPORT ---
+Extend existing export functionality if present; otherwise prepare the reporting architecture to later support CSV, Excel, and PDF. Exports must respect permissions: HR Manager gets only their team's data, HR User only what they're authorized to access, Admin gets system-wide data.
+
+--- 12. ACCESS CONTROL (CRITICAL) ---
+Do not rely on frontend hiding. All permissions must be enforced at the backend/API/database query level. An HR Manager can access their team's users/jobs/files/candidates/activities but not another team's, unless they're an Admin. An HR User must not gain access to another user's files by changing an ID in an API request. Implement proper authorization checks for every protected resource.
+
+--- 13. FILE ACCESS TRACKING ---
+Expand Created By / Last Accessed By / Last Activity Time into proper access tracking: whenever an authorized user (e.g. the manager) opens a sourcing file they didn't create, record that access distinctly from the original creator, and surface it in the relevant dashboard/management views.
+
+--- 14. USER MANAGEMENT ---
+Admin: create/edit user, assign role, assign manager, activate/deactivate, move between teams. HR Manager: view team members, team member details, team activity, team performance — not system-wide user management unless explicitly authorized.
+
+--- 15. TEAM STRUCTURE UI ---
+A clean team management section showing the manager, their team members, and a quick stat per member (e.g. active sourcing files). Follow the existing design system exactly.
+
+--- 16. NOTIFICATIONS ---
+Prepare for manager notifications (sourcing run completed/failed, high-quality candidates found, shortlist activity, new sourcing file, team member completed a task) — but first inspect whether a notification architecture already exists and reuse it. Do not build unnecessary new infrastructure if it doesn't fit.
+
+--- 17. DASHBOARD DIFFERENCES ---
+HR User Dashboard shows only their own work. HR Manager Dashboard shows their team. Admin Dashboard shows the whole organization. Do not mix these scopes — dashboard data must automatically respect the logged-in user's role and team.
+
+--- 18. DATABASE DESIGN ---
+Before changing anything, inspect User, Job, Sourcing Run, Sourcing File, Candidate, Candidate Status, Activity, Access history, Match Score, and existing roles/permissions. Then design the minimum required schema changes (possible new entities: Team, ActivityLog), using the project's existing naming conventions and avoiding unnecessary duplication.
+
+--- 19. API DESIGN ---
+Create or update APIs for teams, manager views (dashboard, team, team member detail, activity, sourcing files, reports), and user activity/performance — using the existing routing conventions rather than the exact conceptual endpoints below. Every endpoint must enforce authorization:
+GET /teams, GET /teams/:id, GET /teams/:id/members
+GET /manager/dashboard, GET /manager/team, GET /manager/team/:userId, GET /manager/activity, GET /manager/sourcing-files, GET /manager/reports
+GET /users/:id/activity, GET /users/:id/performance
+
+--- 20. PERFORMANCE ---
+The manager dashboard may hold significantly more data than a normal HR user dashboard. Avoid N+1 queries, loading every candidate into the frontend just to count them, recalculating large statistics on every render, and unnecessary API requests. Use database aggregation instead of counting in React.
+
+--- 21. SECURITY ---
+Treat authorization as a security requirement. Test: HR User accessing another user's file; HR User accessing another team's data; HR Manager accessing another manager's team; HR Manager accessing system-wide admin data; manually changed resource IDs; access to unauthorized API endpoints. All unauthorized requests must be rejected by the backend — never rely on frontend route protection alone.
+
+--- 22. MIGRATION ---
+Do not break existing data. Existing users get an appropriate role/team assignment; existing files retain their original creator/owner; existing candidate relationships and activity data remain intact. If there's currently no manager/team structure, introduce a safe default strategy for existing users. Never delete existing production data.
+
+Sequencing decision for this part specifically (already agreed): PHASED, not big-bang. Ship the schema (profiles/teams/roles tables) and migrate existing users into a default team/role now, but keep current access behavior working as-is until the manager/team features are built and tested. Tighten RLS and API-level filtering as a final, explicitly tracked cutover step — do not rewrite RLS, API filtering, and all manager features in a single pass, since the existing jobs/candidates/status routes currently assume no ownership checks at all, and a big-bang change there is high-risk with no working fallback if something breaks mid-way. Before flipping enforcement on at the end, run every scenario in section 24 (Testing) below as a hard gate.
+
+--- 23. IMPLEMENTATION PROCESS ---
+Before coding, inspect: the auth system, User model, roles/permissions, Job model, Sourcing Run/File models, Candidate model and ownership, activity tracking, access tracking, dashboard APIs, frontend routing, and existing dashboard components. Identify the minimum required architecture changes, provide a short implementation plan, then implement.
+
+--- 24. TESTING ---
+At minimum, verify: Admin sees everything; HR Manager sees only their team; HR User sees only their own workspace; an HR User is rejected when accessing another user's file; a Manager accessing a team member's file is allowed AND the access is recorded; a Manager viewing a team member profile sees performance/activity/jobs/files/pipeline; Manager A cannot access Manager B's team; a candidate status change is recorded with who/when; a new sourcing file records creator and team relationship; a manager's generated report contains only authorized team data.
+
+--- 25. ARCHITECTURE PRINCIPLE ---
+Three levels of visibility: SYSTEM (Admin, org-wide) -> TEAM (HR Manager, their team) -> USER (HR User, personal workspace). Do not remove individual ownership — the goal is management visibility layered on top of the existing user-level system, without changing who owns files, candidates, jobs, or sourcing runs.
+
+FINAL REQUIREMENT: the platform should end up functioning as an HR management and candidate sourcing system, not only an individual sourcing tool: User Accounts -> HR Teams -> HR Managers -> Jobs -> Sourcing Runs -> Sourcing Files -> Candidates -> Candidate Pipeline -> Activity Tracking -> Access Tracking -> Team Analytics -> HR Reports -> Role-Based Permissions. Keep it clean, scalable, secure, and consistent with the existing application.
+
+After completing the implementation, provide: 1) architecture changes, 2) database changes, 3) backend/API changes, 4) frontend changes, 5) permission matrix, 6) reporting changes, 7) activity/audit changes, 8) migration strategy, 9) tests performed, 10) any remaining issues or assumptions.

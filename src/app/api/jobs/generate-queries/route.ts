@@ -63,19 +63,32 @@ export const POST = withErrorHandling(async (request: Request) => {
     previousQueries = (data ?? []).map((row) => row.query as string);
   }
 
-  // The quoted location phrase in the generated query should be the optional
-  // specific city the recruiter picked (jobAnalysis.city —
-  // Cairo/Alexandria/Giza/Suez), when set, instead of the fixed nationwide
-  // "Egypt" value `location` always holds now. A city from CITY_OPTIONS is
-  // already a single clean value safe to quote as-is. When no city is
-  // picked, resolveCleanLocationText/"Egypt" is the fallback — see its doc
-  // comment for why an uncleaned, multi-value location string must never be
-  // quoted verbatim (confirmed live to make Google silently drop the
-  // query's real constraints and return noise).
-  const cleanedJobAnalysis = {
-    ...jobAnalysis,
-    location: jobAnalysis.city || resolveCleanLocationText(jobAnalysis.location) || "Egypt",
-  };
+  // A raw location value straight from a recruiter can be a list of cities
+  // or other non-canonical text ("Egypt; Cairo, Giza, Mansoura, Alex").
+  // Quoting that verbatim as a literal search phrase asks Google to match
+  // text no real profile will ever contain — confirmed live to make Google
+  // silently drop the query's actual constraints and return unrelated
+  // noise instead of erroring. Clean it the same way the SerpApi location
+  // param is cleaned (see resolveCleanLocationText) before it ever reaches
+  // the prompt.
+
+  
+  // const cleanedJobAnalysis = {
+  //   ...jobAnalysis,
+  //   location: resolveCleanLocationText(jobAnalysis.location) ?? "",
+  // };
+
+const DEFAULT_LOCATION = "Cairo OR Giza OR Mansoura OR Alexandria";
+
+const cleanedLocation =
+  resolveCleanLocationText(jobAnalysis.location)?.trim();
+
+const finalLocation = cleanedLocation || DEFAULT_LOCATION;
+
+const cleanedJobAnalysis = {
+  ...jobAnalysis,
+  location: finalLocation,
+};
 
   const provider = getAIProvider();
   const queries = await generateSearchQueries(cleanedJobAnalysis, provider, previousQueries);

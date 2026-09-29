@@ -1,0 +1,777 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>HR User Role Guide</title>
+<link rel="stylesheet" href="style.css">
+<style>
+.mock .body.rel{position:relative}
+.mock .chipx{display:inline-block;border-radius:10px;padding:0 6px;font-size:6.8pt;margin:1px 2px 1px 0;background:#dcfce9;color:#059669;border:1px solid #b6ebcb}
+.mock .chipx.a{background:#fdf1d6;color:#b7791f;border-color:#f0dba0}
+.mock .lbl{font-size:6.8pt;color:#5b6878;display:block;margin:3px 0 1px}
+.mock .tab{display:inline-block;padding:1px 8px;border-bottom:2px solid transparent;color:#5b6878}
+.mock .tab.on{border-color:#2a78d6;color:#1c5cab;font-weight:700}
+.mock .circ{width:44px;height:44px;border-radius:50%;border:5px solid #059669;text-align:center;line-height:34px;font-weight:700;font-size:10pt}
+.mock .tile{background:#f4f7fb;border:1px solid #dde3ec;border-radius:4px;padding:2px 6px;text-align:center}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.two.wide{grid-template-columns:1.25fr 1fr}
+.kv td:first-child{font-weight:600;white-space:nowrap;width:30%}
+.callout.tip .t:before{content:"TIP  ";color:#1c5cab;font-size:8pt;letter-spacing:.08em}
+table.tight td,table.tight th{padding:3px 6px}
+.cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.cols3 .card{font-size:9.2pt}
+.cols3 ul{padding-left:16px;margin:0}
+</style></head><body>
+
+<section class="cover">
+  <div class="band">
+    <div class="kicker">AI Candidate Sourcing Platform</div>
+    <h1 class="title">HR User<br>Role Guide</h1>
+    <div class="subtitle">Everything a recruiter needs to run sourcing work: from uploading a job description to exporting a scored, shortlisted candidate list.</div>
+    <div class="meta"><span>Role: HR User</span><span>Personal workspace</span><span>Document 3 of the System Guide</span></div>
+  </div>
+  <div class="toc-mini">
+    <h2>What is inside</h2>
+    <div class="grid2" style="font-size:9.6pt">
+      <div>1 Role at a glance<br>2 Getting access and signing in<br>3 Navigation<br>4 Dashboard<br>5 Jobs list<br>6 Creating a job and finding candidates<br>7 Working the candidate list<br>8 Candidate profile</div>
+      <div>9 The six statuses<br>10 How the AI pipeline works<br>11 Reports for your own work<br>12 Button and control reference<br>13 Step-by-step tasks<br>14 Rules, limits and visibility<br>15 Troubleshooting FAQ and gotchas</div>
+    </div>
+  </div>
+  <div class="foot">Written from the application source code and the live database structure. Screens shown are wireframes that mirror the real layout; numbers and names in them are examples only.</div>
+</section>
+
+<h1 class="first" style="break-before:auto">Contents</h1>
+<ol class="toc" style="padding:0">
+<li><span class="n">1</span>Role at a glance</li>
+<li><span class="n">2</span>Getting access and signing in</li>
+<li><span class="n">3</span>Navigation</li>
+<li><span class="n">4</span>Dashboard (<code>/dashboard</code>)</li>
+<li><span class="n">5</span>Jobs list (<code>/jobs</code>)</li>
+<li><span class="n">6</span>Creating a job and finding candidates (<code>/jobs/new</code>)</li>
+<li><span class="n">7</span>Working the candidate list (<code>/candidates</code>)</li>
+<li><span class="n">8</span>Candidate profile (<code>/candidates/[id]</code>)</li>
+<li><span class="n">9</span>The six statuses and what they trigger</li>
+<li><span class="n">10</span>How the AI pipeline works</li>
+<li><span class="n">11</span>Reports for your own work (<code>/reports</code>)</li>
+<li><span class="n">12</span>Button and control reference</li>
+<li><span class="n">13</span>Step-by-step tasks</li>
+<li><span class="n">14</span>Rules, limits and who can see your work</li>
+<li><span class="n">15</span>Troubleshooting FAQ and gotchas</li>
+</ol>
+<div class="callout"><span class="t">How to read this guide</span>
+<p>Chapters 1 to 3 orient you. Chapters 4 to 8 walk through each screen in the order you will meet them. Chapters 9 to 11 explain the concepts behind what you see. Chapters 12 to 15 are for reference. Screens are shown as wireframes with red numbered markers; the numbered legend below each wireframe explains every marker.</p></div>
+<div class="grid3">
+<div class="callout tip"><span class="t">Tip callouts</span><p class="small">Blue boxes give shortcuts and good habits.</p></div>
+<div class="callout warn"><span class="t">Warning callouts</span><p class="small">Amber boxes flag behaviour that can surprise you.</p></div>
+<div class="callout danger"><span class="t">Red callouts</span><p class="small">Red boxes mark actions that cannot be undone.</p></div>
+</div>
+
+<h1>1. Role at a glance</h1>
+<p><span class="chip user">HR User</span> is the individual recruiter. You have a <b>personal workspace</b>: every job you create, every candidate the platform finds for you and every score, note and status you set belongs to you (your HR Manager and Admins can look, but not change).</p>
+<div class="callout ok"><span class="t">Scope in one sentence</span><p>You see and change <b>only your own jobs and candidates</b>. Nothing you do affects a colleague&rsquo;s data, and nothing a colleague does affects yours.</p></div>
+<div class="cols3">
+<div class="card user"><h3>CAN SEE</h3><ul>
+<li>Your own dashboard, jobs and candidates</li>
+<li>Match scores and AI summaries for your candidates</li>
+<li>Your own notes on each candidate</li>
+<li>Reports scoped to &ldquo;My work&rdquo;</li>
+<li>Your account e-mail (Settings)</li>
+<li>Who last opened each of your sourcing files</li></ul></div>
+<div class="card user"><h3>CAN DO</h3><ul>
+<li>Create jobs from an uploaded or pasted job description</li>
+<li>Run AI analysis and edit the extracted requirements</li>
+<li>Start candidate searches (Egypt)</li>
+<li>Score candidates with AI</li>
+<li>Filter, sort, page and export candidates to Excel</li>
+<li>Change candidate status, add notes</li>
+<li>Delete jobs and candidates you own</li>
+<li>Export your own reports as CSV or Excel</li></ul></div>
+<div class="card user"><h3>CANNOT DO</h3><ul>
+<li>See other people&rsquo;s jobs, candidates or dashboards</li>
+<li>Open the Team (<code>/manager</code>) or Admin (<code>/admin</code>) areas</li>
+<li>See the notification bell (managers and admins only)</li>
+<li>Invite users or change roles</li>
+<li>Edit a job after creation (no edit screen)</li>
+<li>Edit or delete a note once saved</li>
+<li>Change your password or profile in Settings</li></ul></div>
+</div>
+<h2>Role comparison</h2>
+<table class="matrix compact"><thead><tr><th>Capability</th><th>HR User</th><th>HR Manager</th><th>Admin</th></tr></thead><tbody>
+<tr><td>Create jobs, search, score, export own candidates</td><td class="y-c">Yes</td><td class="y-c">Yes</td><td class="y-c">Yes</td></tr>
+<tr><td>Change status / notes on own candidates</td><td class="y-c">Yes</td><td class="y-c">Yes</td><td class="y-c">Yes</td></tr>
+<tr><td>Read teammates&rsquo; jobs and candidates</td><td class="n-c">No</td><td class="r-c">Own team, read-only</td><td class="r-c">All, read-only</td></tr>
+<tr><td>Reports</td><td class="r-c">My work only</td><td class="r-c">Own team</td><td class="r-c">Organization or a team</td></tr>
+<tr><td>Notification bell</td><td class="n-c">No</td><td class="y-c">Yes</td><td class="y-c">Yes</td></tr>
+<tr><td>Team page</td><td class="n-c">No</td><td class="y-c">Yes</td><td class="y-c">Yes</td></tr>
+<tr><td>Admin page (invites, roles, teams)</td><td class="n-c">No</td><td class="n-c">No</td><td class="y-c">Yes</td></tr>
+</tbody></table>
+<div class="callout"><span class="t">If you try something you cannot do</span><p>The screens simply do not show the control. If a request is forced anyway, the platform refuses it with a message such as <i>&ldquo;You can view this job, but only its owner can change it.&rdquo;</i></p></div>
+
+<h1>2. Getting access and signing in</h1>
+<h2>2.1 How you get access</h2>
+<p>The platform is not open to everyone. Access exists only when your account is marked <b>active</b>. There are two routes to it:</p>
+<div class="grid2">
+<div class="card user"><h3>Route A: you are invited (recommended)</h3>
+<ol class="steps"><li>An Admin enters your e-mail on the Admin page and picks the role <b>HR User</b> and your team.</li><li>You open the login page and sign up (or use Google) with <b>that exact e-mail</b>.</li><li>Your account is created already active, with the role and team the Admin chose. You land on the Dashboard.</li></ol></div>
+<div class="card"><h3>Route B: you ask for access</h3>
+<ol class="steps"><li>You sign up with an e-mail nobody invited.</li><li>The account is created <b>inactive</b> and every Admin is notified of an access request.</li><li>Until an Admin approves it, signing in shows: <i>&ldquo;Your account doesn&rsquo;t have access yet. Ask an admin to invite you or approve your access request.&rdquo;</i></li></ol></div>
+</div>
+<div class="callout warn"><span class="t">There is no &ldquo;rejected&rdquo; message</span><p>Admins have an Approve button but no Reject button. If nobody approves your request you simply keep seeing the &ldquo;doesn&rsquo;t have access yet&rdquo; message. Contact an Admin directly.</p></div>
+<h2>2.2 The login screen</h2>
+<div class="two">
+<div>
+<div class="mock"><div class="bar"><i></i><i></i><i></i><span class="url">/login</span></div>
+<div class="body rel" style="padding:14px 26px">
+<div style="background:#fff;border:1px solid #dde3ec;border-radius:8px;padding:10px 12px;text-align:left">
+<b style="font-size:10pt">Log in</b><div class="small" style="margin-bottom:6px">Enter your email and password to continue.</div>
+<div class="field" style="margin-bottom:4px">Email</div><div class="field" style="margin-bottom:6px">Password</div>
+<div class="btn" style="display:block;text-align:center;margin-bottom:5px">Log in</div>
+<div style="text-align:center;color:#5b6878;margin:3px 0">or</div>
+<div class="btn out" style="display:block;text-align:center">Continue with Google</div>
+<div style="text-align:center;color:#1c5cab;margin-top:6px;font-size:7.5pt">Need an account? Sign up</div></div>
+<span class="callnum" style="left:6px;top:64px">1</span><span class="callnum" style="left:6px;top:88px">2</span><span class="callnum" style="left:6px;top:112px">3</span><span class="callnum" style="left:6px;top:150px">4</span><span class="callnum" style="left:6px;top:170px">5</span>
+</div></div></div>
+<div><ol class="legend">
+<li><b>Email</b>: a valid e-mail address (browser validation).</li>
+<li><b>Password</b>: at least 6 characters.</li>
+<li><b>Log in</b> button. It reads &ldquo;Please wait...&rdquo; while working.</li>
+<li><b>Continue with Google</b>: reads &ldquo;Redirecting...&rdquo; while working.</li>
+<li><b>Mode switch</b>: toggles between &ldquo;Need an account? Sign up&rdquo; and &ldquo;Already have an account? Log in&rdquo;.</li>
+</ol></div></div>
+<h3>Signing in with e-mail and password</h3>
+<ol class="steps"><li>Open the platform address. Visiting any page while signed out sends you to the login page.</li><li>Type your e-mail and password and press <b>Log in</b>.</li><li>On success you always land on the <b>Dashboard</b>.</li><li>On failure the reason is shown in red under the form.</li></ol>
+<h3>Signing up for the first time</h3>
+<p>Press <b>Need an account? Sign up</b>, enter e-mail and password (6+ characters) and press <b>Sign up</b>. You will see: <i>&ldquo;Account created. Check your email to confirm, then log in. If you weren&rsquo;t invited, an admin will need to approve your access first.&rdquo;</i> Confirm your e-mail from the message you receive, then log in.</p>
+<h3>Signing in with Google</h3>
+<p>Press <b>Continue with Google</b>, choose your Google account and you return to the platform automatically. The Google e-mail must be the invited e-mail. If Google sign-in fails you see <i>&ldquo;Google sign-in failed. Please try again.&rdquo;</i></p>
+<h3>Logging out</h3>
+<p>Press <b>Log out</b> at the far right of the top bar. There is no confirmation; you are sent straight to the login page. Sign-ins, failed sign-ins for known accounts and sign-outs are recorded in the activity log.</p>
+<div class="callout"><span class="t">Access can be removed while you are working</span><p>If an Admin deactivates your account, your next page load signs you out and shows the &ldquo;doesn&rsquo;t have access&rdquo; message. Any action already in progress in the browser is refused with &ldquo;Unauthorized&rdquo;.</p></div>
+<table class="compact"><thead><tr><th>Message on the login page</th><th>Meaning</th><th>What to do</th></tr></thead><tbody>
+<tr><td>Your account doesn&rsquo;t have access yet...</td><td>Account exists but is inactive, or has no profile</td><td>Ask an Admin to invite or approve you</td></tr>
+<tr><td>Google sign-in failed. Please try again.</td><td>Google flow did not complete</td><td>Retry; use the invited Google account</td></tr>
+<tr><td>Account created. Check your email...</td><td>Sign-up succeeded</td><td>Confirm e-mail, then log in</td></tr>
+<tr><td>Error text in red</td><td>Wrong password, unconfirmed e-mail, etc.</td><td>Correct the details and retry</td></tr>
+</tbody></table>
+
+<h1 style="break-before:auto;margin-top:26px">3. Navigation</h1>
+<p>Every page shares one sticky top bar. As an HR User it has exactly five links plus <b>Log out</b>.</p>
+<div class="mock"><div class="bar"><i></i><i></i><i></i><span class="url">any page</span></div>
+<div class="nav" style="position:relative"><b>AI Candidate</b><span class="on">Dashboard</span><span>Jobs</span><span>Candidates</span><span>Reports</span><span>Settings</span><span class="sp"></span><span class="btn out">Log out</span>
+<span class="callnum" style="left:8px;top:-6px">1</span><span class="callnum" style="left:100px;top:-6px">2</span><span class="callnum" style="left:300px;top:-6px">3</span><span class="callnum" style="right:4px;top:-6px">4</span></div>
+<div class="body" style="height:20px"></div></div>
+<ol class="legend">
+<li><b>AI Candidate</b> (brand): always returns to the Dashboard.</li>
+<li><b>Main links</b>: Dashboard, Jobs, Candidates, Reports, Settings. The current section is underlined (Dashboard only on the exact page).</li>
+<li><b>Reports</b> shows your own work only.</li>
+<li><b>Log out</b>: signs you out immediately.</li>
+</ol>
+<div class="grid2">
+<div class="card user"><h3>What you do not see</h3><p class="small">The <b>Team</b> link (managers and admins), the <b>Admin</b> link (admins) and the <b>notification bell</b> (managers and admins). This is normal for an HR User. Your manager is told about your shortlists and hires instead (see chapter 9).</p></div>
+<div class="card user"><h3>Settings page</h3><p class="small">Shows one card, <b>Account</b>, with &ldquo;Signed in as &lt;your e-mail&gt;&rdquo;. There are no controls: you cannot change your password, name or preferences here.</p></div>
+</div>
+<h3>Typical journey</h3>
+<figure><svg viewBox="0 0 700 90" width="700" role="img" aria-label="Typical journey">
+<defs><marker id="a1" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#2a78d6"/></marker></defs>
+<g font-family="Segoe UI,Arial" font-size="11" text-anchor="middle">
+<rect x="4" y="20" width="98" height="50" rx="8" fill="#e6f0fc" stroke="#2a78d6"/><text x="53" y="42" font-weight="700">Dashboard</text><text x="53" y="58" font-size="9" fill="#5b6878">see status</text>
+<rect x="126" y="20" width="98" height="50" rx="8" fill="#e6f0fc" stroke="#2a78d6"/><text x="175" y="42" font-weight="700">New Job</text><text x="175" y="58" font-size="9" fill="#5b6878">/jobs/new</text>
+<rect x="248" y="20" width="98" height="50" rx="8" fill="#e6f0fc" stroke="#2a78d6"/><text x="297" y="42" font-weight="700">Candidates</text><text x="297" y="58" font-size="9" fill="#5b6878">score + filter</text>
+<rect x="370" y="20" width="98" height="50" rx="8" fill="#e6f0fc" stroke="#2a78d6"/><text x="419" y="42" font-weight="700">Profile</text><text x="419" y="58" font-size="9" fill="#5b6878">status + notes</text>
+<rect x="492" y="20" width="98" height="50" rx="8" fill="#e6f0fc" stroke="#2a78d6"/><text x="541" y="42" font-weight="700">Export</text><text x="541" y="58" font-size="9" fill="#5b6878">Excel file</text>
+<rect x="596" y="20" width="98" height="50" rx="8" fill="#dcfce9" stroke="#059669"/><text x="645" y="42" font-weight="700">Reports</text><text x="645" y="58" font-size="9" fill="#5b6878">CSV / Excel</text>
+</g>
+<g stroke="#2a78d6" stroke-width="2" marker-end="url(#a1)"><line x1="102" y1="45" x2="124" y2="45"/><line x1="224" y1="45" x2="246" y2="45"/><line x1="346" y1="45" x2="368" y2="45"/><line x1="468" y1="45" x2="490" y2="45"/><line x1="590" y1="45" x2="594" y2="45"/></g></svg>
+<figcaption>The usual path through the platform.</figcaption></figure>
+
+<h1>4. Dashboard</h1>
+<div class="page-head"><span class="route">/dashboard</span><h2>Your personal Dashboard</h2><span class="chip user">HR User</span></div>
+<p>The Dashboard is the landing page after every sign-in. It is <b>personal</b>: every number counts only rows you own. There are no filters, date ranges or settings; the only interactions are the links and buttons. While the page loads you see grey placeholder cards.</p>
+<div class="mock"><div class="bar"><i></i><i></i><i></i><span class="url">/dashboard</span></div>
+<div class="nav"><b>AI Candidate</b><span class="on">Dashboard</span><span>Jobs</span><span>Candidates</span><span>Reports</span><span>Settings</span><span class="sp"></span><span class="btn out">Log out</span></div>
+<div class="body rel">
+<div class="hero"><small style="opacity:.85">AI-Powered Recruitment Pipeline</small><b>Candidate Sourcing Hub</b><span class="btn out" style="margin-top:3px">New Job Opening</span> <span class="btn out">Browse Candidates</span></div>
+<div class="row"><div class="stat"><small>Active Jobs</small><b>12</b></div><div class="stat"><small>Total Candidates</small><b>214</b></div><div class="stat"><small>Average Match Quality</small><b>68%</b></div><div class="stat"><small>Shortlisted Talent</small><b>9</b></div></div>
+<div class="row"><div class="panel"><b>Candidate Pipeline Stages <span class="badge b">214 total</span></b>
+<div class="small">New</div><div class="bar-h" style="width:90%"></div><div class="small">Reviewed</div><div class="bar-h" style="width:45%"></div><div class="small">Shortlisted</div><div class="bar-h" style="width:12%"></div><div class="small">Contacted / Hired / Rejected ...</div></div>
+<div class="panel"><b>Match Score Distribution <span class="badge g">68% avg</span></b>
+<div style="display:flex;align-items:flex-end;gap:5px;height:60px"><div style="flex:1;background:#86b6ef;height:15%"></div><div style="flex:1;background:#86b6ef;height:30%"></div><div style="flex:1;background:#5598e7;height:55%"></div><div style="flex:1;background:#2a78d6;height:100%"></div><div style="flex:1;background:#1c5cab;height:45%"></div></div><div class="small">0-20 | 21-40 | 41-60 | 61-80 | 81-100</div></div>
+<div class="panel"><b>Today&rsquo;s Searched Candidates <span class="badge g">4 today</span></b><div class="small">Sara A. - Front-End Dev &middot; React Lead<br>Omar H. - QA Engineer &middot; QA Analyst<br>...</div></div></div>
+<div class="panel"><b>Sourcing Files <span class="btn" style="float:right">New Job</span></b>
+<table><thead><tr><th>Job Title</th><th>Status</th><th>Total</th><th>Shortlisted</th><th>Unseen</th><th>Created By</th><th>Last Accessed</th><th>Last Activity</th><th></th></tr></thead>
+<tbody><tr><td>React Lead</td><td><span class="badge g">complete</span></td><td>38</td><td>4</td><td>21</td><td>Zeyad Ragab</td><td>Amr Fayez</td><td>2 hours ago</td><td><span class="btn out">View</span></td></tr>
+<tr><td>QA Analyst</td><td><span class="badge a">running</span></td><td>0</td><td>0</td><td>0</td><td>Zeyad Ragab</td><td></td><td>Just now</td><td><span class="btn out">View</span></td></tr></tbody></table></div>
+<span class="callnum" style="left:4px;top:6px">1</span><span class="callnum" style="left:4px;top:80px">2</span><span class="callnum" style="left:26%;top:80px">3</span><span class="callnum" style="left:51%;top:80px">4</span><span class="callnum" style="left:76%;top:80px">5</span>
+<span class="callnum" style="left:4px;top:138px">6</span><span class="callnum" style="left:34%;top:138px">7</span><span class="callnum" style="left:68%;top:138px">8</span><span class="callnum" style="left:4px;top:266px">9</span>
+</div></div>
+<ol class="legend">
+<li><b>Header banner</b> with <b>New Job Opening</b> (goes to <code>/jobs/new</code>) and <b>Browse Candidates</b> (goes to <code>/candidates</code>), plus a static four-step guide: Upload Job Spec, AI Criteria Extraction, Autonomous Sourcing, AI Scoring &amp; Excel.</li>
+<li><b>Active Jobs</b> stat card.</li>
+<li><b>Total Candidates</b> stat card.</li>
+<li><b>Average Match Quality</b> stat card.</li>
+<li><b>Shortlisted Talent</b> stat card.</li>
+<li><b>Candidate Pipeline Stages</b> bar chart.</li>
+<li><b>Match Score Distribution</b> histogram.</li>
+<li><b>Today&rsquo;s Searched Candidates</b> list.</li>
+<li><b>Sourcing Files</b> table (one row per search run) with the <b>New Job</b> and <b>View</b> buttons.</li>
+</ol>
+<h2>4.1 Exactly how every number is computed</h2>
+<table class="tight"><thead><tr><th style="width:19%">Card</th><th>What it counts</th><th style="width:30%">Watch out for</th></tr></thead><tbody>
+<tr><td><b>Active Jobs</b></td><td>Number of jobs you own. It is <b>not</b> filtered by any &ldquo;active&rdquo; flag: every job you ever created, minus ones you deleted.</td><td>The name says &ldquo;Active&rdquo; but it is your total job count.</td></tr>
+<tr><td><b>Total Candidates</b></td><td>Number of candidate records you own. Candidates are stored once per person for you, even if found for several jobs.</td><td>A person found for two jobs counts once.</td></tr>
+<tr><td><b>Average Match Quality</b></td><td>The match scores are grouped by <b>search run</b>; each run&rsquo;s scores are averaged; then those per-run averages are averaged and rounded. Every scored sourcing file therefore weighs the same, big or small. If nothing is scored, the card says <i>&ldquo;No evaluated files yet&rdquo;</i>.</td><td>Scores with no search run attached are ignored here. Runs with no scores are left out. Stays empty until you press <b>Score Candidates</b>.</td></tr>
+<tr><td><b>Shortlisted Talent</b></td><td>Candidates you own whose status is currently <b>Shortlisted</b>.</td><td>Moving a candidate to Hired removes them from this count.</td></tr>
+</tbody></table>
+<h3>Candidate Pipeline Stages</h3>
+<p>A badge shows &ldquo;N total&rdquo;. Horizontal bars show how many of your candidates currently have each status, in this order: <b>New, Reviewed, Shortlisted, Contacted, Hired, Rejected</b>. Bars are sized relative to the biggest stage (with a small minimum width); a stage with zero has no bar. Status is a property of the candidate itself, so the chart is across all your jobs. Empty state: <i>&ldquo;No candidates yet — run a search to start building your pipeline.&rdquo;</i></p>
+<h3>Match Score Distribution</h3>
+<p>A five-bar histogram of <b>every</b> match score you own, in buckets <b>0-20, 21-40, 41-60, 61-80, 81-100</b>. A green badge shows the overall average (&ldquo;68% avg&rdquo;). Hover a bar to see &ldquo;61-80%: N candidate(s)&rdquo;. Empty state: <i>&ldquo;No candidates scored yet — run &lsquo;Score Candidates&rsquo; on a job to see the match-quality breakdown here.&rdquo;</i></p>
+<div class="callout warn"><span class="t">Two averages can differ</span><p>The Average Match Quality card averages per sourcing file, and skips scores that have no run attached. The distribution chart badge includes all scores. Small differences between the two are expected.</p></div>
+<h3>Today&rsquo;s Searched Candidates</h3>
+<p>Badge &ldquo;N today&rdquo; (green when above zero) counts candidate records <b>created</b> since midnight (server time, which is UTC when hosted on Vercel, not your local midnight). The list shows the latest 8: name, headline, the job the candidate was first linked to, and the time. Empty: <i>&ldquo;No candidates sourced today yet&rdquo;</i>.</p>
+<div class="callout warn"><span class="t">Two things to know</span><p>(1) A person who already existed and is found again today is <b>not</b> counted, only brand-new records. (2) Clicking a name opens the profile <b>without</b> a job, so there is no Match Score card and the candidate is not marked as seen. To see the score, open the candidate from the job&rsquo;s candidate list instead.</p></div>
+<h2>4.2 Sourcing Files table</h2>
+<p>One row per <b>search run</b>, newest first, limited to the latest 20 runs on your jobs. Empty state: <i>&ldquo;No sourcing activity yet&rdquo;</i>.</p>
+<table class="tight"><thead><tr><th style="width:19%">Column</th><th>Meaning</th></tr></thead><tbody>
+<tr><td>Job Title</td><td>The job&rsquo;s title (&ldquo;Untitled Role&rdquo; if blank).</td></tr>
+<tr><td>Sourcing Status</td><td>Badge for the run: <span class="chip amber">pending</span> and <span class="chip amber">running</span> (amber), <span class="chip green">complete</span> (green), <span class="chip red">error</span> (red).</td></tr>
+<tr><td>Total Candidates</td><td>Candidates first linked to your job by <i>this</i> run. If a later re-run finds someone already linked to the job, that person stays attributed to the earlier run, so re-runs show only newly linked people.</td></tr>
+<tr><td>Shortlisted</td><td>Of those, how many currently have status Shortlisted.</td></tr>
+<tr><td>Unseen</td><td>Of those, how many you have never opened <i>from the job&rsquo;s candidate list</i>. A candidate becomes &ldquo;seen&rdquo; only when you open the profile with the job attached.</td></tr>
+<tr><td>File Created By</td><td>Display name built from the e-mail (zeyad.ragab@... becomes &ldquo;Zeyad Ragab&rdquo;).</td></tr>
+<tr><td>Last Accessed By</td><td>Who most recently opened this run&rsquo;s candidate list. This includes your own visits, and your manager&rsquo;s or an Admin&rsquo;s.</td></tr>
+<tr><td>Last Activity</td><td>Most recent of: completed, started, created, or last opened. Shown as &ldquo;Just now&rdquo;, &ldquo;N minutes/hours/days ago&rdquo;, then a date after 30 days.</td></tr>
+<tr><td>Action</td><td><b>View</b> opens the candidates list for that job. The list is for the whole job, not just that run.</td></tr>
+</tbody></table>
+<div class="callout"><span class="t">Error banner</span><p>If part of the data cannot load you see a red banner: <i>&ldquo;Some dashboard data failed to load. Try refreshing the page.&rdquo;</i> Refresh; numbers shown may be incomplete until you do.</p></div>
+<div class="callout tip"><span class="t">Start each day here</span><p>Scan Sourcing Files for red <b>error</b> badges and amber runs still <b>running</b>, then use <b>View</b> on the file with the highest Unseen count.</p></div>
+
+<h1>5. Jobs list</h1>
+<div class="page-head"><span class="route">/jobs</span><h2>Jobs</h2><span class="chip user">HR User</span></div>
+<p>A simple, read-only list of the jobs you created. Use it to find a job and jump to its candidates.</p>
+<div class="mock"><div class="bar"><i></i><i></i><i></i><span class="url">/jobs</span></div>
+<div class="nav"><b>AI Candidate</b><span>Dashboard</span><span class="on">Jobs</span><span>Candidates</span><span>Reports</span><span>Settings</span></div>
+<div class="body rel"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><b style="font-size:11pt">Jobs</b><span class="btn">New Job</span></div>
+<div class="panel"><b>All Jobs</b><table><thead><tr><th>Title</th><th>Location</th><th>Employment Type</th><th>Seniority</th><th>Created</th><th>Candidates</th></tr></thead>
+<tbody><tr><td>React Lead</td><td>Egypt</td><td>Full-time</td><td>Lead</td><td>27/09/2026</td><td><span class="btn out">View Candidates</span></td></tr><tr><td>QA Analyst</td><td>Egypt</td><td>Contract</td><td>Mid</td><td>25/09/2026</td><td><span class="btn out">View Candidates</span></td></tr></tbody></table>
+<div style="display:flex;justify-content:space-between;margin-top:4px" class="small"><span>Page 1 of 2 (14 total)</span><span><span class="btn out">Previous</span> <span class="btn out">Next</span></span></div></div>
+<span class="callnum" style="right:6px;top:4px">1</span><span class="callnum" style="left:2px;top:44px">2</span><span class="callnum" style="right:4px;top:52px">3</span><span class="callnum" style="left:2px;bottom:3px">4</span></div></div>
+<ol class="legend"><li><b>New Job</b>: opens <code>/jobs/new</code>.</li><li><b>All Jobs table</b>, newest first, 10 per page. Columns: Title, Location, Employment Type, Seniority, Created (date), Candidates. Blank values show a dash-like empty cell.</li><li><b>View Candidates</b>: opens <code>/candidates?jobId=...</code> for that job.</li><li><b>Pagination</b>: &ldquo;Page X of Y (N total)&rdquo; with Previous and Next (disabled at the ends).</li></ol>
+<div class="grid2">
+<div class="card user"><h3>States you may see</h3><ul class="small"><li>&ldquo;Loading jobs...&rdquo;</li><li>Red error text if loading fails</li><li>Empty: <i>&ldquo;No jobs yet. Create your first job to start finding candidates.&rdquo;</i></li></ul></div>
+<div class="card user"><h3>What is not here</h3><p class="small">No edit, no delete, no job detail page and no export on this screen. To delete a job use the picker on <code>/candidates</code> (chapter 7). To change a job, create a new one.</p></div>
+</div>
+
+<h1>6. Creating a job and finding candidates</h1>
+<div class="page-head"><span class="route">/jobs/new</span><h2>New Job: the core of your work</h2><span class="chip user">HR User</span></div>
+<p>This one page takes you from a job description document to a saved job and a list of candidates. It has four stages: <b>(A)</b> job details, <b>(B)</b> job description and AI analysis, <b>(C)</b> review of extracted requirements, and <b>(D)</b> finding candidates. Two collapsible cards (Job Details and Job Description) start open; you can click either header to fold or unfold it.</p>
+<figure><svg viewBox="0 0 700 84" width="700" role="img" aria-label="Job creation stages">
+<defs><marker id="a2" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#2a78d6"/></marker></defs>
+<g font-family="Segoe UI,Arial" font-size="11" text-anchor="middle">
+<rect x="2" y="14" width="150" height="56" rx="8" fill="#e6f0fc" stroke="#2a78d6"/><text x="77" y="36" font-weight="700">A. Job Details</text><text x="77" y="54" font-size="9" fill="#5b6878">title, company, type, arrangement</text>
+<rect x="182" y="14" width="150" height="56" rx="8" fill="#e6f0fc" stroke="#2a78d6"/><text x="257" y="36" font-weight="700">B. Job Description</text><text x="257" y="54" font-size="9" fill="#5b6878">upload / paste, Analyze with AI</text>
+<rect x="362" y="14" width="150" height="56" rx="8" fill="#e6f0fc" stroke="#2a78d6"/><text x="437" y="36" font-weight="700">C. Requirements</text><text x="437" y="54" font-size="9" fill="#5b6878">review and edit AI output</text>
+<rect x="542" y="14" width="150" height="56" rx="8" fill="#dcfce9" stroke="#059669"/><text x="617" y="36" font-weight="700">D. Find Candidates</text><text x="617" y="54" font-size="9" fill="#5b6878">queries, save, search, modal</text></g>
+<g stroke="#2a78d6" stroke-width="2" marker-end="url(#a2)"><line x1="152" y1="42" x2="180" y2="42"/><line x1="332" y1="42" x2="360" y2="42"/><line x1="512" y1="42" x2="540" y2="42"/></g></svg>
+<figcaption>The four stages on the New Job page.</figcaption></figure>
+
+<h2>6.1 Stage A: Job Details</h2>
+<div class="mock"><div class="bar"><i></i><i></i><i></i><span class="url">/jobs/new</span></div>
+<div class="body rel">
+<div class="panel" style="margin-bottom:8px"><b>1. Job Details <span class="small" style="font-weight:400">React Lead &bull; G Hotels &bull; Full-time &bull; Hybrid</span></b>
+<div class="row"><div><span class="lbl">Job Title *</span><div class="field">e.g. Senior React Developer</div></div><div><span class="lbl">Company *</span><div class="field">Select a company</div></div></div>
+<div class="row"><div><span class="lbl">Employment Type *</span><div class="field">Select type (e.g. Full-time)</div></div><div><span class="lbl">Work Arrangement *</span><div class="field">Select arrangement (e.g. Remote)</div></div></div>
+<span class="btn out">Save &amp; Collapse</span></div>
+<div class="panel"><b>2. Job Description <span class="badge b">File Attached</span></b>
+<div><span class="btn">Upload File (PDF / DOCX)</span> <span class="btn out">Paste Text</span></div>
+<div style="border:1.5px dashed #b9c4d4;border-radius:6px;text-align:center;padding:10px;margin:6px 0;color:#5b6878">Click to upload or drag &amp; drop file<br><span class="small">Supports PDF, DOCX, or TXT documents up to 10MB</span></div>
+<span class="btn">Analyze Job with AI</span></div>
+<span class="callnum" style="left:43%;top:44px">1</span><span class="callnum" style="right:6px;top:44px">2</span><span class="callnum" style="left:43%;top:84px">3</span><span class="callnum" style="right:6px;top:84px">4</span><span class="callnum" style="left:150px;top:134px">5</span><span class="callnum" style="left:250px;top:196px">6</span><span class="callnum" style="right:8px;top:234px">7</span><span class="callnum" style="left:150px;top:282px">8</span>
+</div></div>
+<ol class="legend">
+<li><b>Job Title</b> (required).</li><li><b>Company</b> (required).</li><li><b>Employment Type</b> (required).</li><li><b>Work Arrangement</b> (required).</li>
+<li><b>Save &amp; Collapse</b> only folds the card.</li>
+<li><b>Mode toggle</b>: Upload File or Paste Text.</li>
+<li><b>Dropzone</b> (upload mode) or text box (paste mode).</li>
+<li><b>Analyze Job with AI</b> (enabled once there are 50+ characters of description).</li>
+</ol>
+<table class="tight"><thead><tr><th style="width:17%">Field</th><th style="width:18%">Required?</th><th>Options / rules</th><th style="width:26%">Validation message</th></tr></thead><tbody>
+<tr><td>Job Title</td><td>Yes</td><td>Free text. Placeholder &ldquo;e.g. Senior React Developer&rdquo;. If left empty, filled automatically with the AI-detected title after analysis.</td><td>&ldquo;Job title is required.&rdquo;</td></tr>
+<tr><td>Company</td><td>Yes</td><td>Dropdown loaded from the platform: G Developments, G Communities, G Lifestyle, G Hotels, G Clubs, G Utilities, G Investments, BuildDora. Shows &ldquo;Loading companies...&rdquo; while loading (disabled). The list is maintained by Admins in the database, not in the app.</td><td>&ldquo;Company is required.&rdquo; If loading fails: &ldquo;Failed to load companies.&rdquo;</td></tr>
+<tr><td>Employment Type</td><td>Yes</td><td>Full-time, Part-time, Contract, Internship. May be auto-filled from the AI result if still empty.</td><td>&ldquo;Employment type is required.&rdquo;</td></tr>
+<tr><td>Work Arrangement</td><td>Yes</td><td>Remote, Hybrid, On-site. Never auto-filled.</td><td>&ldquo;Work arrangement is required.&rdquo;</td></tr>
+</tbody></table>
+<p class="small">Error messages appear after you leave a field (blur) or when you try to continue. When the card is folded, its header shows a one-line summary (title, company, type, arrangement); until you fill things in, it shows placeholder words such as &ldquo;Role Title&rdquo; and &ldquo;Company&rdquo;, not real values.</p>
+<div class="callout warn"><span class="t">Auto-filled Employment Type quirk</span><p>If the AI proposes an employment type that is not one of the four options, validation passes but the dropdown looks blank. Open the dropdown and pick a value explicitly.</p></div>
+
+<h2>6.2 Stage B: Job Description</h2>
+<h3>Upload File</h3>
+<div class="grid2">
+<div class="card user"><h3>Accepted files</h3><ul><li><b>PDF</b>, <b>DOCX</b>, <b>TXT</b></li><li>Maximum size <b>10 MB</b></li><li>Type is decided by the file name ending (.pdf, .docx, .txt)</li><li>Old Word <code>.doc</code> files are <b>not</b> supported: save as DOCX or PDF</li></ul></div>
+<div class="card user"><h3>What happens after you choose a file</h3><ol class="steps"><li>Toast &ldquo;Extracting text from &lt;file&gt;...&rdquo; and the card reads &ldquo;Parsing text from &lt;file&gt;...&rdquo;.</li><li>Text is extracted on the server. Toast &ldquo;Upload Successful&rdquo;.</li><li>The card shows the file name, size and &ldquo;Ready for analysis&rdquo;, plus an &ldquo;Extracted Text Preview&rdquo; box.</li></ol></div>
+</div>
+<p>After a successful upload you can press <b>Change File</b> to pick another or the <b>X</b> icon to remove the file (this also clears the extracted text). You can drag and drop, but a dropped file of the wrong type is only rejected by the server after it is sent.</p>
+<table class="tight compact"><thead><tr><th>Error message</th><th>Cause</th></tr></thead><tbody>
+<tr><td>No file was provided.</td><td>The upload contained no file.</td></tr>
+<tr><td>File is too large. Maximum size is 10MB.</td><td>File above 10 MB. Checked on the server only, after upload.</td></tr>
+<tr><td>Unsupported file type ".xyz". Supported types: PDF, DOCX, TXT.</td><td>Any other extension, including .doc.</td></tr>
+<tr><td>Could not extract text from this PDF file. It may be corrupted or password-protected.</td><td>Damaged or protected file (similar wording for DOCX/TXT).</td></tr>
+<tr><td>Failed to upload or process the file.</td><td>Generic failure (network etc.).</td></tr></tbody></table>
+<div class="callout danger"><span class="t">Scanned PDFs extract as empty</span><p>The platform does not read images. A scanned or image-only PDF gives an empty result, the description stays empty and <b>Analyze Job with AI</b> stays disabled without any message. Open the PDF, copy the text out (or re-export it from Word) and use <b>Paste Text</b>.</p></div>
+<h3>Paste Text</h3>
+<p>Click <b>Paste Text</b> to get a large text box with the placeholder <i>&ldquo;Paste the full job description here (responsibilities, technical requirements, qualifications)...&rdquo;</i>. Under it, &ldquo;Minimum 50 characters required&rdquo; and a live character counter. There is no maximum.</p>
+<div class="callout tip"><span class="t">Better description, better search</span><p>Include responsibilities, must-have skills, years of experience, education and seniority. The AI only uses what is written; it does not guess missing requirements.</p></div>
+
+<h3>Analyze Job with AI</h3>
+<ol class="steps"><li>The button is disabled while analyzing or while the description is shorter than 50 characters (after trimming).</li><li>Press it. Both cards fold, a loader card reads &ldquo;Analyzing Job Description...&rdquo; and a toast tells you the AI is working.</li><li>The AI reads the description and returns a structured profile (chapter 10). Toast: <i>&ldquo;Requirements successfully extracted from job spec!&rdquo;</i></li><li>The <b>Extracted Requirements</b> card (stage C) appears with badge &ldquo;Analysis Verified&rdquo;.</li></ol>
+<div class="callout warn"><span class="t">If the analysis fails</span><p>The cards stay folded and only a toast appears. Reopen the Job Description card to see the red message under it. Common ones: <i>&ldquo;Job description is too short to analyze.&rdquo;</i>, <i>&ldquo;The AI service is currently unavailable. Please try again shortly.&rdquo;</i>, <i>&ldquo;The AI returned an unexpected response. Please try again.&rdquo;</i>, or <i>&ldquo;Too many requests. Please slow down and try again shortly.&rdquo;</i> (limit: 10 AI requests per minute, shared with query generation and scoring).</p></div>
+
+<h2>6.3 Stage C: Extracted Requirements</h2>
+<p>This is your chance to correct the AI before searching. Everything here is editable. The location is always fixed to Egypt.</p>
+<div class="mock"><div class="bar"><i></i><i></i><i></i><span class="url">/jobs/new (after analysis)</span></div>
+<div class="body rel">
+<div class="panel"><b>Extracted Requirements <span class="badge g">Analysis Verified</span></b>
+<div class="small"><b>Extracted Role Profile</b> <span class="badge b">AI-Analyzed</span></div>
+<div class="row"><div><span class="lbl">Job Title</span><div class="field">Senior React Developer</div></div><div><span class="lbl">Seniority Level</span><div class="field">e.g. Senior, Lead, Mid</div></div></div>
+<div class="row"><div><span class="lbl">Location *</span><div class="field">Egypt</div></div><div><span class="lbl">City</span><div class="field">Not specified</div></div><div><span class="lbl">Employment Type</span><div class="field">Full-time</div></div></div>
+<div class="row"><div><span class="lbl">Min Experience (Years)</span><div class="field">5</div></div><div><span class="lbl">Max Experience (Years)</span><div class="field">8</div></div><div></div></div>
+<div style="border-bottom:1px solid #dde3ec;margin:4px 0"><span class="tab on">Skills &amp; Technologies <span class="badge b">9</span></span><span class="tab">Education &amp; Qualifications</span><span class="tab">Responsibilities &amp; Keywords</span></div>
+<span class="lbl">Required Skills</span><span class="chipx">React &times;</span><span class="chipx">TypeScript &times;</span><span class="chipx">Redux &times;</span><span class="chipx">REST APIs &times;</span> <span class="field" style="display:inline-block;width:90px">Add skill</span> <span class="btn">Add</span>
+<span class="lbl">Preferred Skills</span><span class="chipx a">Next.js &times;</span><span class="chipx a">Jest &times;</span>
+<div style="background:#e6f0fc;border-radius:6px;padding:6px 8px;margin-top:8px"><b>Ready to Find Candidates?</b> <span class="btn green" style="float:right">Generate Queries &amp; Find Candidates</span></div></div>
+<span class="callnum" style="left:44%;top:62px">1</span><span class="callnum" style="left:31%;top:100px">2</span><span class="callnum" style="left:63%;top:100px">3</span><span class="callnum" style="left:44%;top:138px">4</span><span class="callnum" style="left:72%;top:196px">5</span><span class="callnum" style="left:42%;top:233px">6</span><span class="callnum" style="right:6px;top:304px">7</span>
+</div></div>
+<ol class="legend">
+<li><b>Text fields</b>: Job Title and Seniority Level.</li><li><b>Location</b>: Egypt only (dropdown with a single option).</li><li><b>City</b>: optional narrowing (Cairo, Alexandria, Giza, Suez).</li><li><b>Experience</b> range in years.</li><li><b>Tabs</b> switch between skills, education and responsibilities.</li><li><b>Editable chips</b>: click a chip to rename it, click &times; to remove it, type in the add box and press Enter or <b>Add</b>.</li><li><b>Generate Queries &amp; Find Candidates</b> (stage D).</li>
+</ol>
+<table class="tight"><thead><tr><th style="width:22%">Control</th><th>Details</th></tr></thead><tbody>
+<tr><td>Job Title, Seniority Level</td><td>Free text. Seniority placeholder &ldquo;e.g. Senior, Lead, Mid&rdquo;.</td></tr>
+<tr><td>Location *</td><td>Dropdown with only <b>Egypt</b>. The helper text explains that every role sources nationwide in Egypt.</td></tr>
+<tr><td>City</td><td>&ldquo;Not specified&rdquo; plus Cairo, Alexandria, Giza, Suez. Optional. Narrows the Google search to that city instead of nationwide Egypt.</td></tr>
+<tr><td>Employment Type</td><td>&ldquo;Not specified&rdquo; plus the four types.</td></tr>
+<tr><td>Min / Max Experience (Years)</td><td>Number boxes; empty means no limit. The platform does <b>not</b> check that min is below max or that values are positive.</td></tr>
+<tr><td>Tab: Skills &amp; Technologies</td><td>Required Skills (green chips) and Preferred Skills (amber chips). Badge shows the combined count.</td></tr>
+<tr><td>Tab: Education &amp; Qualifications</td><td>Education, Certifications, Languages, Industries.</td></tr>
+<tr><td>Tab: Responsibilities &amp; Keywords</td><td>Responsibilities and Keywords.</td></tr>
+<tr><td>Chip lists</td><td>Blank entries are ignored. Duplicates are allowed. There is no maximum.</td></tr>
+</tbody></table>
+<div class="callout warn"><span class="t">Section 1 wins for title and employment type</span><p>The saved job title and employment type come from <b>Stage A</b> fields when those are filled in. Changing the Job Title or Employment Type only inside this editor changes the stored AI analysis, but not the job&rsquo;s title or type shown on your Jobs list. Set them in Job Details.</p></div>
+<div class="callout tip"><span class="t">Curate the skills</span><p>Search quality depends mostly on Required Skills and the title. Delete vague or over-specific chips, and keep the list short and meaningful. Choose a City only when you truly need one city: it narrows the search geographically and can reduce results.</p></div>
+
+<h2>6.4 Stage D: Generate Queries &amp; Find Candidates</h2>
+<p>The green <b>Generate Queries &amp; Find Candidates</b> button lives under &ldquo;Ready to Find Candidates?&rdquo;. It is disabled while a search is running or when Job Details is incomplete; in that case the message says <i>&ldquo;Complete all required job details (title, company, employment type, work arrangement, location) above to continue.&rdquo;</i> If you still trigger it, you get <i>&ldquo;Please complete all required job details before continuing.&rdquo;</i>, a &ldquo;Missing Required Fields&rdquo; toast, and Job Details reopens.</p>
+<h3>What happens, step by step</h3>
+<ol class="steps">
+<li><b>Query generation</b>: the AI writes 2 to 4 Google &ldquo;X-ray&rdquo; queries aimed at LinkedIn profiles, from your title, seniority, skills and location. Status text: &ldquo;Synthesizing multi-variable search queries...&rdquo;. You cannot see or edit the queries.</li>
+<li><b>Save the job</b>: your job (title, company, Egypt, city, type, arrangement, seniority, skills, experience, education, certifications, languages, keywords and the full AI analysis) is saved to your account. Status text: &ldquo;Querying authorized talent pools across public sources...&rdquo;</li>
+<li><b>Start the search run</b>: a run is created with status <i>pending</i> and the platform answers immediately. The heavy work continues on the server in the background.</li>
+<li><b>Polling</b>: the page asks for the run&rsquo;s status every 2 seconds, for up to 10 minutes. The button shows a spinner and &ldquo;Finding Candidates...&rdquo;. (The label &ldquo;Deduplicating candidates and computing AI match scores...&rdquo; is misleading: no scoring happens here.)</li>
+<li><b>Completion</b>: the success modal opens and a toast says <i>&ldquo;Found N candidates! Sourcing complete.&rdquo;</i></li>
+</ol>
+<div class="mock"><div class="bar"><i></i><i></i><i></i><span class="url">/jobs/new (success modal)</span></div>
+<div class="body rel" style="background:#8d99ab33;padding:18px 60px">
+<div style="background:#fff;border-radius:8px;padding:12px;text-align:center;border:1px solid #dde3ec"><div style="color:#059669;font-weight:700;font-size:10pt">Candidate Sourcing Complete!</div>
+<p class="small" style="margin:4px 0">Successfully identified and evaluated 38 candidates matching your requirements for Senior React Developer</p>
+<p class="small">Company: G Hotels</p><span class="btn out">Close</span> <span class="btn">Show Candidates</span></div>
+<span class="callnum" style="left:66px;top:24px">1</span><span class="callnum" style="left:66px;top:70px">2</span><span class="callnum" style="right:66px;top:100px">3</span></div></div>
+<ol class="legend"><li><b>Headline</b> confirms completion.</li><li><b>Summary</b>: the count of candidates found for your job (wording says &ldquo;evaluated&rdquo;, but they are not scored yet).</li><li><b>Close</b> keeps you on the page; <b>Show Candidates</b> opens the candidate list for the new job.</li></ol>
+<div class="callout danger"><span class="t">Nothing is scored yet</span><p>Despite the wording, the search only <i>finds and stores</i> people. Scores appear only after you press <b>Score Candidates</b> on the candidate list (chapter 7). Your dashboard average and distribution stay empty until then.</p></div>
+<h3>What can go wrong</h3>
+<table class="tight"><thead><tr><th style="width:30%">You see</th><th>Meaning and action</th></tr></thead><tbody>
+<tr><td>Red banner + &ldquo;Sourcing Failed&rdquo; toast</td><td>The run ended in error. The message says why, for example the search service failed on every query. Wait a moment and try again.</td></tr>
+<tr><td>&ldquo;Search Error&rdquo; toast</td><td>The status check could not find the run (&ldquo;Search run not found.&rdquo;), so polling stopped.</td></tr>
+<tr><td>&ldquo;Search is taking longer than expected. Check back shortly.&rdquo;</td><td>10 minutes passed. The search may still finish on the server: check the Dashboard&rsquo;s Sourcing Files for the run.</td></tr>
+<tr><td>&ldquo;Too many requests...&rdquo;</td><td>Rate limit: 10 AI requests per minute, or 5 searches per minute.</td></tr>
+<tr><td>&ldquo;Invalid job analysis data.&rdquo;</td><td>The analysis content is malformed: run Analyze again.</td></tr>
+<tr><td>&ldquo;The search provider is currently unavailable...&rdquo;</td><td>The search service is down or refused the request. Retry later.</td></tr>
+<tr><td>Modal shows 0 candidates</td><td>The queries returned nothing usable, or every result was outside Egypt. Broaden skills or remove the City, then search again.</td></tr>
+</tbody></table>
+<div class="callout danger"><span class="t">Retrying creates a duplicate job</span><p>The job is <b>saved before</b> the search starts. If the search step fails (for example a rate limit) and you press the button again, a <b>second job</b> is created. Check the Jobs list or the candidates job picker afterwards and delete the extra one (chapter 7). To re-search a job you already saved, see chapter 13.</p></div>
+<div class="callout tip"><span class="t">Leave the page?</span><p>Once the run has started, the search continues on the server even if you close the tab. Return to the Dashboard and use <b>View</b> on the Sourcing Files row when its status turns <span class="chip green">complete</span>.</p></div>
+
+<h1>7. Working the candidate list</h1>
+<div class="page-head"><span class="route">/candidates</span><h2>Candidates</h2><span class="chip user">HR User</span></div>
+<p>This page has two modes. Without a job selected it shows the <b>job picker</b>. With a job selected (<code>?jobId=...</code>) it shows that job&rsquo;s <b>candidate table</b>.</p>
+<h2>7.1 The job picker</h2>
+<div class="mock"><div class="bar"><i></i><i></i><i></i><span class="url">/candidates</span></div>
+<div class="nav"><b>AI Candidate</b><span>Dashboard</span><span>Jobs</span><span class="on">Candidates</span><span>Reports</span><span>Settings</span></div>
+<div class="body rel"><b style="font-size:11pt">Select a job</b>
+<div class="panel" style="margin-top:6px"><table><thead><tr><th>Job</th><th>Created</th><th>Location</th><th>Type</th><th></th></tr></thead><tbody>
+<tr><td>React Lead</td><td>27 Sep 2026 &middot; 10:12</td><td>Egypt</td><td>Full-time</td><td><span class="btn out">View</span> &nbsp;<span class="btn red">&#128465;</span></td></tr>
+<tr><td>QA Analyst</td><td>25 Sep 2026 &middot; 14:40</td><td>Egypt</td><td>Contract</td><td><span class="btn out">View</span> &nbsp;<span style="color:#d03b3b">Delete this job?</span> <span class="btn red">Confirm</span> <span class="btn out">Cancel</span></td></tr></tbody></table></div>
+<span class="callnum" style="left:3px;top:34px">1</span><span class="callnum" style="right:150px;top:52px">2</span><span class="callnum" style="right:170px;top:78px">3</span></div></div>
+<ol class="legend"><li><b>Row</b>: title, date and time created, location and employment type. Newest first.</li><li><b>View</b> opens that job&rsquo;s candidate table; the trash icon starts a delete.</li><li><b>Inline confirmation</b>: &ldquo;Delete this job?&rdquo; with <b>Confirm</b> (shows &ldquo;Deleting...&rdquo; while working) and <b>Cancel</b>.</li></ol>
+<ul>
+<li>On success a toast says <i>&ldquo;Job and its listing removed.&rdquo;</i> (title &ldquo;Job Deleted&rdquo;) and the row disappears. On failure you get &ldquo;Delete Failed&rdquo;.</li>
+<li>If you have no jobs, the page offers a link to create one.</li>
+</ul>
+<div class="callout danger"><span class="t">Deleting a job cannot be undone</span><p>There is no recycle bin. The job&rsquo;s own data (its search runs, links and match scores) goes with it. The candidate records themselves are yours and remain in your account.</p></div>
+<div class="callout warn"><span class="t">Only the 20 newest jobs are listed</span><p>The picker has no pagination. If you have more than 20 jobs, older ones do not appear here. You can still reach them from <code>/jobs</code> via <b>View Candidates</b>, which is paged 10 at a time.</p></div>
+
+<h2>7.2 The candidate table</h2>
+<p>The heading reads &ldquo;Candidates for &lt;job title&gt;&rdquo;. Opening the page also records that the sourcing file was opened; you will see your own name under <b>Last Accessed By</b> on the Dashboard.</p>
+<div class="mock"><div class="bar"><i></i><i></i><i></i><span class="url">/candidates?jobId=...</span></div>
+<div class="body rel">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:10.5pt">Candidates for Senior React Developer</b><span class="btn out">Score Candidates</span></div>
+<div class="panel" style="margin-bottom:6px"><div class="row" style="margin-bottom:4px"><div class="field">Search by name</div><div class="field">Search by skill</div><div class="field">Company</div><div class="field">Location</div></div>
+<div class="row" style="margin:0;align-items:center"><div class="field">All statuses &#9662;</div><div class="field">Sort by: Match Score &#9662;</div><div class="field" style="flex:.6">High &rarr; Low</div><div style="flex:1.2;text-align:right"><span class="btn">Apply Filters</span> <span class="btn out">Clear</span></div></div></div>
+<div class="panel"><table><thead><tr><th>#</th><th>Name</th><th>Location</th><th>Skills</th><th>Match</th><th>Date Added</th><th>Status</th><th>Profile</th><th>Actions</th></tr></thead><tbody>
+<tr><td>1</td><td>Sara Adel</td><td>Cairo <span class="badge g">Egypt verified</span></td><td>React, TS, Redux +4</td><td><span class="badge g">87%</span></td><td>27 Sep &middot; 10:20</td><td><span class="field">Shortlisted &#9662;</span></td><td><span class="btn out">View</span></td><td>&#128065; &#128465;</td></tr>
+<tr><td>2</td><td>Omar Hany</td><td>Giza</td><td>React, JS</td><td><span class="badge a">55%</span></td><td>27 Sep &middot; 10:20</td><td><span class="field">New &#9662;</span></td><td><span class="btn out">View</span></td><td>&#128065; &#128465;</td></tr></tbody></table>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px"><span class="small">Page 1 of 4 (38 total)</span><span><span class="btn out">Export Excel</span> <span class="btn out">Previous</span> <span class="btn out">Next</span></span></div></div>
+<span class="callnum" style="right:4px;top:6px">1</span><span class="callnum" style="left:3px;top:32px">2</span><span class="callnum" style="left:28%;top:56px">3</span><span class="callnum" style="right:2px;top:70px">4</span><span class="callnum" style="left:6px;top:114px">5</span><span class="callnum" style="left:39%;top:112px">6</span><span class="callnum" style="left:46.5%;top:112px">7</span><span class="callnum" style="left:74%;top:112px">8</span><span class="callnum" style="left:3px;bottom:3px">9</span><span class="callnum" style="right:120px;bottom:3px">10</span>
+</div></div>
+<ol class="legend">
+<li><b>Score Candidates</b>: AI-scores everyone linked to this job.</li>
+<li><b>Text filters</b>: name, skill, company, location. Applied only with the button.</li>
+<li><b>Status filter</b>, <b>Sort by</b> and the direction button apply instantly.</li>
+<li><b>Apply Filters</b> and <b>Clear</b>.</li>
+<li><b>Name</b>: opens the profile with this job attached.</li>
+<li><b>Skills</b> cell: 3 shown, then &ldquo;+N&rdquo;.</li>
+<li><b>Match</b> percentage badge.</li>
+<li><b>Status</b> dropdown: change in place.</li>
+<li><b>Pagination</b> text.</li>
+<li><b>Export Excel</b>, <b>Previous</b>, <b>Next</b>.</li>
+</ol>
+<h3>Filters and sorting</h3>
+<table class="tight"><thead><tr><th style="width:20%">Control</th><th style="width:20%">Applies</th><th>Behaviour</th></tr></thead><tbody>
+<tr><td>Search by name / skill</td><td class="r-c">On <b>Apply Filters</b></td><td>Case-insensitive &ldquo;contains&rdquo; match. Pressing Enter does nothing.</td></tr>
+<tr><td>Company / Location</td><td class="r-c">On <b>Apply Filters</b></td><td>Case-insensitive &ldquo;contains&rdquo; match.</td></tr>
+<tr><td>Status</td><td class="y-c">Instantly</td><td>&ldquo;All statuses&rdquo; plus the six statuses (exact match).</td></tr>
+<tr><td>Sort by</td><td class="y-c">Instantly</td><td>Match Score (default), Experience, Name, Date Added.</td></tr>
+<tr><td>Direction button</td><td class="y-c">Instantly</td><td>Toggles &ldquo;High &rarr; Low&rdquo; (descending) and &ldquo;Low &rarr; High&rdquo; (ascending). Blank values always sort last.</td></tr>
+<tr><td>Clear</td><td class="y-c">Instantly</td><td>Empties the 5 filters. Keeps your chosen sort.</td></tr>
+</tbody></table>
+<p>All filters combine with AND. Any filter change returns you to page 1. The page size is fixed at 10 rows. If nothing matches, you see <i>&ldquo;No candidates match these filters.&rdquo;</i></p>
+<div class="callout tip"><span class="t">Typed but nothing happened?</span><p>Text boxes are only a draft until you click <b>Apply Filters</b>. The export also uses only the <i>applied</i> filters, not what is merely typed.</p></div>
+<h3>Table columns</h3>
+<table class="tight"><thead><tr><th style="width:18%">Column</th><th>Contents</th></tr></thead><tbody>
+<tr><td>#</td><td>Row number across pages.</td></tr>
+<tr><td>Name</td><td>Avatar and name (&ldquo;Unnamed candidate&rdquo; if unknown). A link to the profile with this job attached.</td></tr>
+<tr><td>Location</td><td>Location text plus a green <span class="chip green">Egypt verified</span> badge when the platform confirmed an Egypt location.</td></tr>
+<tr><td>Skills</td><td>First three skills as badges; <b>+N</b> expands the rest; <b>Show less</b> collapses.</td></tr>
+<tr><td>Match</td><td>Percentage badge: <span class="chip green">70+ green</span> <span class="chip amber">40-69 amber</span> <span class="chip red">under 40 red</span>. Blank if not scored.</td></tr>
+<tr><td>Date Added</td><td>Date and time the candidate record was created.</td></tr>
+<tr><td>Status</td><td>Dropdown of the six statuses (disabled while saving).</td></tr>
+<tr><td>Profile</td><td><b>View</b>: opens the candidate&rsquo;s public profile page (LinkedIn) in a new tab. Blank if no address.</td></tr>
+<tr><td>Actions</td><td>Eye icon: open the profile here. Trash icon: delete the candidate (with confirmation).</td></tr>
+</tbody></table>
+<h3>Score Candidates</h3>
+<ol class="steps"><li>Press <b>Score Candidates</b>. It appears only when the list is not empty. The label becomes &ldquo;Scoring...&rdquo;.</li><li>Toast: &ldquo;Evaluating all candidate profiles against job requirements...&rdquo;. The AI scores <b>every candidate linked to the job</b>, three at a time.</li><li>Result toast &ldquo;Match Scoring Completed&rdquo;: <i>&ldquo;Scored N candidates successfully!&rdquo;</i> and a summary such as <i>&ldquo;Scored X of Y candidates (Z failed).&rdquo;</i> The list refreshes.</li></ol>
+<div class="callout warn"><span class="t">It re-scores everyone, every time</span><p>There is no confirmation and no &ldquo;score only new ones&rdquo; option. Each press overwrites earlier scores and uses one AI call per candidate. It counts as one hit toward the 10-per-minute AI limit. The request runs while you wait, so large lists take a while: stay on the page until the toast appears.</p></div>
+<div class="callout tip"><span class="t">Manager alert on strong matches</span><p>If at least one newly scored candidate reaches <b>80% or more</b>, your HR Manager is notified that you scored candidates with strong matches.</p></div>
+<h3>Changing a status</h3>
+<p>Pick a value in the row&rsquo;s Status dropdown. It saves at once (no confirmation) and a toast confirms <i>&ldquo;Candidate status marked as &lsquo;&lt;status&gt;&rsquo;&rdquo;</i>. Status belongs to the candidate, so it applies in every job that person is linked to and changes the Dashboard counts. Meanings are in chapter 9.</p>
+<h3>Viewing and deleting a candidate</h3>
+<p>The eye icon opens the profile. The trash icon shows an inline <b>Delete?</b> with <b>Confirm</b> and <b>Cancel</b>.</p>
+<div class="callout danger"><span class="t">Deleting a candidate is permanent and global</span><p>The toast says <i>&ldquo;Candidate removed from this job.&rdquo;</i> but the whole candidate record is deleted from your account, including their notes, scores, status history and links to <b>all</b> your jobs. It is not just removed from this list. There is no undo.</p></div>
+<h3>Pagination and Export</h3>
+<p>The footer shows &ldquo;Page X of Y (N total)&rdquo; with <b>Previous</b> and <b>Next</b>. <b>Export Excel</b> is described next.</p>
+
+<h2>7.3 Export Excel</h2>
+<p><b>Export Excel</b> downloads one spreadsheet containing <b>all rows matching your applied filters and sort</b>, not only the current page. A toast &ldquo;Downloading candidate export spreadsheet...&rdquo; appears when you click.</p>
+<table class="kv"><tbody>
+<tr><td>File name</td><td><code>candidates-&lt;job-title-slug&gt;-&lt;YYYY-MM-DD&gt;.xlsx</code>, for example <code>candidates-senior-react-developer-2026-09-29.xlsx</code>. The slug is the title in lower case with anything other than letters and digits turned into hyphens; the date is the UTC date. A title with no Latin letters produces <code>candidates--&lt;date&gt;.xlsx</code>.</td></tr>
+<tr><td>Sheet</td><td>One sheet named <b>Candidates</b>.</td></tr>
+<tr><td>Rows</td><td>All filtered candidates, in your chosen sort order.</td></tr>
+<tr><td>Lists</td><td>Skills and requirement lists are joined with commas. Notes are joined newest first.</td></tr>
+<tr><td>Blank values</td><td>Scores are blank for unscored candidates.</td></tr>
+</tbody></table>
+<h3>The 20 columns, in order</h3>
+<table class="tight compact"><thead><tr><th>#</th><th>Column</th><th>#</th><th>Column</th><th>#</th><th>Column</th><th>#</th><th>Column</th></tr></thead><tbody>
+<tr><td>1</td><td>Name</td><td>6</td><td>Skills</td><td>11</td><td>Education Score</td><td>16</td><td>Source</td></tr>
+<tr><td>2</td><td>Headline</td><td>7</td><td>Match Score</td><td>12</td><td>Seniority Score</td><td>17</td><td>Profile URL</td></tr>
+<tr><td>3</td><td>Company</td><td>8</td><td>Skills Score</td><td>13</td><td>Matched Requirements</td><td>18</td><td>Status</td></tr>
+<tr><td>4</td><td>Location</td><td>9</td><td>Experience Score</td><td>14</td><td>Missing Requirements</td><td>19</td><td>Recruiter Notes</td></tr>
+<tr><td>5</td><td>Experience</td><td>10</td><td>Location Score</td><td>15</td><td>AI Summary</td><td>20</td><td>Date Added</td></tr></tbody></table>
+<p class="small">Experience is a number of years. Strengths, concerns and the Egypt-verified flag are on screen but are not exported.</p>
+<div class="callout warn"><span class="t">Export errors show raw text</span><p>The button is an ordinary link. If the export fails (for example too many exports in a minute: limit 20 per minute), your browser navigates to a plain text/JSON error such as <i>&ldquo;Too many requests...&rdquo;</i> instead of a message on the page. Press Back and try again. The &ldquo;Downloading...&rdquo; toast appears regardless of the outcome.</p></div>
+
+<h1>8. Candidate profile</h1>
+<div class="page-head"><span class="route">/candidates/[id]</span><h2>Candidate profile</h2><span class="chip user">HR User</span></div>
+<p>Open it with the name link, the eye icon, or a Dashboard &ldquo;Today&rsquo;s Searched Candidates&rdquo; link. There is no back button or breadcrumb: use the top navigation or your browser&rsquo;s Back.</p>
+<div class="callout warn"><span class="t">Open it from the job list to see the score</span><p>The <b>Match Score</b> card appears only when the page was opened <i>with a job attached</i> (from the candidate list). Opening from the Dashboard list has no job, so no score card is shown and the candidate is not marked as seen.</p></div>
+<div class="mock"><div class="bar"><i></i><i></i><i></i><span class="url">/candidates/[id]?jobId=...</span></div>
+<div class="body rel">
+<div class="panel" style="margin-bottom:6px"><div style="display:flex;gap:8px"><div style="width:34px;height:34px;border-radius:50%;background:#e6f0fc"></div><div><b style="font-size:10pt">Sara Adel</b><br><span class="small">Senior Front-End Engineer</span><br><span class="small">Vendor Co &middot; Cairo, Egypt &nbsp; Experience: 7 yrs &nbsp; Source: serpapi &nbsp; <u>View profile</u></span><br><span class="small">Skills: React, TypeScript, Redux, Jest</span></div></div><div class="small" style="margin-top:3px">Summary text from the search snippet or LinkedIn profile...</div></div>
+<div class="row"><div class="panel"><b>Match Score</b><div style="display:flex;gap:8px;align-items:center"><div class="circ">87%</div><div class="small">Overall Match</div></div>
+<div style="display:flex;gap:4px;margin:4px 0"><div class="tile">Skills<br><b>92%</b></div><div class="tile">Experience<br><b>85%</b></div><div class="tile">Location<br><b>100%</b></div><div class="tile">Education<br><b>70%</b></div><div class="tile">Seniority<br><b>80%</b></div></div>
+<div class="small">AI summary... <br>Matched Requirements / Missing Requirements / Strengths / Concerns</div></div>
+<div><div class="panel" style="margin-bottom:6px"><b>Status</b><div class="field">Shortlisted &#9662;</div></div>
+<div class="panel"><b>Recruiter Notes</b><div class="field" style="height:26px">Add a note about this candidate...</div><span class="btn" style="margin-top:3px">Add Note</span><div class="small" style="margin-top:3px">28 Sep, 09:14 - Spoke on the phone...</div></div></div></div>
+<span class="callnum" style="left:3px;top:6px">1</span><span class="callnum" style="left:3px;top:125px">2</span><span class="callnum" style="left:108px;top:157px">3</span><span class="callnum" style="left:3px;top:197px">4</span><span class="callnum" style="left:50%;top:125px">5</span><span class="callnum" style="left:50%;top:175px">6</span>
+</div></div>
+<ol class="legend"><li><b>Header card</b>: photo, name, headline, company &middot; location, experience, all skills, source, <b>View profile</b> link (new tab) and summary text.</li><li><b>Match Score card</b> (only with a job attached).</li><li><b>Overall Match</b> circle, coloured by tone.</li><li><b>Five sub-score tiles</b>.</li><li><b>Status</b> card.</li><li><b>Recruiter Notes</b> card.</li></ol>
+<h3>Match Score card</h3>
+<table class="tight"><thead><tr><th style="width:22%">Item</th><th>What it shows</th></tr></thead><tbody>
+<tr><td>Overall Match</td><td>Big percentage circle (0-100). Green at 70+, amber 40-69, red below 40.</td></tr>
+<tr><td>Skills</td><td>How well the candidate&rsquo;s skills cover the required and preferred skills. Synonyms count (for example JS and JavaScript).</td></tr>
+<tr><td>Experience</td><td>Candidate&rsquo;s years compared with the job&rsquo;s experience range.</td></tr>
+<tr><td>Location</td><td>100 if the location matches or the job states no location requirement.</td></tr>
+<tr><td>Education</td><td>Fit with the education/certifications requirement. Scored conservatively when the profile shows no evidence.</td></tr>
+<tr><td>Seniority</td><td>Fit with the seniority level. Scored conservatively when no evidence.</td></tr>
+<tr><td>AI summary</td><td>A short written justification.</td></tr>
+<tr><td>Four lists</td><td>Matched Requirements, Missing Requirements, Strengths, Concerns. Each shows &ldquo;None listed.&rdquo; when empty.</td></tr>
+</tbody></table>
+<p>If the candidate has not been scored for this job you see <i>&ldquo;Not scored for this job yet.&rdquo;</i> There is no score button on the profile: go back to the list and press <b>Score Candidates</b>.</p>
+<h3>Status card</h3>
+<p>A dropdown with the six statuses. Changing it saves immediately (no confirmation). After a change the page may temporarily lose the Match Score card or note box until you reload it, because the update replaces the page&rsquo;s data.</p>
+<h3>Recruiter Notes</h3>
+<ol class="steps"><li>Type in the box (placeholder &ldquo;Add a note about this candidate...&rdquo;).</li><li>Press <b>Add Note</b>. It is disabled while the box is blank or while saving (&ldquo;Saving...&rdquo;).</li><li>The note appears at the top of the list with date and time; toast: <i>&ldquo;Recruiter note saved to candidate record&rdquo;</i>.</li></ol>
+<ul><li>Notes are private to you and your managers/admins; the author name is not printed on the note.</li><li>Empty notes are refused: &ldquo;Note cannot be empty.&rdquo;</li><li>Notes cannot be edited or deleted and have no length limit. The list shows &ldquo;No notes yet.&rdquo; when empty.</li><li>Notes appear in the Excel export (column Recruiter Notes).</li></ul>
+<div class="callout tip"><span class="t">Write notes for future you</span><p>Because notes are permanent, write in short factual entries: date of contact, outcome, next step. Avoid sensitive personal remarks.</p></div>
+<div class="callout"><span class="t">No status history and no delete here</span><p>Status changes are recorded behind the scenes but are not shown to you. To delete a candidate use the trash icon on the candidate list.</p></div>
+
+<h1>9. The six statuses</h1>
+<p>Every candidate has exactly one status. It starts as <b>New</b> and you change it by hand. The statuses are, in dropdown order:</p>
+<table class="tight"><thead><tr><th style="width:15%">Status</th><th style="width:40%">Meaning (recommended use)</th><th>Effect in the platform</th></tr></thead><tbody>
+<tr><td><span class="chip grey">New</span></td><td>Found by the search; nobody has looked yet. Default.</td><td>Counted in the Pipeline chart and in report tile &ldquo;New&rdquo;.</td></tr>
+<tr><td><span class="chip user">Reviewed</span></td><td>You looked at the profile and scores.</td><td>Counted as Reviewed.</td></tr>
+<tr><td><span class="chip green">Shortlisted</span></td><td>Worth pursuing.</td><td>Counts toward <b>Shortlisted Talent</b> and the Shortlisted column of Sourcing Files. <b>Your HR Manager is notified.</b></td></tr>
+<tr><td><span class="chip red">Rejected</span></td><td>Not suitable.</td><td>Counted as Rejected. No notification.</td></tr>
+<tr><td><span class="chip amber">Contacted</span></td><td>You reached out to the candidate.</td><td>Counts as progressed in reports.</td></tr>
+<tr><td><span class="chip green">Hired</span></td><td>Candidate was hired.</td><td>Counted as Hired. <b>Your HR Manager is notified.</b></td></tr>
+</tbody></table>
+<div class="grid2">
+<div class="card user"><h3>Order on the Dashboard chart</h3><p class="small">New, Reviewed, Shortlisted, Contacted, Hired, Rejected. (The dropdown order differs: Rejected sits before Contacted.)</p></div>
+<div class="card user"><h3>Who is notified</h3><p class="small">Only changes <b>to</b> Shortlisted or Hired notify your team&rsquo;s HR Manager (if you belong to a team with an active manager). You never receive notifications yourself. Setting the same status again does nothing and is not logged.</p></div>
+</div>
+<div class="callout warn"><span class="t">Status is global for the candidate</span><p>If the same person is linked to two of your jobs, changing status in one job changes it in the other, and the Dashboard counts.</p></div>
+<div class="callout tip"><span class="t">Suggested flow</span><p>New &rarr; Reviewed &rarr; Shortlisted &rarr; Contacted &rarr; Hired, with Rejected as the exit at any point. Keeping statuses current makes the Pipeline chart and your reports meaningful.</p></div>
+
+<h1>10. How the AI pipeline works</h1>
+<p>You do not need to understand the internals to use the platform, but knowing what each stage does explains why results look the way they do.</p>
+<figure><svg viewBox="0 0 700 330" width="700" role="img" aria-label="AI pipeline flow">
+<defs><marker id="a3" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#1c5cab"/></marker></defs>
+<g font-family="Segoe UI,Arial" font-size="10.5" text-anchor="middle">
+<rect x="4" y="8" width="128" height="52" rx="8" fill="#e6f0fc" stroke="#2a78d6"/><text x="68" y="28" font-weight="700">1. Job description</text><text x="68" y="44" font-size="9" fill="#5b6878">upload / paste, text extracted</text>
+<rect x="152" y="8" width="128" height="52" rx="8" fill="#e6f0fc" stroke="#2a78d6"/><text x="216" y="28" font-weight="700">2. AI analysis</text><text x="216" y="44" font-size="9" fill="#5b6878">structured requirements</text>
+<rect x="300" y="8" width="128" height="52" rx="8" fill="#fff" stroke="#b9c4d4"/><text x="364" y="28" font-weight="700">You review</text><text x="364" y="44" font-size="9" fill="#5b6878">edit chips, pick city</text>
+<rect x="448" y="8" width="128" height="52" rx="8" fill="#e6f0fc" stroke="#2a78d6"/><text x="512" y="28" font-weight="700">3. Query generation</text><text x="512" y="44" font-size="9" fill="#5b6878">2-4 Google queries</text>
+<rect x="596" y="8" width="100" height="52" rx="8" fill="#e6f0fc" stroke="#2a78d6"/><text x="646" y="28" font-weight="700">Job saved</text><text x="646" y="44" font-size="9" fill="#5b6878">run = pending</text>
+<rect x="4" y="110" width="128" height="58" rx="8" fill="#fdf1d6" stroke="#b7791f"/><text x="68" y="130" font-weight="700">4. Search (Google)</text><text x="68" y="146" font-size="9" fill="#5b6878">via SerpApi, restricted</text><text x="68" y="158" font-size="9" fill="#5b6878">to Egypt, LinkedIn profiles</text>
+<rect x="152" y="110" width="128" height="58" rx="8" fill="#fdf1d6" stroke="#b7791f"/><text x="216" y="130" font-weight="700">5. Enrichment</text><text x="216" y="146" font-size="9" fill="#5b6878">Apify reads the profile:</text><text x="216" y="158" font-size="9" fill="#5b6878">location, skills, years</text>
+<rect x="300" y="110" width="128" height="58" rx="8" fill="#fdf1d6" stroke="#b7791f"/><text x="364" y="130" font-weight="700">6. Egypt verification</text><text x="364" y="146" font-size="9" fill="#5b6878">non-Egypt candidates</text><text x="364" y="158" font-size="9" fill="#5b6878">are dropped</text>
+<rect x="448" y="110" width="128" height="58" rx="8" fill="#fdf1d6" stroke="#b7791f"/><text x="512" y="130" font-weight="700">7. Clean + dedupe</text><text x="512" y="146" font-size="9" fill="#5b6878">same person merged,</text><text x="512" y="158" font-size="9" fill="#5b6878">existing records reused</text>
+<rect x="596" y="110" width="100" height="58" rx="8" fill="#dcfce9" stroke="#059669"/><text x="646" y="130" font-weight="700">Run complete</text><text x="646" y="146" font-size="9" fill="#5b6878">candidates linked</text><text x="646" y="158" font-size="9" fill="#5b6878">to your job</text>
+<rect x="152" y="230" width="196" height="64" rx="8" fill="#e9e8fd" stroke="#4f46e5"/><text x="250" y="250" font-weight="700">8. Score Candidates (manual)</text><text x="250" y="266" font-size="9" fill="#5b6878">You press the button on /candidates</text><text x="250" y="280" font-size="9" fill="#5b6878">AI gives 0-100 overall + 5 sub-scores</text>
+<rect x="400" y="230" width="176" height="64" rx="8" fill="#e6f0fc" stroke="#2a78d6"/><text x="488" y="250" font-weight="700">9. You decide</text><text x="488" y="266" font-size="9" fill="#5b6878">status, notes, export</text><text x="488" y="280" font-size="9" fill="#5b6878">dashboard + reports update</text>
+</g>
+<g stroke="#1c5cab" stroke-width="2" fill="none" marker-end="url(#a3)">
+<line x1="132" y1="34" x2="150" y2="34"/><line x1="280" y1="34" x2="298" y2="34"/><line x1="428" y1="34" x2="446" y2="34"/><line x1="576" y1="34" x2="594" y2="34"/>
+<path d="M646 60 L646 84 L68 84 L68 108"/>
+<line x1="132" y1="139" x2="150" y2="139"/><line x1="280" y1="139" x2="298" y2="139"/><line x1="428" y1="139" x2="446" y2="139"/><line x1="576" y1="139" x2="594" y2="139"/>
+<path d="M646 168 L646 200 L250 200 L250 228"/><line x1="348" y1="262" x2="398" y2="262"/></g>
+<text x="350" y="196" font-family="Segoe UI,Arial" font-size="9" fill="#5b6878" text-anchor="middle">automatic, runs in the background</text>
+<text x="350" y="316" font-family="Segoe UI,Arial" font-size="9" fill="#b7791f" text-anchor="middle">amber = search run (automatic) &#183; purple = manual, started by you</text>
+</svg><figcaption>From job description to shortlisted candidate. Stages 4 to 7 happen automatically after you press the search button; scoring is a separate manual step.</figcaption></figure>
+<h2>Stage by stage</h2>
+<table class="tight"><thead><tr><th style="width:20%">Stage</th><th>What really happens</th></tr></thead><tbody>
+<tr><td><b>1. Text extraction</b></td><td>PDF, DOCX or TXT is converted to plain text on the server. No image reading (OCR).</td></tr>
+<tr><td><b>2. AI analysis</b></td><td>An AI model (OpenAI) reads the description and returns a profile: job title, seniority, employment type, required and preferred skills, minimum/maximum years of experience, education, certifications, languages, industries, keywords and responsibilities. It is told to use only what is in the text. Location is then forced to Egypt.</td></tr>
+<tr><td><b>3. Query generation</b></td><td>The AI writes 2 to 4 Google search strings that target LinkedIn profiles. Each contains a group of title synonyms (3 to 6), one or two short quoted skill phrases and a quoted location. If the job already has earlier queries, new ones avoid repeating them.</td></tr>
+<tr><td><b>4. Search</b></td><td>Every query is run on Google through a search service (SerpApi), all at once. Requests are biased to Egypt (Google Egypt, country code EG). If you chose a City, the location parameter is that city. Each query normally returns about 10 organic results, so 2 to 4 queries give roughly up to 40 raw results. Company pages, job boards (Indeed, Glassdoor, Bayt, Wuzzuf and similar), recruitment agencies and job postings are filtered out; individual profiles are kept.</td></tr>
+<tr><td><b>5. Enrichment</b></td><td>When configured, each LinkedIn profile is read by an Apify scraper to obtain the real name, headline, current company, location, about text, skills and total years of experience. Enrichment overrides the thinner data from the search snippet. If it fails, the run still continues with search data only.</td></tr>
+<tr><td><b>6. Location verification</b></td><td>For Egypt-scoped jobs (all jobs), each candidate&rsquo;s location is checked: text that mentions Egypt or one of Egypt&rsquo;s 27 governorates passes; text naming somewhere else (for example Dubai) is <b>dropped</b>. With no location text, the AI judges from the headline and summary; &ldquo;unknown&rdquo; is kept. Verified people get the green <span class="chip green">Egypt verified</span> badge.</td></tr>
+<tr><td><b>7. Clean, dedupe, save</b></td><td>Implausible values are removed (for example a company equal to the group&rsquo;s own name, or impossible years of experience). The same person is recognised by LinkedIn address (or other address, or name + company) and merged. If you already have that person, the existing record is only <i>topped up</i> (never overwritten) and reused; otherwise a new candidate with status New is created. All are linked to your job.</td></tr>
+<tr><td><b>8. Scoring (manual)</b></td><td>Only when you press <b>Score Candidates</b>. The AI compares each candidate&rsquo;s profile with the job&rsquo;s requirements and returns an overall match score 0-100 and five sub-scores (skills, experience, location, education, seniority), plus lists of matched and missing requirements, strengths, concerns and a summary.</td></tr>
+</tbody></table>
+<div class="callout danger"><span class="t">Scoring is model-determined</span><p>There is <b>no fixed formula or weighting</b> in the platform. The overall score is whatever the AI returns as its weighted judgment, and the five sub-scores are the AI&rsquo;s own. The same candidate may score slightly differently if re-scored. Treat scores as a ranking aid, not a verdict, and read the AI summary, missing requirements and concerns before deciding.</p></div>
+<div class="grid2">
+<div class="card user"><h3>How the AI scores skills</h3><p class="small">Skills are matched by <b>meaning</b>, not exact words: JS = JavaScript, Postgres = PostgreSQL. An umbrella term such as &ldquo;Front-End Development&rdquo; can be satisfied by HTML, CSS and JS, with partial coverage split between matched and missing. It is told never to invent skills that are not on the profile.</p></div>
+<div class="card user"><h3>Score colours</h3><p class="small"><span class="chip green">70 to 100 green</span> <span class="chip amber">40 to 69 amber</span> <span class="chip red">0 to 39 red</span><br>&ldquo;Strong match&rdquo; for manager notification is 80 or above.</p></div>
+</div>
+<div class="callout warn"><span class="t">What the search cannot know</span><p>Google shows only public pages. It returns people whose public profile matches the wording of the queries; it is not a database of everyone in Egypt. Profiles with the location written as an abbreviation or a city not in the governorate list (for example &ldquo;Alex&rdquo;) may be dropped by the Egypt check.</p></div>
+
+<h1>11. Reports for your own work</h1>
+<div class="page-head"><span class="route">/reports</span><h2>Reports</h2><span class="chip user">HR User</span></div>
+<p>The Reports page is open to every role. For an HR User the scope is always <b>&ldquo;My work&rdquo;</b>, described under the banner as <i>&ldquo;Your own work only.&rdquo;</i> The scope is decided by the server from your role; it cannot be changed. Because you are the only member, each per-member table has one row (yours).</p>
+<div class="mock"><div class="bar"><i></i><i></i><i></i><span class="url">/reports</span></div>
+<div class="body rel"><div class="hero"><span class="badge b">My work &middot; Last 30 days</span><b>Team Performance Report</b><span class="small" style="color:#fff;opacity:.9">Your own work only.</span></div>
+<div class="panel" style="margin-bottom:6px"><span class="tab on">Team Performance</span><span class="tab">Activity</span><span class="tab">Recruitment Pipeline</span><span class="tab">Sourcing Quality</span></div>
+<div class="panel" style="margin-bottom:6px;display:flex;gap:6px;align-items:center"><span class="small">Period</span><span class="field">Last 30 days &#9662;</span><span class="field">From</span><span class="field">To</span><span class="btn">Update report</span><span style="flex:1"></span><span class="btn out">CSV</span><span class="btn out">Excel</span></div>
+<div class="row"><div class="stat"><small>Jobs created</small><b>5</b></div><div class="stat"><small>Sourcing runs</small><b>6</b></div><div class="stat"><small>Candidates sourced</small><b>120</b></div><div class="stat"><small>Average match</small><b>68%</b></div></div>
+<span class="callnum" style="left:3px;top:36px">1</span><span class="callnum" style="left:3px;top:82px">2</span><span class="callnum" style="left:16%;top:138px">3</span><span class="callnum" style="right:3px;top:138px">4</span><span class="callnum" style="left:3px;top:175px">5</span></div></div>
+<ol class="legend"><li><b>Header</b>: scope and period, report name.</li><li><b>Report tabs</b>: the four reports.</li><li><b>Period, From, To, Update report</b>.</li><li><b>CSV</b> and <b>Excel</b> download buttons.</li><li><b>Summary tiles</b> and then detail tables (with a Total row where relevant).</li></ol>
+<h2>The four reports</h2>
+<table class="tight"><thead><tr><th style="width:19%">Report</th><th>What it shows for you</th></tr></thead><tbody>
+<tr><td><b>Team Performance</b></td><td>&ldquo;Jobs, sourcing runs, and candidate outcomes.&rdquo; Tiles: Members, Jobs created, Sourcing runs, Candidates sourced, Shortlisted, Average match. Table &ldquo;Performance by member&rdquo;: Jobs, Sourcing runs, Completed runs, Active runs, Failed runs, Candidates, Shortlisted, Contacted, Rejected, Avg match. Counts cover items <i>created</i> in the period; candidate statuses are the current ones.</td></tr>
+<tr><td><b>Activity</b></td><td>&ldquo;Sign-ins and recorded actions.&rdquo; Tiles: Sign-ins, Failed sign-ins, Sourcing runs, Logged actions, Active members. Table columns: Sign-ins, Failed sign-ins, Job actions, Sourcing runs, Teammate files opened, Candidate actions, Team changes, Reports, Logged actions, Last activity; plus &ldquo;Actions by type&rdquo;. The activity log only started recording in September 2026.</td></tr>
+<tr><td><b>Recruitment Pipeline</b></td><td>Where candidates sourced in the period currently sit: Total, New, Reviewed, Shortlisted, Contacted, Rejected, Hired, and <b>Progressed</b> % (share now Shortlisted, Contacted or Hired).</td></tr>
+<tr><td><b>Sourcing Quality</b></td><td>Average AI match quality. Tiles: Average match, Files evaluated (x / y), Strong files (average 70% or more), Weak files (below 40%). Tables: by member, by job (with best file) and by sourcing file (status, created, candidates, shortlisted, avg match, up to 500 files).</td></tr>
+</tbody></table>
+<h3>Date range</h3>
+<p>The <b>Period</b> menu offers All time, Today, Last 7 days, Last 30 days (default), Last 90 days and Custom range. Choose <b>Custom range</b> and fill <b>From</b> and <b>To</b>, then press <b>Update report</b> (setting the dates alone is also treated as custom). Tab links keep your period.</p>
+<h3>Exporting</h3>
+<p><b>CSV</b> and <b>Excel</b> download the current report. Files are named <code>&lt;report-title&gt;-report-&lt;scope&gt;-&lt;YYYY-MM-DD&gt;.csv|xlsx</code>. CSV has a header block (title, scope, period, generated date) followed by each table; Excel has an <b>Overview</b> sheet plus one sheet per table. Exports are limited to 20 per minute. Exporting and simply viewing a report are recorded in the activity log (a view is recorded once per 10 minutes for the same report).</p>
+<div class="callout"><span class="t">If a report fails</span><p>You see <i>&ldquo;This report couldn&rsquo;t be generated. Try again in a moment.&rdquo;</i></p></div>
+<div class="callout tip"><span class="t">Weekly habit</span><p>Once a week open <b>Recruitment Pipeline</b> for the last 7 days and check that few candidates remain in <i>New</i>. Then check <b>Sourcing Quality</b> to see which job files score weakest and may need better requirements.</p></div>
+
+<h1>12. Button and control reference</h1>
+<p>Every control an HR User meets, page by page.</p>
+<h3>Login and top bar</h3>
+<table class="buttons tight"><thead><tr><th style="width:26%">Control</th><th style="width:22%">Where</th><th>What it does</th></tr></thead><tbody>
+<tr><td><span class="lbl">Log in</span> / <span class="lbl">Sign up</span></td><td>/login</td><td>Submits e-mail and password. Shows &ldquo;Please wait...&rdquo; meanwhile.</td></tr>
+<tr><td><span class="lbl">Continue with Google</span></td><td>/login</td><td>Starts Google sign-in.</td></tr>
+<tr><td><span class="lbl">Need an account? Sign up</span></td><td>/login</td><td>Switches between log in and sign up.</td></tr>
+<tr><td><span class="lbl">AI Candidate</span> (brand)</td><td>Top bar</td><td>Goes to Dashboard.</td></tr>
+<tr><td><span class="lbl">Dashboard / Jobs / Candidates / Reports / Settings</span></td><td>Top bar</td><td>Navigate to the section.</td></tr>
+<tr><td><span class="lbl">Log out</span></td><td>Top bar</td><td>Signs out immediately and returns to login.</td></tr>
+<tr><td><span class="lbl">Try again</span> / <span class="lbl">Back to dashboard</span></td><td>Error / not-found pages</td><td>Retries the page / returns to Dashboard.</td></tr>
+</tbody></table>
+<h3>Dashboard and Jobs</h3>
+<table class="buttons tight"><thead><tr><th style="width:26%">Control</th><th style="width:22%">Where</th><th>What it does</th></tr></thead><tbody>
+<tr><td><span class="lbl">New Job Opening</span></td><td>Dashboard banner</td><td>Opens New Job.</td></tr>
+<tr><td><span class="lbl">Browse Candidates</span></td><td>Dashboard banner</td><td>Opens the job picker.</td></tr>
+<tr><td><span class="lbl">New Job</span></td><td>Dashboard (Sourcing Files), Jobs</td><td>Opens New Job.</td></tr>
+<tr><td><span class="lbl">View</span></td><td>Dashboard row</td><td>Opens the job&rsquo;s candidate list.</td></tr>
+<tr><td>Candidate name link</td><td>Dashboard, Today&rsquo;s list</td><td>Opens profile without a job (no score card).</td></tr>
+<tr><td><span class="lbl">View Candidates</span></td><td>Jobs row</td><td>Opens the job&rsquo;s candidate list.</td></tr>
+<tr><td><span class="lbl">Previous</span> / <span class="lbl">Next</span></td><td>Jobs</td><td>Pages of 10 jobs.</td></tr>
+</tbody></table>
+<h3>New Job</h3>
+<table class="buttons tight"><thead><tr><th style="width:26%">Control</th><th style="width:22%">Where</th><th>What it does</th></tr></thead><tbody>
+<tr><td>Card headers</td><td>Job Details, Job Description</td><td>Fold or unfold the card.</td></tr>
+<tr><td><span class="lbl">Save &amp; Collapse</span></td><td>Job Details</td><td>Folds the card only; nothing is saved.</td></tr>
+<tr><td><span class="lbl">Upload File (PDF / DOCX)</span></td><td>Job Description</td><td>Upload mode (default).</td></tr>
+<tr><td><span class="lbl">Paste Text</span></td><td>Job Description</td><td>Paste mode.</td></tr>
+<tr><td>Dropzone</td><td>Job Description</td><td>Click or drag a PDF/DOCX/TXT up to 10 MB.</td></tr>
+<tr><td><span class="lbl">Change File</span> / <span class="lbl">X</span></td><td>After upload</td><td>Choose another file / remove the file and its text.</td></tr>
+<tr><td><span class="lbl">Analyze Job with AI</span></td><td>Job Description</td><td>Runs AI analysis. Needs 50+ characters.</td></tr>
+<tr><td>Location, City, Employment Type, Experience fields</td><td>Requirements</td><td>Edit the extracted profile.</td></tr>
+<tr><td>Tabs: Skills &amp; Technologies / Education &amp; Qualifications / Responsibilities &amp; Keywords</td><td>Requirements</td><td>Switch chip lists.</td></tr>
+<tr><td>Chip text, <span class="lbl">&times;</span>, <span class="lbl">Add</span></td><td>Requirements</td><td>Rename, remove, or add an item (Enter also adds).</td></tr>
+<tr><td><span class="lbl">Generate Queries &amp; Find Candidates</span></td><td>Requirements</td><td>Generates queries, saves the job, starts the search, polls until complete.</td></tr>
+<tr><td><span class="lbl">Close</span> / <span class="lbl">Show Candidates</span></td><td>Success modal</td><td>Dismiss / open the job&rsquo;s candidate list.</td></tr>
+</tbody></table>
+<h3>Candidates and profile</h3>
+<table class="buttons tight"><thead><tr><th style="width:26%">Control</th><th style="width:22%">Where</th><th>What it does</th></tr></thead><tbody>
+<tr><td><span class="lbl">View</span></td><td>Job picker</td><td>Opens the job&rsquo;s candidate table.</td></tr>
+<tr><td>Trash icon, <span class="lbl">Confirm</span>, <span class="lbl">Cancel</span></td><td>Job picker</td><td>Delete the job (irreversible) or cancel.</td></tr>
+<tr><td><span class="lbl">Score Candidates</span></td><td>Candidate table</td><td>AI-scores all candidates of the job.</td></tr>
+<tr><td>Name / company / location / skill boxes</td><td>Candidate table</td><td>Draft filter text.</td></tr>
+<tr><td><span class="lbl">Apply Filters</span></td><td>Candidate table</td><td>Applies the four text filters.</td></tr>
+<tr><td>Status filter, Sort by, direction button</td><td>Candidate table</td><td>Apply immediately.</td></tr>
+<tr><td><span class="lbl">Clear</span></td><td>Candidate table</td><td>Resets the filters.</td></tr>
+<tr><td><span class="lbl">+N</span> / <span class="lbl">Show less</span></td><td>Skills cell</td><td>Expand / collapse skills.</td></tr>
+<tr><td>Status dropdown</td><td>Row and profile</td><td>Changes status at once.</td></tr>
+<tr><td><span class="lbl">View</span> (Profile column)</td><td>Row</td><td>Opens the external profile in a new tab.</td></tr>
+<tr><td>Eye icon</td><td>Row</td><td>Opens the candidate profile.</td></tr>
+<tr><td>Trash icon, <span class="lbl">Confirm</span>, <span class="lbl">Cancel</span></td><td>Row</td><td>Delete the candidate permanently (all jobs).</td></tr>
+<tr><td><span class="lbl">Export Excel</span></td><td>Candidate table footer</td><td>Downloads the 20-column spreadsheet of filtered rows.</td></tr>
+<tr><td><span class="lbl">Previous</span> / <span class="lbl">Next</span></td><td>Candidate table</td><td>Pages of 10 candidates.</td></tr>
+<tr><td><span class="lbl">View profile</span></td><td>Profile header</td><td>Opens the external profile in a new tab.</td></tr>
+<tr><td><span class="lbl">Add Note</span></td><td>Profile</td><td>Saves the note (permanent).</td></tr>
+</tbody></table>
+<h3>Reports</h3>
+<table class="buttons tight"><thead><tr><th style="width:26%">Control</th><th style="width:22%">Where</th><th>What it does</th></tr></thead><tbody>
+<tr><td>Report tabs</td><td>Reports</td><td>Team Performance, Activity, Recruitment Pipeline, Sourcing Quality.</td></tr>
+<tr><td>Period, From, To</td><td>Reports</td><td>Chooses the date window.</td></tr>
+<tr><td><span class="lbl">Update report</span></td><td>Reports</td><td>Reloads with the chosen period.</td></tr>
+<tr><td><span class="lbl">CSV</span> / <span class="lbl">Excel</span></td><td>Reports</td><td>Downloads the current report.</td></tr>
+</tbody></table>
+
+<h1>13. Step-by-step tasks</h1>
+<h2>Task 1: Run your first search</h2>
+<ol class="steps">
+<li>Click <b>New Job Opening</b> on the Dashboard (or <b>New Job</b> on the Jobs page).</li>
+<li>Fill <b>Job Title</b>, <b>Company</b>, <b>Employment Type</b> and <b>Work Arrangement</b>.</li>
+<li>In Job Description, upload a PDF/DOCX/TXT (or choose <b>Paste Text</b> and paste at least 50 characters).</li>
+<li>Press <b>Analyze Job with AI</b> and wait for &ldquo;Requirements successfully extracted from job spec!&rdquo;.</li>
+<li>Review the Extracted Requirements: fix title and seniority, keep Egypt, optionally choose a City, set the experience range, prune and add skill chips on the three tabs.</li>
+<li>Press <b>Generate Queries &amp; Find Candidates</b>. Wait while the button shows &ldquo;Finding Candidates...&rdquo; (usually up to a few minutes).</li>
+<li>When &ldquo;Candidate Sourcing Complete!&rdquo; appears, press <b>Show Candidates</b>.</li>
+<li>Press <b>Score Candidates</b> and wait for the success toast.</li>
+</ol>
+<div class="callout tip"><span class="t">Before you press the big green button</span><p>Check that the Company and Employment Type are the ones you want: the job cannot be edited later.</p></div>
+<h2>Task 2: Search again for a job</h2>
+<p>There is no &ldquo;run again&rdquo; button and no edit screen for saved jobs. Searches can only be started from the New Job page, which always saves a <b>new</b> job. To search again (for example with a different City or refined skills):</p>
+<ol class="steps">
+<li>Open New Job and re-enter the details, then re-upload or re-paste the same description.</li>
+<li>Analyze, adjust the requirements as needed, and start the search.</li>
+<li>People you already hold are recognised and reused (their records are only topped up, not duplicated, and keep their status and notes); they are linked to the new job. New people are added.</li>
+<li>Score the new job&rsquo;s candidates and, when you are happy, delete the old job from the job picker to keep your list tidy.</li>
+</ol>
+<div class="callout warn"><span class="t">Old scores stay with the old job</span><p>Scores are stored per job and candidate. A new job starts unscored, even for people who were scored in the old job.</p></div>
+<h2>Task 3: Score and shortlist</h2>
+<ol class="steps">
+<li>Open <b>Candidates</b>, click <b>View</b> on your job.</li>
+<li>Press <b>Score Candidates</b> and wait for &ldquo;Match Scoring Completed&rdquo;.</li>
+<li>Leave the sort at <b>Match Score</b>, direction <b>High &rarr; Low</b>.</li>
+<li>Open the top candidates with the eye icon or name link. Read the AI summary, missing requirements and concerns; open <b>View profile</b> to check the real profile.</li>
+<li>Set the status to <b>Shortlisted</b> (or <b>Rejected</b>) directly in the Status dropdown.</li>
+<li>To view only your shortlist, set the Status filter to <b>Shortlisted</b>.</li>
+</ol>
+<h2>Task 4: Add notes</h2>
+<ol class="steps"><li>Open the candidate from the job&rsquo;s list.</li><li>Scroll to <b>Recruiter Notes</b>, type the note.</li><li>Press <b>Add Note</b> and wait for the &ldquo;saved&rdquo; toast. The note shows at the top with date and time.</li></ol>
+<h2>Task 5: Export</h2>
+<ol class="steps"><li>Open the job&rsquo;s candidate list.</li><li>Set filters and sort the way you want the spreadsheet (type text filters, then press <b>Apply Filters</b>).</li><li>Press <b>Export Excel</b>. The file <code>candidates-&lt;title&gt;-&lt;date&gt;.xlsx</code> downloads with all matching rows across pages.</li><li>To export a report instead, use <b>CSV</b> or <b>Excel</b> on <code>/reports</code>.</li></ol>
+<div class="callout tip"><span class="t">Score first, export second</span><p>Score columns are blank for unscored candidates, so score before exporting a list you plan to share.</p></div>
+<h2>Task 6: Clean up jobs</h2>
+<ol class="steps"><li>Open <b>Candidates</b> to see the job picker (20 newest jobs).</li><li>Click the trash icon next to the job you no longer need, then <b>Confirm</b>.</li><li>Toast &ldquo;Job and its listing removed.&rdquo; confirms it. Candidates remain in your account.</li><li>To remove individual candidates, open the job&rsquo;s list and use the row trash icon (permanent, all jobs).</li></ol>
+<div class="callout danger"><span class="t">Check before you delete</span><p>Export the list first if you may need the scores or notes later; deletion of a job or a candidate cannot be undone.</p></div>
+
+<h1>14. Rules, limits and who can see your work</h1>
+<h2>14.1 Limits at a glance</h2>
+<table class="tight"><thead><tr><th style="width:36%">Rule</th><th style="width:22%">Limit</th><th>Notes</th></tr></thead><tbody>
+<tr><td>AI requests (analysis, query generation, scoring)</td><td>10 per minute</td><td>Shared counter; a whole &ldquo;Score Candidates&rdquo; run counts as one.</td></tr>
+<tr><td>Candidate searches</td><td>5 per minute</td><td>Each press of Generate Queries &amp; Find Candidates.</td></tr>
+<tr><td>Exports (Excel of candidates, report CSV/Excel)</td><td>20 per minute</td><td>Combined counter.</td></tr>
+<tr><td>Job description file</td><td>10 MB; PDF, DOCX, TXT</td><td>No .doc, no images.</td></tr>
+<tr><td>Job description text</td><td>50+ characters</td><td>No maximum.</td></tr>
+<tr><td>Search wait in the browser</td><td>10 minutes</td><td>Search may continue on the server afterwards.</td></tr>
+<tr><td>Queries per search</td><td>2 to 4</td><td>Written by AI; you cannot edit them.</td></tr>
+<tr><td>Location</td><td>Egypt only</td><td>Optional City: Cairo, Alexandria, Giza, Suez.</td></tr>
+<tr><td>Rows per page</td><td>10</td><td>Jobs, candidates. Picker: 20 newest jobs.</td></tr>
+<tr><td>Dashboard Sourcing Files</td><td>Latest 20 runs</td><td>Today&rsquo;s list shows latest 8.</td></tr>
+<tr><td>Strong match threshold (manager alert)</td><td>80%</td><td>Only for newly scored candidates.</td></tr>
+<tr><td>No limit</td><td colspan="2">Uploading and extracting files, opening pages, changing statuses, adding notes, listing candidates.</td></tr>
+</tbody></table>
+<div class="callout"><span class="t">When you hit a rate limit</span><p>You see <i>&ldquo;Too many requests. Please slow down and try again shortly.&rdquo;</i> Wait about a minute. Limits are counted per person and are approximate (they are kept in server memory, so exact timing can vary).</p></div>
+<h2>14.2 Who can see your work</h2>
+<table class="matrix compact"><thead><tr><th>Your data</th><th>You</th><th>Your HR Manager</th><th>Admin</th><th>Other HR Users</th></tr></thead><tbody>
+<tr><td>Jobs, candidates, scores, notes</td><td class="y-c">Read + change</td><td class="r-c">Read-only (if same team)</td><td class="r-c">Read-only</td><td class="n-c">No</td></tr>
+<tr><td>Dashboard numbers</td><td class="y-c">Yes</td><td class="r-c">Rolled into team pages</td><td class="r-c">Rolled into org pages</td><td class="n-c">No</td></tr>
+<tr><td>Your activity (sign-ins, job actions, status changes)</td><td class="r-c">Via your report</td><td class="r-c">Yes (team activity)</td><td class="r-c">Yes</td><td class="n-c">No</td></tr>
+<tr><td>Shortlist / Hired status changes, strong-match scoring, search started/completed/failed</td><td class="n-c">No bell</td><td class="y-c">Notified</td><td class="n-c">Not notified</td><td class="n-c">No</td></tr>
+</tbody></table>
+<ul>
+<li><b>Read-only means read-only.</b> A manager or admin who opens your file sees a banner &ldquo;Viewing &lt;name&gt;&rsquo;s sourcing file &middot; read-only&rdquo; and cannot change statuses, notes or scores.</li>
+<li><b>Opening is recorded.</b> When a manager or admin opens your candidate list, it is logged; their name then shows under <b>Last Accessed By</b> on your Dashboard&rsquo;s Sourcing Files table, and the event appears in the team activity feed.</li>
+<li><b>Everything you do is logged</b> (signing in and out, creating and deleting jobs, starting searches, scoring, status changes, notes, deleting candidates, viewing and exporting reports). The log cannot be edited or deleted.</li>
+<li>Excel exports are files you keep: once downloaded, the platform no longer controls who sees them. Treat candidate data as confidential.</li>
+</ul>
+<div class="callout warn"><span class="t">Processing by third-party services</span><p>Job descriptions are sent to an AI service for analysis and scoring, and candidate profile information is sent for scoring and location checks. Do not paste confidential text that should not leave the company.</p></div>
+
+<h1>15. Troubleshooting FAQ and gotchas</h1>
+<h2>Frequently asked questions</h2>
+<table class="tight"><thead><tr><th style="width:32%">Question / symptom</th><th>Answer</th></tr></thead><tbody>
+<tr><td>I searched but every score is empty and the Dashboard average says &ldquo;No evaluated files yet&rdquo;.</td><td>The search never scores. Open the job&rsquo;s candidate list and press <b>Score Candidates</b>. The modal wording &ldquo;identified and evaluated&rdquo; is misleading.</td></tr>
+<tr><td>The search failed and I pressed the button again: now I have two jobs.</td><td>The job is saved before the search starts, so each retry creates a new job. Delete the duplicate from the Candidates job picker.</td></tr>
+<tr><td>The toast says the candidate was removed &ldquo;from this job&rdquo;. Is it only removed here?</td><td>No. The candidate is deleted from your whole account, with notes, scores and links to all jobs. It cannot be undone.</td></tr>
+<tr><td>I cannot find an older job on the Candidates page.</td><td>The picker lists only the 20 newest jobs. Use <b>Jobs</b> and its <b>View Candidates</b> link (10 per page).</td></tr>
+<tr><td>I opened a candidate from &ldquo;Today&rsquo;s Searched Candidates&rdquo; and there is no Match Score.</td><td>That link skips the job. Open the candidate from the job&rsquo;s list to see the score; that also marks the candidate as seen.</td></tr>
+<tr><td>The Unseen number never goes down.</td><td>A candidate becomes seen only when opened with the job attached (from the candidate list).</td></tr>
+<tr><td>Export Excel replaced my page with unreadable text.</td><td>The export failed (usually too many exports in a minute, or a temporary error) and the link shows the error text. Press Back and retry.</td></tr>
+<tr><td>My Excel is missing rows I typed a filter for.</td><td>Only <i>applied</i> filters are exported. Press <b>Apply Filters</b> first.</td></tr>
+<tr><td>Analyze Job with AI is greyed out after uploading a PDF.</td><td>Probably a scanned PDF (image only): the extracted text is empty. Copy the text out and use Paste Text. Also check the description is 50+ characters.</td></tr>
+<tr><td>My upload of a large PDF fails before the 10 MB message.</td><td>The size rule is checked on the server after upload. Hosting can reject very large requests earlier; compress the file or paste the text.</td></tr>
+<tr><td>The dropdown for Employment Type looks empty after analysis.</td><td>The AI proposed a value not in the list. Select one of the four options.</td></tr>
+<tr><td>I edited Job Title / Employment Type in the requirements editor but the Jobs list did not change.</td><td>The job&rsquo;s title and type come from the Job Details card when it is filled in. Set them there.</td></tr>
+<tr><td>I chose a City but results look nationwide.</td><td>City narrows the search location for Google. Queries still contain the Egypt-wide wording; filtering by city is approximate.</td></tr>
+<tr><td>Zero or few candidates found.</td><td>Queries returned little, or people were dropped by the Egypt check. Remove overly narrow skills, remove the City, use common job titles, and search again.</td></tr>
+<tr><td>A candidate I know is in Egypt is missing.</td><td>The Egypt check drops locations that do not mention Egypt or one of its governorates (for example a bare city or abbreviation).</td></tr>
+<tr><td>A run shows &ldquo;running&rdquo; for a very long time.</td><td>The background job may have been stopped by the platform on long runs. After roughly 10 minutes, start the search again on a new job and tell your Admin.</td></tr>
+<tr><td>Scoring says &ldquo;Scored X of Y candidates (Z failed)&rdquo;.</td><td>Some candidates could not be scored (AI unavailable or unexpected answer). Press <b>Score Candidates</b> again after a minute.</td></tr>
+<tr><td>Today&rsquo;s count is 0 but I searched today.</td><td>Only brand-new candidate records count, and &ldquo;today&rdquo; follows server time (UTC).</td></tr>
+<tr><td>After changing a status on the profile, the Match Score card vanished.</td><td>Reload the page.</td></tr>
+<tr><td>I cannot see a Team or Admin menu.</td><td>Those are for HR Managers and Admins. Your role is HR User.</td></tr>
+<tr><td>I get &ldquo;Unauthorized&rdquo; or am sent to the login page with &ldquo;doesn&rsquo;t have access yet&rdquo;.</td><td>Your account was deactivated or was never approved. Contact an Admin.</td></tr>
+</tbody></table>
+<h2>Gotchas at a glance</h2>
+<div class="cols3">
+<div class="card user"><h3>Irreversible</h3><ul class="small"><li>Deleting a job</li><li>Deleting a candidate (global)</li><li>Saving a note</li><li>Score Candidates overwrite</li></ul></div>
+<div class="card user"><h3>Not automatic</h3><ul class="small"><li>Scoring after a search</li><li>Filters until Apply Filters</li><li>Saving from Save &amp; Collapse</li><li>Re-running a saved job</li></ul></div>
+<div class="card user"><h3>Not editable</h3><ul class="small"><li>Saved jobs</li><li>Search queries</li><li>Notes</li><li>Account e-mail / password</li></ul></div>
+</div>
+<div class="callout tip"><span class="t">Good habits</span><p>1. Keep job descriptions clear and text-based. 2. Prune skill chips before searching. 3. Score, then review, then set statuses. 4. Export before deleting anything. 5. Check the Dashboard&rsquo;s Sourcing Files for red or stuck runs.</p></div>
+<div class="callout"><span class="t">Still stuck?</span><p>Note the time, the page, and the exact message shown, then contact your HR Manager or an Admin. Every error response carries a request identifier that lets the technical team trace what happened.</p></div>
+</body></html>

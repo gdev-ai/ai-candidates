@@ -1,0 +1,1452 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>AI Candidate Sourcing Platform - System Guide</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="style.css">
+<style>
+  .lead { font-size: 11.5pt; color: var(--muted); margin-bottom: 10px; }
+  .kpi { display:flex; gap:8px; margin:8px 0 12px; }
+  .kpi div { flex:1; border:1px solid var(--line); border-radius:8px; padding:8px 10px; background:var(--bg-soft); }
+  .kpi b { display:block; font-size:15pt; color:var(--blue-dark); }
+  .kpi span { font-size:8.5pt; color:var(--muted); }
+  table.buttons td:nth-child(3), table.buttons td:nth-child(3) code { word-break: break-word; }
+  table.buttons { table-layout: fixed; }
+  table.buttons td:first-child { white-space: normal; width: 26%; }
+  table.buttons th:nth-child(1) { width: 26%; }
+  table.buttons th:nth-child(2) { width: 34%; }
+  table.buttons th:nth-child(3) { width: 20%; }
+  table.buttons th:nth-child(4) { width: 20%; }
+  td code, li code, p code { word-break: break-word; }
+  .sub { margin-top: 4px; }
+  .mock .body { min-height: 30px; }
+  .mock .grid-c { display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:8px; margin-bottom:8px; }
+  .tl { display:flex; gap:0; margin:8px 0 12px; }
+  .tl div { flex:1; text-align:center; padding:6px 4px; color:#fff; font-weight:600; font-size:8.6pt; }
+</style>
+</head><body>
+
+<!-- ============ COVER ============ -->
+<section class="cover">
+  <div class="band">
+    <div class="kicker">Complete System Guide</div>
+    <h1 class="title">AI Candidate Sourcing Platform</h1>
+    <div class="subtitle">Everything a new team member or owner needs to know: what the system does, who can do what, every page and button, how the AI sourcing pipeline works, and where its limits are.</div>
+    <div class="meta"><span>Admin</span><span>HR Manager</span><span>HR User</span><span>Next.js + Supabase</span><span>OpenAI + SerpApi + Apify</span></div>
+  </div>
+  <div class="toc-mini">
+    <h2>Contents</h2>
+    <ol class="toc">
+      <li><span class="n">1</span>What the system is and who it is for</li>
+      <li><span class="n">2</span>The three roles at a glance and the permission matrix</li>
+      <li><span class="n">3</span>System architecture and tech stack</li>
+      <li><span class="n">4</span>Getting in: sign-up, invites, access requests, deactivation</li>
+      <li><span class="n">5</span>Navigation and shared parts (menu, notification bell, toasts, settings)</li>
+      <li><span class="n">6</span>Page-by-page tour with button reference</li>
+      <li><span class="n">7</span>The AI sourcing pipeline end to end</li>
+      <li><span class="n">8</span>Ownership, access tracking and read-only viewing</li>
+      <li><span class="n">9</span>Reports and exports</li>
+      <li><span class="n">10</span>Activity log and audit trail</li>
+      <li><span class="n">11</span>Data model</li>
+      <li><span class="n">12</span>Security model and error responses</li>
+      <li><span class="n">13</span>Common workflows, step by step</li>
+      <li><span class="n">14</span>Known limitations and gotchas</li>
+      <li><span class="n">15</span>Glossary</li>
+    </ol>
+  </div>
+  <div class="foot">Wireframes in this guide are illustrative HTML/CSS mockups of the app screens, not screenshots. Facts were verified against the source code and the live database schema.</div>
+</section>
+
+<!-- ============ 1 ============ -->
+<h1 class="first">1. What the system is and who it is for</h1>
+<p class="lead">A web application that helps recruiters find candidates in Egypt. You upload or paste a job description, AI turns it into structured requirements, the system searches public sources for matching people, and AI scores each person against the role.</p>
+
+<div class="grid3">
+  <div class="card user"><h3>1. Describe the role</h3><p>Upload a PDF/DOCX/TXT or paste text. AI extracts title, skills, seniority, education and more. You review and edit them.</p></div>
+  <div class="card manager"><h3>2. Find people</h3><p>AI writes Google X-ray search queries. SerpApi runs them, Apify enriches LinkedIn profiles, and only candidates located in Egypt are kept.</p></div>
+  <div class="card admin"><h3>3. Score and decide</h3><p>On demand, AI scores every candidate 0-100 against the job. Recruiters set statuses, add notes and export to Excel.</p></div>
+</div>
+
+<h2>Who uses it</h2>
+<table>
+<thead><tr><th style="width:20%">Person</th><th>What they do in the system</th></tr></thead>
+<tbody>
+<tr><td><span class="chip user">HR User</span></td><td>The recruiter. Creates jobs, runs sourcing searches, scores and manages candidates. Sees only their own work.</td></tr>
+<tr><td><span class="chip manager">HR Manager</span></td><td>Leads a team of HR Users. Does everything an HR User does for their own work, plus a read-only view of the team: performance, sourcing files, candidates and activity. Gets notifications about team activity.</td></tr>
+<tr><td><span class="chip admin">Admin</span></td><td>Runs the organization. Invites and approves people, creates teams, assigns roles and managers, deactivates access, sees organization-wide performance and all reports. Also read-only on other people's sourcing data.</td></tr>
+</tbody></table>
+
+<h2>Key ideas to remember</h2>
+<ul>
+<li><b>Access is by invitation.</b> Signing up is not enough. An account only works when an admin has invited or approved it (section 4).</li>
+<li><b>Data has one owner.</b> Whoever creates a job owns it and everything found for it. Nobody else can edit it, not even an admin. Managers and admins can only <i>look</i> (sections 2 and 8).</li>
+<li><b>Searching and scoring are separate steps.</b> A search finds candidates but does not score them. Scoring is a manual click on the candidates page (section 7).</li>
+<li><b>Everything is recorded.</b> Important actions go into an append-only activity log that feeds notifications and reports (section 10).</li>
+<li><b>Egypt only.</b> Every job is located in Egypt; the optional city narrows the search to Cairo, Alexandria, Giza or Suez.</li>
+</ul>
+
+<div class="callout"><span class="t">Vocabulary used throughout</span>
+<p><b>Job</b> = a role you are hiring for. <b>Sourcing run</b> (also called a <b>sourcing file</b>) = one execution of a search for a job. <b>Candidate</b> = a person found. <b>Match score</b> = AI's 0-100 fit rating of a candidate for a specific job. See the Glossary in section 15.</p></div>
+
+<!-- ============ 2 ============ -->
+<h1>2. The three roles at a glance</h1>
+<p>Roles form a hierarchy of <b>visibility</b>, but not of <b>ownership</b>. Going up the tiers you can see more, yet you can never edit another person's jobs or candidates.</p>
+
+<figure>
+<svg viewBox="0 0 780 300" width="480" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
+  <polygon points="320,12 400,100 240,100" fill="#7c3aed"/>
+  <text x="320" y="82" text-anchor="middle" fill="#fff" font-weight="700" font-size="15">Admin</text>
+  <polygon points="236,108 404,108 470,196 170,196" fill="#0e7490"/>
+  <text x="320" y="150" text-anchor="middle" fill="#fff" font-weight="700" font-size="15">HR Manager</text>
+  <text x="320" y="170" text-anchor="middle" fill="#d9f1f6" font-size="11">one team</text>
+  <polygon points="166,204 474,204 550,290 90,290" fill="#2a78d6"/>
+  <text x="320" y="242" text-anchor="middle" fill="#fff" font-weight="700" font-size="15">HR User</text>
+  <text x="320" y="262" text-anchor="middle" fill="#e6f0fc" font-size="11">own work only</text>
+  <g font-size="11.5" fill="#16202e">
+    <text x="420" y="40" font-weight="700" fill="#7c3aed">Sees the whole organization</text>
+    <text x="420" y="56">All teams, users, reports, activity log</text>
+    <text x="420" y="72">Manages access, roles, teams, managers</text>
+    <text x="490" y="130" font-weight="700" fill="#0e7490">Sees their team</text>
+    <text x="490" y="146">Members' files, candidates, activity</text>
+    <text x="490" y="162">Read-only on teammates' data</text>
+    <text x="10" y="232" font-weight="700" fill="#2a78d6">Sees only themselves</text>
+    <text x="10" y="248">Creates and owns jobs</text>
+    <text x="10" y="264">and candidates</text>
+  </g>
+  <text x="10" y="40" font-size="11" fill="#5b6878">More visibility</text>
+  <text x="10" y="56" font-size="18" fill="#5b6878">&#8593;</text>
+</svg>
+<figcaption>Visibility grows upward. Ownership never moves: every write is owner-only at every tier.</figcaption>
+</figure>
+
+<div class="grid3">
+<div class="card admin"><h3>Admin</h3><p>Default landing: <code>/dashboard</code> (personal). Extra pages: <code>/admin</code>, <code>/manager</code> (any team), org-wide <code>/reports</code>. Bell: access requests only.</p></div>
+<div class="card manager"><h3>HR Manager</h3><p>Extra page: <code>/manager</code> pinned to their own team. Team-scoped reports. Bell: team sourcing runs, shortlists, hires, strong matches.</p></div>
+<div class="card user"><h3>HR User</h3><p>Base pages only: Dashboard, Jobs, Candidates, Reports (own work), Settings. No bell, no Team or Admin links. Visiting <code>/manager</code> or <code>/admin</code> bounces to the dashboard.</p></div>
+</div>
+
+<h2>Permission matrix</h2>
+<p class="small">Nobody can edit or delete activity log entries. Green = allowed, amber = read-only (can look, cannot change), red = not allowed. "Own" means data the person created themselves.</p>
+<table class="matrix compact">
+<thead><tr><th style="width:52%">Capability</th><th>Admin</th><th>HR Manager</th><th>HR User</th></tr></thead>
+<tbody>
+<tr><td>Create, search, score, delete <b>own</b> jobs and candidates</td><td class="y-c">Yes</td><td class="y-c">Yes</td><td class="y-c">Yes</td></tr>
+<tr><td>Change status / add notes on <b>own</b> candidates</td><td class="y-c">Yes</td><td class="y-c">Yes</td><td class="y-c">Yes</td></tr>
+<tr><td>Personal dashboard, Jobs list, Candidates picker (own only)</td><td class="y-c">Yes</td><td class="y-c">Yes</td><td class="y-c">Yes</td></tr>
+<tr><td>Open a teammate's job / sourcing file / candidate</td><td class="r-c">Read-only, anyone</td><td class="r-c">Read-only, own team</td><td class="n-c">No</td></tr>
+<tr><td>Edit, delete, re-score, re-search or add notes on someone else's data</td><td class="n-c">No</td><td class="n-c">No</td><td class="n-c">No</td></tr>
+<tr><td>Export Excel of a job's candidates</td><td class="y-c">Any job they can open</td><td class="y-c">Own + team jobs</td><td class="y-c">Own</td></tr>
+<tr><td>Team dashboard <code>/manager</code> and member pages</td><td class="y-c">Any team</td><td class="y-c">Own team</td><td class="n-c">No</td></tr>
+<tr><td>Reports (4 types, CSV/Excel)</td><td class="y-c">Whole org or one team</td><td class="y-c">Own team</td><td class="y-c">My work only</td></tr>
+<tr><td>Notification bell</td><td class="y-c">Access requests</td><td class="y-c">Team activity</td><td class="n-c">No bell</td></tr>
+<tr><td>See team activity log entries</td><td class="y-c">All</td><td class="r-c">Own team</td><td class="r-c">Own only</td></tr>
+<tr><td>Admin dashboard <code>/admin</code></td><td class="y-c">Yes</td><td class="n-c">No</td><td class="n-c">No</td></tr>
+<tr><td>Invite people, approve access requests, withdraw invites</td><td class="y-c">Yes</td><td class="n-c">No</td><td class="n-c">No</td></tr>
+<tr><td>Change roles, teams; deactivate / reactivate users</td><td class="y-c">Yes (not self)</td><td class="n-c">No</td><td class="n-c">No</td></tr>
+<tr><td>Create teams, assign a team manager (no rename/delete in the UI)</td><td class="y-c">Yes</td><td class="n-c">No</td><td class="n-c">No</td></tr>
+</tbody></table>
+
+<!-- ============ 3 ============ -->
+<h1>3. System architecture and tech stack</h1>
+<p>The app is a single Next.js project deployed on Vercel. The browser talks to Next.js pages and API routes; API routes talk to Supabase (database, login) and to three outside services.</p>
+
+<figure>
+<svg viewBox="0 0 700 380" width="400" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif" font-size="12">
+  <defs><marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#5b6878"/></marker></defs>
+  <rect x="10" y="150" width="120" height="80" rx="10" fill="#e6f0fc" stroke="#2a78d6" stroke-width="2"/>
+  <text x="70" y="182" text-anchor="middle" font-weight="700" fill="#1c5cab">Browser</text>
+  <text x="70" y="200" text-anchor="middle" fill="#16202e" font-size="10.5">React UI</text>
+  <text x="70" y="214" text-anchor="middle" fill="#16202e" font-size="10.5">Supabase JS (login)</text>
+
+  <rect x="190" y="30" width="270" height="320" rx="12" fill="#f4f7fb" stroke="#1c5cab" stroke-width="2"/>
+  <text x="325" y="52" text-anchor="middle" font-weight="700" fill="#1c5cab">Next.js 15 on Vercel</text>
+  <rect x="206" y="68" width="238" height="52" rx="8" fill="#fff" stroke="#b9c4d4"/>
+  <text x="325" y="88" text-anchor="middle" font-weight="700">Middleware</text>
+  <text x="325" y="105" text-anchor="middle" font-size="10.5" fill="#5b6878">session refresh, route protection</text>
+  <rect x="206" y="132" width="238" height="52" rx="8" fill="#fff" stroke="#b9c4d4"/>
+  <text x="325" y="152" text-anchor="middle" font-weight="700">Pages (App Router)</text>
+  <text x="325" y="169" text-anchor="middle" font-size="10.5" fill="#5b6878">dashboard, jobs, candidates, reports, admin</text>
+  <rect x="206" y="196" width="238" height="52" rx="8" fill="#fff" stroke="#b9c4d4"/>
+  <text x="325" y="216" text-anchor="middle" font-weight="700">API routes (/api/*)</text>
+  <text x="325" y="233" text-anchor="middle" font-size="10.5" fill="#5b6878">requireUser / requireRole, rate limits, zod</text>
+  <rect x="206" y="260" width="238" height="74" rx="8" fill="#fff" stroke="#b9c4d4"/>
+  <text x="325" y="280" text-anchor="middle" font-weight="700">Background work</text>
+  <text x="325" y="297" text-anchor="middle" font-size="10.5" fill="#5b6878">search runs continue after the HTTP reply</text>
+  <text x="325" y="311" text-anchor="middle" font-size="10.5" fill="#5b6878">(waitUntil; not a durable queue)</text>
+
+  <rect x="540" y="20" width="150" height="90" rx="10" fill="#dcfce9" stroke="#059669" stroke-width="2"/>
+  <text x="615" y="46" text-anchor="middle" font-weight="700" fill="#059669">Supabase</text>
+  <text x="615" y="63" text-anchor="middle" font-size="10.5">Postgres + RLS</text>
+  <text x="615" y="77" text-anchor="middle" font-size="10.5">Auth (email, Google)</text>
+  <text x="615" y="91" text-anchor="middle" font-size="10.5">triggers + functions</text>
+  <rect x="540" y="130" width="150" height="52" rx="10" fill="#efe7fd" stroke="#7c3aed" stroke-width="2"/>
+  <text x="615" y="153" text-anchor="middle" font-weight="700" fill="#7c3aed">OpenAI</text>
+  <text x="615" y="169" text-anchor="middle" font-size="10.5">analysis, queries, scoring</text>
+  <rect x="540" y="200" width="150" height="52" rx="10" fill="#fdf1d6" stroke="#b7791f" stroke-width="2"/>
+  <text x="615" y="223" text-anchor="middle" font-weight="700" fill="#b7791f">SerpApi (Google)</text>
+  <text x="615" y="239" text-anchor="middle" font-size="10.5">X-ray candidate search</text>
+  <rect x="540" y="270" width="150" height="52" rx="10" fill="#fde4e4" stroke="#d03b3b" stroke-width="2"/>
+  <text x="615" y="293" text-anchor="middle" font-weight="700" fill="#d03b3b">Apify</text>
+  <text x="615" y="309" text-anchor="middle" font-size="10.5">LinkedIn profile enrichment</text>
+
+  <line x1="130" y1="190" x2="188" y2="190" stroke="#5b6878" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="444" y1="222" x2="538" y2="70" stroke="#5b6878" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="444" y1="222" x2="538" y2="156" stroke="#5b6878" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="444" y1="290" x2="538" y2="226" stroke="#5b6878" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="444" y1="300" x2="538" y2="296" stroke="#5b6878" stroke-width="2" marker-end="url(#ar)"/>
+  <path d="M70,150 C70,60 300,10 538,40" fill="none" stroke="#059669" stroke-width="2" stroke-dasharray="5,4" marker-end="url(#ar)"/>
+  <text x="240" y="24" font-size="10.5" fill="#059669">browser signs in directly with Supabase Auth</text>
+</svg>
+<figcaption>Solid arrows: server-side calls made by API routes. Dashed arrow: the browser logs in directly against Supabase Auth.</figcaption>
+</figure>
+
+<h2>Tech stack</h2>
+<table class="compact">
+<thead><tr><th style="width:24%">Layer</th><th>Technology</th></tr></thead>
+<tbody>
+<tr><td>Framework</td><td>Next.js 15 (App Router), React 19, TypeScript 5.7, Node 20.16+</td></tr>
+<tr><td>UI</td><td>Tailwind CSS 3, Radix primitives, shadcn-style components, lucide icons, fonts Inter and Fraunces</td></tr>
+<tr><td>Database and auth</td><td>Supabase (Postgres 17, region eu-central-1, project "ai-candidate-sourcing"): Row Level Security on all 16 public tables, email/password and Google sign-in</td></tr>
+<tr><td>AI</td><td>OpenAI only (default model <code>gpt-5.6-luna</code>, overridable by <code>OPENAI_MODEL</code>); no temperature is sent because the model rejects it</td></tr>
+<tr><td>Search</td><td>SerpApi (Google) via <code>SEARCH_PROVIDER=serpapi</code>; <code>mock</code> returns 8 fixture candidates (the default when unset); <code>serper</code> is declared but not implemented</td></tr>
+<tr><td>Enrichment</td><td>Apify LinkedIn profile scraper (optional; needs <code>APIFY_API_TOKEN</code> and <code>APIFY_ACTOR_ID</code> together)</td></tr>
+<tr><td>Files and export</td><td><code>pdf-parse</code> and <code>mammoth</code> extract job description text; SheetJS <code>xlsx</code> writes Excel</td></tr>
+<tr><td>Validation</td><td>zod 4 on every API body; environment variables validated at boot</td></tr>
+<tr><td>Hosting</td><td>Vercel; structured JSON logs with an <code>x-request-id</code> on every response</td></tr>
+<tr><td>Tests</td><td>Vitest, Testing Library, Playwright</td></tr>
+</tbody></table>
+
+<h2>Required and optional configuration</h2>
+<table class="compact">
+<thead><tr><th style="width:38%">Variable</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>NEXT_PUBLIC_SUPABASE_URL</code>, <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code></td><td>Required. The app refuses to start if missing or invalid.</td></tr>
+<tr><td><code>SEARCH_PROVIDER</code></td><td><code>mock</code> (default), <code>serpapi</code>, <code>serper</code>.</td></tr>
+<tr><td><code>OPENAI_API_KEY</code>, <code>OPENAI_MODEL</code></td><td>AI features. Without a key, AI calls fail with a 500.</td></tr>
+<tr><td><code>SERPAPI_API_KEY</code>, <code>SERPER_API_KEY</code></td><td>Search provider keys.</td></tr>
+<tr><td><code>APIFY_API_TOKEN</code>, <code>APIFY_ACTOR_ID</code></td><td>LinkedIn enrichment; set both or neither.</td></tr>
+</tbody></table>
+<p class="small"><b>Tip:</b> if <code>SEARCH_PROVIDER</code> is left at its default <code>mock</code>, searches return the same 8 fixture people instead of real results.</p>
+
+<!-- ============ 4 ============ -->
+<h1>4. Getting in: accounts and access</h1>
+<p>Nobody can use the app just by creating an account. Access equals an <b>active profile</b> in the database. An admin grants it either <i>before</i> the person signs in (an invite) or <i>after</i> (approving an access request).</p>
+
+<h2>Account lifecycle</h2>
+<figure>
+<svg viewBox="0 0 700 330" width="680" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif" font-size="12">
+  <defs><marker id="a2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#5b6878"/></marker></defs>
+  <rect x="10" y="20" width="120" height="50" rx="25" fill="#e9edf3" stroke="#5b6878"/>
+  <text x="70" y="50" text-anchor="middle" font-weight="700">No account</text>
+
+  <rect x="230" y="20" width="150" height="50" rx="10" fill="#fdf1d6" stroke="#b7791f" stroke-width="2"/>
+  <text x="305" y="42" text-anchor="middle" font-weight="700" fill="#b7791f">Invited</text>
+  <text x="305" y="58" text-anchor="middle" font-size="10.5">pending_role_assignments row</text>
+
+  <rect x="230" y="150" width="150" height="56" rx="10" fill="#fdf1d6" stroke="#b7791f" stroke-width="2"/>
+  <text x="305" y="172" text-anchor="middle" font-weight="700" fill="#b7791f">Access request</text>
+  <text x="305" y="188" text-anchor="middle" font-size="10.5">inactive, no team, HR User</text>
+
+  <rect x="500" y="80" width="180" height="60" rx="30" fill="#dcfce9" stroke="#059669" stroke-width="3"/>
+  <text x="590" y="106" text-anchor="middle" font-weight="700" fill="#059669">Active</text>
+  <text x="590" y="122" text-anchor="middle" font-size="10.5">can use the app</text>
+
+  <rect x="500" y="240" width="180" height="56" rx="10" fill="#fde4e4" stroke="#d03b3b" stroke-width="2"/>
+  <text x="590" y="262" text-anchor="middle" font-weight="700" fill="#d03b3b">Deactivated</text>
+  <text x="590" y="278" text-anchor="middle" font-size="10.5">blocked, data kept</text>
+
+  <line x1="130" y1="45" x2="228" y2="45" stroke="#5b6878" stroke-width="2" marker-end="url(#a2)"/>
+  <text x="180" y="36" text-anchor="middle" font-size="10.5">Admin: Invite</text>
+  <line x1="380" y1="50" x2="508" y2="88" stroke="#5b6878" stroke-width="2" marker-end="url(#a2)"/>
+  <text x="440" y="56" font-size="10.5">first sign-in</text>
+  <text x="440" y="69" font-size="10.5">(role + team applied)</text>
+
+  <line x1="80" y1="72" x2="228" y2="168" stroke="#5b6878" stroke-width="2" marker-end="url(#a2)"/>
+  <text x="70" y="128" font-size="10.5">Signs up / signs in</text>
+  <text x="70" y="141" font-size="10.5">without invite</text>
+  <line x1="380" y1="176" x2="510" y2="130" stroke="#5b6878" stroke-width="2" marker-end="url(#a2)"/>
+  <text x="420" y="172" font-size="10.5">Admin: Approve</text>
+  <path d="M560,140 C548,190 548,205 560,238" fill="none" stroke="#5b6878" stroke-width="2" marker-end="url(#a2)"/>
+  <text x="446" y="215" font-size="10.5">Admin: Deactivate</text>
+  <path d="M620,240 C634,205 634,190 620,142" fill="none" stroke="#5b6878" stroke-width="2" marker-end="url(#a2)"/>
+  <text x="630" y="200" font-size="10.5">Reactivate</text>
+  <path d="M305,150 C305,110 305,100 305,72" fill="none" stroke="#5b6878" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="130" y="230" font-size="10.5" fill="#5b6878">An Invite sent to an existing inactive profile</text>
+  <text x="130" y="243" font-size="10.5" fill="#5b6878">(request or deactivated) activates it immediately.</text>
+  <text x="130" y="290" font-size="10.5" fill="#d03b3b">Deactivated users are signed out on their next page load;</text>
+  <text x="130" y="303" font-size="10.5" fill="#d03b3b">every API call returns 401 at once.</text>
+</svg>
+<figcaption>Account states. There is no "rejected" state: an unapproved request simply stays in the list.</figcaption>
+</figure>
+
+<div class="grid2">
+<div class="card"><h3>Path A: invited first</h3>
+<ol class="steps"><li>Admin enters email, role and team on <code>/admin</code> and clicks Invite.</li><li>The system stores a pending invite. <b>No email is sent</b>; tell the person yourself.</li><li>The person signs up (email or Google) using that exact email.</li><li>A database trigger creates an <b>active</b> profile with the invited role and team, and removes the invite.</li></ol></div>
+<div class="card"><h3>Path B: request first</h3>
+<ol class="steps"><li>Someone signs up or signs in with Google without an invite.</li><li>An inactive profile is created; they are signed out with "not_allowed".</li><li>All admins get a bell notification linking to <code>/admin</code>.</li><li>Admin picks role and team and clicks Approve. The person can now sign in.</li></ol></div>
+</div>
+
+<div class="callout warn"><span class="t">Edge case</span><p>An access request is recognised as "inactive + no team + role HR User". A deactivated HR User who has no team looks identical, so they appear under Access requests instead of User Management.</p></div>
+
+<h2>The login screen (<code>/login</code>)</h2>
+<div class="mock">
+  <div class="bar"><i></i><i></i><i></i><span class="url">app / login</span></div>
+  <div class="body" style="height:273px;background:#eef2f8">
+    <div class="panel" style="width:230px;margin:6px auto;padding:12px;text-align:center">
+      <b style="font-size:11pt">Log in</b>
+      <div class="small" style="margin-bottom:6px">Enter your email and password to continue.</div>
+      <div class="field" style="margin-bottom:5px;text-align:left">Email</div>
+      <div class="field" style="margin-bottom:6px;text-align:left">Password</div>
+      <div class="btn" style="display:block;padding:4px;margin-bottom:5px">Log in</div>
+      <div class="small" style="margin-bottom:5px">or</div>
+      <div class="btn out" style="display:block;padding:4px;margin-bottom:6px">Continue with Google</div>
+      <div class="small" style="color:#1c5cab">Need an account? Sign up</div>
+    </div>
+    <span class="callnum" style="left:30%;top:25%">1</span>
+    <span class="callnum" style="left:30%;top:38%">2</span>
+    <span class="callnum" style="left:34%;top:49%">3</span>
+    <span class="callnum" style="left:34%;top:64%">4</span>
+    <span class="callnum" style="left:34%;top:82%">5</span>
+  </div>
+</div>
+<ol class="legend">
+<li>Email field (required, must be a valid email).</li>
+<li>Password field (required, at least 6 characters).</li>
+<li>Main submit button; reads "Log in" or "Sign up" depending on mode, and "Please wait..." while working.</li>
+<li>"Continue with Google" (Google OAuth).</li>
+<li>Mode switch link between Log in and Sign up.</li>
+</ol>
+
+<table class="buttons">
+<thead><tr><th>Control</th><th>What it does</th><th>API / route</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><span class="lbl">Log in</span></td><td>Signs in with email and password. On success sends a "login" audit event and goes to <code>/</code>, which forwards to <code>/dashboard</code>.</td><td>Supabase <code>signInWithPassword</code>; <code>POST /api/auth/events</code></td><td>Wrong credentials show the error text and record a "failed sign-in" (only for real accounts, max 10 per account per hour). The <code>redirectTo</code> parameter from a blocked page is not used by this flow.</td></tr>
+<tr><td><span class="lbl">Sign up</span></td><td>Creates an account. Message: "Account created. Check your email to confirm, then log in. If you weren't invited, an admin will need to approve your access first."</td><td>Supabase <code>signUp</code></td><td>Does not log you in. Uninvited sign-ups become access requests.</td></tr>
+<tr><td><span class="lbl">Continue with Google</span></td><td>Redirects to Google, then back to <code>/auth/callback</code>. Label becomes "Redirecting..." while pending.</td><td><code>signInWithOAuth</code>; <code>GET /auth/callback</code></td><td>Callback rejects users without an active profile (signs them out, sends to <code>/login?error=not_allowed</code>). On success logs "Signed in with Google" and lands on <code>/dashboard</code>.</td></tr>
+<tr><td><span class="lbl">Need an account? Sign up</span> / <span class="lbl">Already have an account? Log in</span></td><td>Toggles the card between the two modes and clears messages.</td><td>none (client only)</td><td></td></tr>
+</tbody></table>
+
+<h3>Messages you may see on the login page</h3>
+<table class="compact">
+<thead><tr><th style="width:38%">Trigger</th><th>Text</th></tr></thead>
+<tbody>
+<tr><td><code>?error=not_allowed</code></td><td>"Your account doesn't have access yet. Ask an admin to invite you or approve your access request."</td></tr>
+<tr><td><code>?error=oauth_failed</code></td><td>"Google sign-in failed. Please try again."</td></tr>
+<tr><td>Wrong password</td><td>The Supabase error message, in red.</td></tr>
+</tbody></table>
+
+<h2>Deactivation</h2>
+<p>An admin clicks <b>Deactivate</b> on <code>/admin</code>. The person keeps all their data, but immediately every API call returns 401, and at their next page load they are signed out with the "not_allowed" message. Any elevated database powers (admin or manager visibility) also stop at once. If they were a team's manager, the team becomes "Unassigned". Reactivating restores access; an HR Manager with a team is re-attached as manager only if that team currently has none.</p>
+
+<!-- ============ 5 ============ -->
+<h1>5. Navigation and shared parts</h1>
+<h2>Top menu by role</h2>
+<div class="mock">
+  <div class="bar"><i></i><i></i><i></i><span class="url">app / any page</span></div>
+  <div class="nav"><b>AI Candidate</b><span class="on">Dashboard</span><span>Jobs</span><span>Candidates</span><span>Reports</span><span>Settings</span><span>Team</span><span>Admin</span><span class="sp"></span><span>&#128276;<sup style="background:#d03b3b;color:#fff;border-radius:6px;padding:0 3px">3</sup></span><span class="btn out">Log out</span></div>
+  <div class="body" style="height:30px"></div>
+</div>
+<table class="matrix compact">
+<thead><tr><th style="width:36%">Menu item</th><th>Admin</th><th>HR Manager</th><th>HR User</th></tr></thead>
+<tbody>
+<tr><td>Brand "AI Candidate" (goes to /dashboard)</td><td class="y-c">Yes</td><td class="y-c">Yes</td><td class="y-c">Yes</td></tr>
+<tr><td>Dashboard, Jobs, Candidates, Reports, Settings</td><td class="y-c">Yes</td><td class="y-c">Yes</td><td class="y-c">Yes</td></tr>
+<tr><td>Team (/manager)</td><td class="y-c">Yes</td><td class="y-c">Yes</td><td class="n-c">No</td></tr>
+<tr><td>Admin (/admin)</td><td class="y-c">Yes</td><td class="n-c">No</td><td class="n-c">No</td></tr>
+<tr><td>Notification bell</td><td class="y-c">Yes</td><td class="y-c">Yes</td><td class="n-c">No</td></tr>
+<tr><td>Log out button</td><td class="y-c">Yes</td><td class="y-c">Yes</td><td class="y-c">Yes</td></tr>
+</tbody></table>
+<p class="small">The role is read by the browser (a database call) and only decides which links to show. Until it loads, only the five base links appear. Every page and API re-checks the role on the server, so hiding a link is cosmetic, not security. "Dashboard" is active only on the exact path; other links stay active on sub-pages.</p>
+
+<h2>Notification bell</h2>
+<p>Only Admins and HR Managers have a bell. It shows an unread count (99+ cap) and refreshes every 60 seconds while the tab is visible, when the tab regains focus, and when opened. The list holds the 20 latest items. Clicking an item marks it read and opens its destination.</p>
+<table class="buttons">
+<thead><tr><th>Control</th><th>What it does</th><th>API / route</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><span class="lbl">Bell icon</span></td><td>Opens or closes the "Notifications" panel and refreshes it.</td><td><code>GET /api/notifications</code></td><td>Closes on Escape or outside click.</td></tr>
+<tr><td><span class="lbl">Mark all as read</span></td><td>Marks every unread item read. Only shown when something is unread.</td><td><code>PATCH /api/notifications</code> (empty body)</td><td>Optimistic update.</td></tr>
+<tr><td><span class="lbl">Notification row</span></td><td>Marks that item read and navigates to its target.</td><td><code>PATCH /api/notifications {ids}</code></td><td>Unread rows have a dot and tinted background.</td></tr>
+</tbody></table>
+<h3>Every notification type</h3>
+<table class="compact">
+<thead><tr><th style="width:24%">Event</th><th style="width:18%">Who is notified</th><th style="width:30%">Text (after the actor's name)</th><th>Opens</th></tr></thead>
+<tbody>
+<tr><td>Someone requests access</td><td><span class="chip admin">All active admins</span></td><td>requested access to the app</td><td><code>/admin</code></td></tr>
+<tr><td>Sourcing run started</td><td rowspan="6"><span class="chip manager">Active HR Manager(s) of the actor's team</span>, never the actor</td><td>started a sourcing run for "Job"</td><td rowspan="3"><code>/candidates?jobId=&amp;runId=</code> (read-only view, records an access)</td></tr>
+<tr><td>Sourcing run completed</td><td>completed a sourcing run for "Job" (N candidates, M new)</td></tr>
+<tr><td>Sourcing run failed</td><td>had a sourcing run fail for "Job"</td></tr>
+<tr><td>Candidate set to Shortlisted or Hired</td><td>changed Name's status from X to Y</td><td><code>/candidates/&lt;id&gt;</code></td></tr>
+<tr><td>Candidates scored with at least one strong match</td><td>scored N candidates for "Job" - K strong match(es) (80%+)</td><td><code>/candidates?jobId=</code></td></tr>
+<tr><td colspan="2" class="small">Other notification targets fall back to the actor's page <code>/manager/team/&lt;userId&gt;</code>.</td></tr>
+</tbody></table>
+<div class="callout"><span class="t">What does NOT notify</span><p>File opens, job creation or edits, notes, status changes to Reviewed / Contacted / Rejected, sign-ins, a manager's own actions, and anything for a person without a team. Admins are notified only about access requests, not team activity. There are no emails or push messages anywhere in the system.</p></div>
+
+<h2>Toasts, errors and loading</h2>
+<ul>
+<li><b>Toasts</b> appear top-right for 4 seconds in four colours (success, error, warning, info) and each has a close button. They confirm saves and report failures.</li>
+<li><b>Something went wrong</b> page: shown for unexpected errors, with a <span class="chip grey">Try again</span> button.</li>
+<li><b>Page not found</b> page with a <span class="chip grey">Back to dashboard</span> link. Also used when you open a team member outside your team.</li>
+<li><b>Skeleton loaders</b> (grey pulsing blocks) appear while Dashboard, Admin, Team, Reports and Settings load.</li>
+</ul>
+
+<h2>Settings (<code>/settings</code>) and logging out</h2>
+<p><b>Settings</b> is open to every role and contains one card, "Account", showing "Signed in as &lt;your email&gt;". There are no editable controls: no password change, profile or preferences.</p>
+<p><b>Log out</b> (outline button in the menu, no confirmation): records a "Signed out" audit event, ends the session and returns to <code>/login</code>.</p>
+
+<!-- ============ 6 ============ -->
+<h1>6. Page-by-page tour</h1>
+<p>Each page below shows who can open it, a wireframe with numbered callouts, and a reference table of every button, dropdown, filter and link. Wireframes are illustrative mockups, not screenshots.</p>
+<table class="compact">
+<thead><tr><th>Route</th><th>Purpose</th><th>Who</th></tr></thead>
+<tbody>
+<tr><td><code>/login</code></td><td>Sign in / sign up</td><td>Everyone</td></tr>
+<tr><td><code>/dashboard</code></td><td>Personal sourcing overview</td><td><span class="chip admin">Admin</span> <span class="chip manager">Manager</span> <span class="chip user">User</span></td></tr>
+<tr><td><code>/jobs</code>, <code>/jobs/new</code></td><td>Your jobs; create a job and start sourcing</td><td><span class="chip admin">Admin</span> <span class="chip manager">Manager</span> <span class="chip user">User</span></td></tr>
+<tr><td><code>/candidates</code>, <code>/candidates/[id]</code></td><td>Pick a job, review and score candidates; candidate profile</td><td><span class="chip admin">Admin</span> <span class="chip manager">Manager</span> <span class="chip user">User</span> (others' files: read-only, Admin/Manager only)</td></tr>
+<tr><td><code>/reports</code></td><td>Four reports with CSV/Excel export</td><td><span class="chip admin">Admin</span> <span class="chip manager">Manager</span> <span class="chip user">User</span> (different scopes)</td></tr>
+<tr><td><code>/settings</code></td><td>Shows your account email</td><td>Everyone</td></tr>
+<tr><td><code>/manager</code>, <code>/manager/team/[userId]</code></td><td>Team dashboard, member drill-down</td><td><span class="chip admin">Admin</span> <span class="chip manager">Manager</span></td></tr>
+<tr><td><code>/admin</code></td><td>Organization dashboard, access and team management</td><td><span class="chip admin">Admin</span></td></tr>
+</tbody></table>
+
+<div class="page-head"><span class="route">/login</span><h2>Login</h2><span class="chip grey">public</span></div>
+<p>Fully covered in section 4 (wireframe, every button, messages). If you are already signed in, <code>/</code> sends you to <code>/dashboard</code>; a signed-out visitor to any protected page is sent here.</p>
+
+<!-- ============ DASHBOARD ============ -->
+<div class="page-head"><span class="route">/dashboard</span><h2>Dashboard</h2><span class="chip admin">Admin</span><span class="chip manager">Manager</span><span class="chip user">User</span></div>
+<p>A <b>personal</b> dashboard, identical for all roles: every number covers only jobs and candidates <i>you</i> own. Team and organization views live on <code>/manager</code> and <code>/admin</code>. There are no filters or date ranges.</p>
+<div class="mock">
+  <div class="bar"><i></i><i></i><i></i><span class="url">app / dashboard</span></div>
+  <div class="nav"><b>AI Candidate</b><span class="on">Dashboard</span><span>Jobs</span><span>Candidates</span><span>Reports</span><span>Settings</span><span class="sp"></span><span class="btn out">Log out</span></div>
+  <div class="body" style="height:357px">
+    <div class="hero"><b>Candidate Sourcing Hub</b><span style="font-size:7pt">AI-Powered Recruitment Pipeline</span><div style="margin-top:5px"><span class="btn out">New Job Opening</span> <span class="btn out">Browse Candidates</span></div></div>
+    <div class="grid-c">
+      <div class="stat"><small>Active Jobs</small><b>12</b></div>
+      <div class="stat"><small>Total Candidates</small><b>184</b></div>
+      <div class="stat"><small>Avg Match Quality</small><b>68%</b></div>
+      <div class="stat"><small>Shortlisted Talent</small><b>9</b></div>
+    </div>
+    <div class="row">
+      <div class="panel" style="flex:2"><b>Candidate Pipeline Stages <span class="badge b">184 total</span></b>
+        <div class="bar-h" style="width:80%;background:#86b6ef"></div><div class="bar-h" style="width:55%;background:#5598e7"></div><div class="bar-h" style="width:30%;background:#2a78d6"></div><div class="bar-h" style="width:20%;background:#059669"></div></div>
+      <div class="panel"><b>Match Score Distribution <span class="badge g">68% avg</span></b>
+        <div style="display:flex;align-items:flex-end;gap:4px;height:50px"><div style="flex:1;height:20%;background:#2a78d6"></div><div style="flex:1;height:40%;background:#2a78d6"></div><div style="flex:1;height:90%;background:#2a78d6"></div><div style="flex:1;height:60%;background:#2a78d6"></div><div style="flex:1;height:25%;background:#2a78d6"></div></div></div>
+      <div class="panel"><b>Today's Searched <span class="badge g">5 today</span></b>Ahmed S. &middot; Backend Eng.<br>Mona K. &middot; Data Analyst</div>
+    </div>
+    <div class="panel"><b>Sourcing Files <span class="btn" style="float:right">New Job</span></b>
+      <table><tr><th>Job Title</th><th>Status</th><th>Total</th><th>Short.</th><th>Unseen</th><th>Created By</th><th>Last Accessed</th><th>Activity</th><th></th></tr>
+      <tr><td>Senior Engineer</td><td><span class="badge g">complete</span></td><td>32</td><td>3</td><td>10</td><td>Sara N.</td><td>Omar H.</td><td>2 hours ago</td><td><span class="btn out">View</span></td></tr></table></div>
+    <span class="callnum" style="left:66%;top:11%">1</span>
+    <span class="callnum" style="left:2%;top:26%">2</span>
+    <span class="callnum" style="left:3%;top:46%">3</span>
+    <span class="callnum" style="left:40%;top:46%">4</span>
+    <span class="callnum" style="left:71%;top:46%">5</span>
+    <span class="callnum" style="left:88%;top:70%">6</span>
+    <span class="callnum" style="left:96%;top:82%">7</span>
+  </div>
+</div>
+<ol class="legend">
+<li>Header buttons "New Job Opening" and "Browse Candidates".</li>
+<li>Four stat cards.</li>
+<li>Candidate Pipeline Stages bar chart.</li>
+<li>Match Score Distribution histogram.</li>
+<li>Today's Searched Candidates list.</li>
+<li>"New Job" shortcut on the Sourcing Files card.</li>
+<li>Sourcing Files table with the per-row "View" button.</li>
+</ol>
+
+<h3>What each number means</h3>
+<table class="compact">
+<thead><tr><th style="width:24%">Item</th><th>Definition</th></tr></thead>
+<tbody>
+<tr><td>Active Jobs</td><td>All jobs you ever created (there is no "active" flag; deleted jobs vanish).</td></tr>
+<tr><td>Total Candidates</td><td>Candidates you own. A person found for two jobs counts once.</td></tr>
+<tr><td>Average Match Quality</td><td>Average the scores within each sourcing run, then average those per-run averages (every file weighs the same). Shows "No evaluated files yet" until you have scored something.</td></tr>
+<tr><td>Shortlisted Talent</td><td>Your candidates whose status is Shortlisted.</td></tr>
+<tr><td>Pipeline Stages</td><td>Counts by status in the order New, Reviewed, Shortlisted, Contacted, Hired, Rejected.</td></tr>
+<tr><td>Score Distribution</td><td>Histogram of all your match scores in buckets 0-20, 21-40, 41-60, 61-80, 81-100.</td></tr>
+<tr><td>Today's Searched</td><td>Candidate records <i>created</i> today (server time, UTC on Vercel), newest 8. A person re-found today who already existed is not counted.</td></tr>
+<tr><td>Sourcing Files columns</td><td>Job Title; Sourcing Status (pending / running / complete / error); Total Candidates newly linked by that run; Shortlisted; <b>Unseen</b> = not yet opened by you from this file; File Created By; Last Accessed By; Last Activity; Action.</td></tr>
+</tbody></table>
+
+<table class="buttons">
+<thead><tr><th>Control</th><th>What it does</th><th>API / route</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><span class="lbl">New Job Opening</span></td><td>Opens the new-job form.</td><td>link to <code>/jobs/new</code></td><td></td></tr>
+<tr><td><span class="lbl">Browse Candidates</span></td><td>Opens the job picker.</td><td>link to <code>/candidates</code></td><td></td></tr>
+<tr><td><span class="lbl">New Job</span> (Sourcing Files card)</td><td>Same as New Job Opening.</td><td>link to <code>/jobs/new</code></td><td></td></tr>
+<tr><td><span class="lbl">View</span> (per file row)</td><td>Opens that job's candidate list.</td><td>link to <code>/candidates?jobId=&amp;runId=</code></td><td>The list is job-wide, not limited to that run. Opening records an access.</td></tr>
+<tr><td>Candidate name (Today's list)</td><td>Opens the candidate profile.</td><td>link to <code>/candidates/&lt;id&gt;</code></td><td>No jobId, so no Match Score card and it is not marked seen.</td></tr>
+</tbody></table>
+<div class="callout warn"><span class="t">Good to know</span><p>The table shows the newest 20 runs. A re-run on the same job counts only candidates <i>newly linked</i> by that run. If any dashboard query fails, a red banner says "Some dashboard data failed to load. Try refreshing the page."</p></div>
+
+<!-- ============ JOBS ============ -->
+<div class="page-head"><span class="route">/jobs</span><h2>Jobs list</h2><span class="chip admin">Admin</span><span class="chip manager">Manager</span><span class="chip user">User</span></div>
+<p>Lists <b>your own</b> jobs only, 10 per page, newest first (managers and admins do not see team jobs here; use the Team page). There is no edit, delete or detail screen for a job on this page.</p>
+<div class="mock">
+  <div class="bar"><i></i><i></i><i></i><span class="url">app / jobs</span></div>
+  <div class="nav"><b>AI Candidate</b><span>Dashboard</span><span class="on">Jobs</span><span>Candidates</span><span>Reports</span><span>Settings</span><span class="sp"></span><span class="btn out">Log out</span></div>
+  <div class="body" style="height:154px">
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px"><b style="font-size:11pt">Jobs</b><span class="btn">New Job</span></div>
+    <div class="panel"><b>All Jobs</b>
+    <table><tr><th>Title</th><th>Location</th><th>Employment Type</th><th>Seniority</th><th>Created</th><th>Candidates</th></tr>
+    <tr><td>Senior Engineer</td><td>Egypt</td><td>Full-time</td><td>Senior</td><td>12/9/2026</td><td><span class="btn out">View Candidates</span></td></tr></table>
+    <div style="text-align:right;margin-top:4px">Page 1 of 3 (24 total) <span class="btn out">Previous</span> <span class="btn out">Next</span></div></div>
+    <span class="callnum" style="left:91%;top:3%">1</span>
+    <span class="callnum" style="left:90%;top:54%">2</span>
+    <span class="callnum" style="left:60%;top:80%">3</span>
+  </div>
+</div>
+<ol class="legend"><li>"New Job" button.</li><li>"View Candidates" link on each row.</li><li>Pagination.</li></ol>
+<table class="buttons">
+<thead><tr><th>Control</th><th>What it does</th><th>API / route</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><span class="lbl">New Job</span></td><td>Opens the new-job form.</td><td>link to <code>/jobs/new</code></td><td></td></tr>
+<tr><td><span class="lbl">View Candidates</span></td><td>Opens the candidate list for the job.</td><td>link to <code>/candidates?jobId=</code></td><td>No runId, so no access is recorded.</td></tr>
+<tr><td><span class="lbl">Previous</span> / <span class="lbl">Next</span></td><td>Page through jobs; disabled at the ends. Shows "Page X of Y (N total)".</td><td><code>GET /api/jobs?page=&amp;limit=10</code></td><td>States: "Loading jobs...", error text, or "No jobs yet. Create your first job to start finding candidates."</td></tr>
+</tbody></table>
+
+<!-- ============ JOBS NEW ============ -->
+<div class="page-head"><span class="route">/jobs/new</span><h2>New job and sourcing</h2><span class="chip admin">Admin</span><span class="chip manager">Manager</span><span class="chip user">User</span></div>
+<p>One long page in three stages: <b>describe the job</b>, let AI <b>extract requirements</b> you can edit, then <b>start sourcing</b>. It is the same for all roles.</p>
+<div class="mock">
+  <div class="bar"><i></i><i></i><i></i><span class="url">app / jobs / new</span></div>
+  <div class="nav"><b>AI Candidate</b><span>Dashboard</span><span class="on">Jobs</span><span>Candidates</span><span>Reports</span><span>Settings</span><span class="sp"></span><span class="btn out">Log out</span></div>
+  <div class="body" style="height:370px">
+    <div class="panel" style="margin-bottom:6px"><b>1. Job Details</b>
+      <div class="row"><div><small>Job Title *</small><div class="field">e.g. Senior React Developer</div></div><div><small>Company *</small><div class="field">Select a company</div></div><div><small>Employment Type *</small><div class="field">Full-time</div></div><div><small>Work Arrangement *</small><div class="field">Remote</div></div></div>
+      <span class="btn out">Save &amp; Collapse</span></div>
+    <div class="panel" style="margin-bottom:6px"><b>2. Job Description</b>
+      <span class="btn">Upload File (PDF / DOCX)</span> <span class="btn out">Paste Text</span>
+      <div class="field" style="margin:5px 0;text-align:center;padding:12px">Click to upload or drag &amp; drop &middot; PDF, DOCX or TXT up to 10MB</div>
+      <span class="btn">Analyze Job with AI</span></div>
+    <div class="panel"><b>Extracted Requirements <span class="badge g">Analysis Verified</span></b>
+      <div class="row"><div class="field">Seniority</div><div class="field">Location: Egypt</div><div class="field">City</div><div class="field">Min-Max years</div></div>
+      <span class="btn out">Skills &amp; Technologies</span> <span class="btn out">Education</span> <span class="btn out">Responsibilities</span>
+      <div style="margin-top:6px"><span class="btn green" style="padding:4px 12px">Generate Queries &amp; Find Candidates</span></div></div>
+    <span class="callnum" style="left:2%;top:11%">1</span>
+    <span class="callnum" style="left:2%;top:34%">2</span>
+    <span class="callnum" style="left:2%;top:45%">3</span>
+    <span class="callnum" style="left:30%;top:53%">4</span>
+    <span class="callnum" style="left:2%;top:63%">5</span>
+    <span class="callnum" style="left:2%;top:76%">6</span>
+    <span class="callnum" style="left:2%;top:92%">7</span>
+  </div>
+</div>
+<ol class="legend">
+<li>Job Details fields (title, company, employment type, work arrangement; all required).</li>
+<li>Mode toggle: upload a file or paste text.</li>
+<li>Drop zone / text box for the job description.</li>
+<li>"Analyze Job with AI" button.</li>
+<li>Editable role profile (seniority, location, city, employment type, experience range).</li>
+<li>Tabs of editable chip lists (skills, education, responsibilities and keywords).</li>
+<li>"Generate Queries &amp; Find Candidates" starts the search.</li>
+</ol>
+
+<h3>Control reference</h3>
+<table class="buttons">
+<thead><tr><th>Control</th><th>What it does</th><th>API / route</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Job Title *</td><td>Text; required (error "Job title is required." after you leave the field). Auto-filled from AI only if empty.</td><td>saved as <code>jobs.title</code></td><td>Editing "Job Title" in the requirements editor changes only the AI analysis copy, not this field.</td></tr>
+<tr><td>Company *</td><td>Dropdown of the eight group companies (G Developments, G Communities, G Lifestyle, G Hotels, G Clubs, G Utilities, G Investments, BuildDora). Shows "Loading companies..." then "Select a company".</td><td><code>GET /api/companies</code></td><td>Companies have no UI; managed in the database.</td></tr>
+<tr><td>Employment Type *</td><td>Full-time, Part-time, Contract, Internship.</td><td>saved with job</td><td>AI may prefill it; an AI value outside the four options passes validation but the dropdown shows blank.</td></tr>
+<tr><td>Work Arrangement *</td><td>Remote, Hybrid, On-site. Never prefilled.</td><td>saved with job</td><td></td></tr>
+<tr><td><span class="lbl">Save &amp; Collapse</span></td><td>Only collapses the card. Nothing is saved.</td><td>none</td><td>Clicking a card header also toggles it.</td></tr>
+<tr><td><span class="lbl">Upload File (PDF / DOCX)</span> / <span class="lbl">Paste Text</span></td><td>Switch between the two input modes (upload is the default).</td><td>none</td><td></td></tr>
+<tr><td>File drop zone</td><td>Choose or drop a PDF, DOCX or TXT. The text is extracted and shown in a scrollable preview with the file name and size.</td><td><code>POST /api/files/extract</code></td><td>Server rejects over 10 MB, other types, or unreadable/password-protected files. Scanned image PDFs return empty text with no explicit message.</td></tr>
+<tr><td><span class="lbl">Change File</span> / X icon</td><td>Re-open the file picker / remove the file and clear the text.</td><td>none</td><td></td></tr>
+<tr><td>Paste text box</td><td>Paste the full job description. Shows a live character count; minimum 50 characters.</td><td>none</td><td>No maximum.</td></tr>
+<tr><td><span class="lbl">Analyze Job with AI</span></td><td>Collapses both cards, shows "Analyzing Job Description...", and fills the requirements.</td><td><code>POST /api/jobs/analyze</code></td><td>Disabled under 50 characters. Rate limit 10 AI calls/min. On failure a toast shows and you must reopen the description card to see the inline error.</td></tr>
+<tr><td>Role profile fields</td><td>Job Title, Seniority Level, Location (only "Egypt"), City (Not specified, Cairo, Alexandria, Giza, Suez), Employment Type, Min / Max Experience (years).</td><td>saved in <code>ai_analysis</code> and job columns</td><td>City narrows the search location. Min/Max are not validated against each other. Editor's Employment Type is ignored once the Section 1 value is set.</td></tr>
+<tr><td>Tabs: Skills &amp; Technologies / Education &amp; Qualifications / Responsibilities &amp; Keywords</td><td>Switch between editable lists: Required Skills (green), Preferred Skills (amber), Education, Certifications, Languages, Industries, Responsibilities, Keywords.</td><td>none</td><td>Each chip is editable inline; X removes it; the input plus <span class="lbl">Add</span> (or Enter) appends. Blank ignored, duplicates allowed.</td></tr>
+<tr><td><span class="lbl">Generate Queries &amp; Find Candidates</span></td><td>Runs the whole start-up sequence (see below). Shows "Finding Candidates..." while working.</td><td><code>POST /api/jobs/generate-queries</code>, <code>POST /api/jobs</code>, <code>POST /api/jobs/&lt;id&gt;/search</code>, <code>GET /api/search/&lt;runId&gt;/status</code></td><td>Disabled until the four required Section 1 fields are valid. Rate limits: 10 AI/min, 5 searches/min.</td></tr>
+<tr><td><span class="lbl">Show Candidates</span> / <span class="lbl">Close</span></td><td>Buttons in the "Candidate Sourcing Complete!" dialog: open the candidate list for the new job / dismiss.</td><td>link to <code>/candidates?jobId=</code></td><td>No confirmation dialogs exist on this page.</td></tr>
+</tbody></table>
+
+<h3>What happens when you click "Generate Queries &amp; Find Candidates"</h3>
+<ol class="steps">
+<li>AI writes 2-4 Google X-ray search queries from the requirements.</li>
+<li>The job is <b>saved</b> to your account (before any search starts).</li>
+<li>A sourcing run is created and the search runs in the background; the page gets a 202 reply.</li>
+<li>The page polls the run status every 2 seconds for up to 10 minutes. On completion a dialog shows the number of candidates found. If it is still running after 10 minutes you see "Search is taking longer than expected. Check back shortly." and the search continues on the server.</li>
+</ol>
+<div class="callout warn"><span class="t">Wording vs. reality</span><p>The progress label "computing AI match scores" and the dialog phrase "identified and evaluated N candidates" are misleading: no scoring has happened yet. Scores appear only after you click "Score Candidates" on the candidates page. Also, if the search fails to start, the job stays saved and clicking again creates a duplicate job. You cannot see or edit the generated queries.</p></div>
+
+<!-- ============ CANDIDATES ============ -->
+<div class="page-head"><span class="route">/candidates</span><h2>Candidates: job picker</h2><span class="chip admin">Admin</span><span class="chip manager">Manager</span><span class="chip user">User</span></div>
+<p>Without a <code>jobId</code>, the page shows "Select a job". It lists <b>only your own jobs, and only the newest 20</b> (no pager; older jobs are reachable from the Jobs page).</p>
+<div class="mock">
+  <div class="bar"><i></i><i></i><i></i><span class="url">app / candidates</span></div>
+  <div class="nav"><b>AI Candidate</b><span>Dashboard</span><span>Jobs</span><span class="on">Candidates</span><span>Reports</span><span>Settings</span><span class="sp"></span><span class="btn out">Log out</span></div>
+  <div class="body" style="height:130px">
+    <div class="panel"><b>Select a job</b>
+    <table><tr><td>Senior Engineer<br><span class="small">12 Sep &middot; 10:20 &middot; Egypt &middot; Full-time</span></td><td style="text-align:right"><span class="btn out">View</span> &#128465;</td></tr>
+    <tr><td>Data Analyst<br><span class="small">Delete this job?</span></td><td style="text-align:right"><span class="btn red">Confirm</span> <span class="btn out">Cancel</span></td></tr></table></div>
+    <span class="callnum" style="left:86%;top:27%">1</span>
+    <span class="callnum" style="left:93%;top:27%">2</span>
+    <span class="callnum" style="left:74%;top:60%">3</span>
+    <span class="callnum" style="left:86%;top:60%">4</span>
+  </div>
+</div>
+<ol class="legend"><li>"View" opens the job's candidate list.</li><li>Trash icon starts an inline delete confirmation.</li><li>"Confirm" deletes the job.</li><li>"Cancel" aborts.</li></ol>
+<table class="buttons">
+<thead><tr><th>Control</th><th>What it does</th><th>API / route</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><span class="lbl">View</span></td><td>Opens the candidate table for that job.</td><td>link to <code>/candidates?jobId=</code></td><td></td></tr>
+<tr><td>Trash icon ("Delete &lt;title&gt;")</td><td>Replaces the row buttons with "Delete this job?" plus Confirm and Cancel.</td><td>none</td><td>The only in-app way to delete a job.</td></tr>
+<tr><td><span class="lbl">Confirm</span></td><td>Deletes the job ("Deleting..." while working). Toast "Job Deleted / Job and its listing removed." or "Delete Failed".</td><td><code>DELETE /api/jobs/&lt;id&gt;</code></td><td>Owner only; logs "Job deleted". Candidate records you own are not removed by this.</td></tr>
+<tr><td><span class="lbl">Cancel</span></td><td>Dismisses the confirmation.</td><td>none</td><td></td></tr>
+</tbody></table>
+
+<div class="page-head"><span class="route">/candidates?jobId=...</span><h2>Candidates: table for one job</h2><span class="chip admin">Admin</span><span class="chip manager">Manager</span><span class="chip user">User</span></div>
+<p>The workhorse screen. Filters, scoring, status changes, deletion and Excel export all live here. When you open <i>someone else's</i> job (Manager or Admin), the page becomes <b>read-only</b>: a banner reads "Viewing &lt;Owner&gt;'s sourcing file - read-only" and Score, delete and status dropdowns are hidden.</p>
+<div class="mock">
+  <div class="bar"><i></i><i></i><i></i><span class="url">app / candidates?jobId=...&amp;runId=...</span></div>
+  <div class="nav"><b>AI Candidate</b><span>Dashboard</span><span>Jobs</span><span class="on">Candidates</span><span>Reports</span><span>Settings</span><span class="sp"></span><span class="btn out">Log out</span></div>
+  <div class="body" style="height:243px">
+    <div style="display:flex;justify-content:space-between;margin-bottom:5px"><b style="font-size:11pt">Candidates for Senior Engineer</b><span class="btn out">Score Candidates</span></div>
+    <div style="background:#e9e8fd;color:#4f46e5;border-radius:4px;padding:3px 8px;margin-bottom:5px">&#128065; Viewing Sara N.'s sourcing file &middot; read-only <i>(only when not the owner)</i></div>
+    <div class="row"><div class="field">Search by name</div><div class="field">Search by skill</div><div class="field">Company</div><div class="field">Location</div><div class="field">Status: All</div></div>
+    <div style="margin-bottom:6px"><span class="btn">Apply Filters</span> <span class="btn out">Clear</span> &nbsp; Sort by <span class="field">Match Score</span> <span class="btn out">High &rarr; Low</span></div>
+    <div class="panel"><table>
+    <tr><th>#</th><th>Name</th><th>Location</th><th>Skills</th><th>Match</th><th>Date Added</th><th>Status</th><th>Profile</th><th>Actions</th></tr>
+    <tr><td>1</td><td>Ahmed S.</td><td>Cairo <span class="badge g">Egypt verified</span></td><td><span class="badge b">React</span> <span class="badge b">Node</span> +3</td><td><span class="badge g">86%</span></td><td>12 Sep</td><td><span class="field">Shortlisted</span></td><td><span class="btn out">View</span></td><td>&#128065; &#128465;</td></tr>
+    <tr><td>2</td><td>Mona K.</td><td>Giza</td><td><span class="badge b">SQL</span></td><td><span class="badge a">55%</span></td><td>12 Sep</td><td><span class="field">New</span></td><td><span class="btn out">View</span></td><td>&#128065; &#128465;</td></tr></table>
+    <div style="display:flex;justify-content:space-between;margin-top:5px"><span class="btn out">Export Excel</span><span>Page 1 of 4 (32 total) <span class="btn out">Previous</span> <span class="btn out">Next</span></span></div></div>
+    <span class="callnum" style="left:78%;top:5%">1</span>
+    <span class="callnum" style="left:1%;top:26%">2</span>
+    <span class="callnum" style="left:2%;top:34%">3</span>
+    <span class="callnum" style="left:73%;top:34%">4</span>
+    <span class="callnum" style="left:33%;top:44%">5</span>
+    <span class="callnum" style="left:52%;top:54%">6</span>
+    <span class="callnum" style="left:89%;top:54%">7</span>
+    <span class="callnum" style="left:2%;top:90%">8</span>
+    <span class="callnum" style="left:88%;top:90%">9</span>
+  </div>
+</div>
+<ol class="legend">
+<li>Score Candidates (hidden for read-only viewers or when no candidates).</li>
+<li>Filter inputs and Status dropdown.</li>
+<li>Apply Filters and Clear buttons.</li>
+<li>Sort dropdown and direction toggle.</li>
+<li>Skills cell: three badges, "+N" expands.</li>
+<li>Match badge (green 70+, amber 40-69, red below 40, blank if unscored).</li>
+<li>Status dropdown per row (badge only for non-owners).</li>
+<li>Export Excel.</li>
+<li>Pagination.</li>
+</ol>
+
+<table class="buttons">
+<thead><tr><th>Control</th><th>What it does</th><th>API / route</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Search by name / Search by skill / Company / Location</td><td>Case-insensitive contains filters, combined with AND.</td><td><code>GET /api/jobs/&lt;id&gt;/candidates?name&amp;skill&amp;company&amp;location&amp;status&amp;sort_by&amp;sort_dir&amp;page&amp;limit=10</code></td><td>Typing alone does nothing; Enter does nothing. Click Apply Filters.</td></tr>
+<tr><td><span class="lbl">Apply Filters</span></td><td>Applies the four text filters and jumps to page 1.</td><td>same</td><td></td></tr>
+<tr><td>Status filter</td><td>"All statuses" or one of New, Reviewed, Shortlisted, Rejected, Contacted, Hired. Applies immediately.</td><td>same</td><td></td></tr>
+<tr><td><span class="lbl">Clear</span></td><td>Resets the five filters (keeps the sort) immediately.</td><td>same</td><td></td></tr>
+<tr><td>Sort by</td><td>Match Score, Experience, Name, Date Added. Applies immediately. Default: Match Score, high to low.</td><td>same</td><td>Empty values always sort last.</td></tr>
+<tr><td><span class="lbl">High &rarr; Low</span> / <span class="lbl">Low &rarr; High</span></td><td>Toggles sort direction.</td><td>same</td><td></td></tr>
+<tr><td><span class="lbl">Score Candidates</span></td><td>Sends every candidate on the job to AI for scoring ("Scoring..." while working). Toast "Scored N candidates successfully!". Summary "Scored X of Y candidates (Z failed)."</td><td><code>POST /api/jobs/&lt;id&gt;/match</code></td><td>Owner only. Re-scores everyone and overwrites earlier scores. No confirmation. 1 AI rate-limit hit but one OpenAI call per candidate. Runs synchronously, so large lists take a while.</td></tr>
+<tr><td>Candidate name / eye icon</td><td>Opens the candidate profile with the job context so the Match Score card shows.</td><td>link to <code>/candidates/&lt;id&gt;?jobId=</code></td><td>Also marks the candidate as seen for you.</td></tr>
+<tr><td>Skills "+N" / "Show less"</td><td>Expands or collapses the skills cell.</td><td>none</td><td></td></tr>
+<tr><td>Status dropdown (row)</td><td>Sets New / Reviewed / Shortlisted / Rejected / Contacted / Hired. Toast "Candidate status marked as ...".</td><td><code>PUT /api/candidates/&lt;id&gt;/status</code></td><td>Owner only, no confirmation. Status belongs to the candidate, so it changes for every job the person is linked to.</td></tr>
+<tr><td><span class="lbl">View</span> (Profile column)</td><td>Opens the LinkedIn/source profile in a new tab.</td><td>external <code>profile_url</code></td><td>Blank if no URL.</td></tr>
+<tr><td>Trash icon, then <span class="lbl">Confirm</span> / <span class="lbl">Cancel</span></td><td>Inline "Delete?" confirmation; Confirm deletes the candidate.</td><td><code>DELETE /api/candidates/&lt;id&gt;</code></td><td>Owner only. See warning below: this is a global delete.</td></tr>
+<tr><td><span class="lbl">Export Excel</span></td><td>Downloads an .xlsx of all rows matching the applied filters and sort (ignores paging). See section 9 for columns.</td><td><code>GET /api/jobs/&lt;id&gt;/export?...</code></td><td>Plain link: an error (e.g. 429) navigates to raw JSON. Visible to read-only viewers too. Unapplied typed filters are not included.</td></tr>
+<tr><td><span class="lbl">Previous</span> / <span class="lbl">Next</span></td><td>Page through results, 10 per page. "Page X of Y (N total)".</td><td>same list API</td><td>Empty: "No candidates match these filters."</td></tr>
+</tbody></table>
+<div class="callout danger"><span class="t">Deleting a candidate is permanent and global</span><p>The toast says "Candidate removed from this job", but the candidate record is deleted for all jobs, together with their matches, notes, status history and links. There is no undo.</p></div>
+<p><b>Automatic side effect:</b> when the URL includes <code>runId</code>, opening the page records an access on that sourcing file (section 8).</p>
+
+<!-- ============ CANDIDATE DETAIL ============ -->
+<div class="page-head"><span class="route">/candidates/[id]</span><h2>Candidate profile</h2><span class="chip admin">Admin</span><span class="chip manager">Manager</span><span class="chip user">User</span></div>
+<p>Everything known about one person. Add <code>?jobId=</code> to also see the AI match breakdown for that job (and to mark the candidate as seen). There is no back button; use the browser or the menu.</p>
+<div class="mock">
+  <div class="bar"><i></i><i></i><i></i><span class="url">app / candidates / 3f2a...?jobId=...</span></div>
+  <div class="nav"><b>AI Candidate</b><span>Dashboard</span><span>Jobs</span><span class="on">Candidates</span><span>Reports</span><span>Settings</span><span class="sp"></span><span class="btn out">Log out</span></div>
+  <div class="body" style="height:323px">
+    <div class="panel" style="margin-bottom:6px"><b style="font-size:10pt">Ahmed S. <span class="badge g">Egypt</span></b>Senior Backend Engineer &middot; Acme &middot; Cairo<br>Experience: 8 yrs &middot; Skills: Node, SQL, AWS &middot; Source: serpapi <span class="btn out" style="float:right">View profile</span></div>
+    <div class="row">
+      <div class="panel" style="flex:2"><b>Match Score</b>
+        <div style="display:flex;gap:8px;align-items:center"><div style="width:44px;height:44px;border-radius:50%;background:var(--green-soft);color:var(--green);font-weight:700;display:flex;align-items:center;justify-content:center;font-size:11pt">86%</div><div>Skills 90% &middot; Experience 85% &middot; Location 100% &middot; Education 70% &middot; Seniority 80%</div></div>
+        <div style="margin-top:4px">AI summary text...<br>Matched requirements &middot; Missing requirements &middot; Strengths &middot; Concerns</div></div>
+      <div class="panel"><b>Status</b><div class="field">Shortlisted</div></div>
+    </div>
+    <div class="panel"><b>Recruiter Notes</b><div class="field" style="height:30px">Add a note about this candidate...</div><div style="margin:4px 0"><span class="btn">Add Note</span></div>
+      <span class="small">12 Sep 10:44 &mdash; Called, interested.</span></div>
+    <span class="callnum" style="left:91%;top:6%">1</span>
+    <span class="callnum" style="left:3%;top:27%">2</span>
+    <span class="callnum" style="left:75%;top:27%">3</span>
+    <span class="callnum" style="left:3%;top:66%">4</span>
+    <span class="callnum" style="left:15%;top:76%">5</span>
+  </div>
+</div>
+<ol class="legend"><li>"View profile" external link.</li><li>Match Score card (only with jobId; otherwise absent).</li><li>Status dropdown.</li><li>Notes textbox (owner only).</li><li>"Add Note" button.</li></ol>
+<table class="buttons">
+<thead><tr><th>Control</th><th>What it does</th><th>API / route</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><span class="lbl">View profile</span></td><td>Opens the source profile in a new tab.</td><td>external</td><td></td></tr>
+<tr><td>Status dropdown</td><td>Changes the candidate's status. Non-owners see plain text "&lt;status&gt; - only &lt;owner&gt; can change this".</td><td><code>PUT /api/candidates/&lt;id&gt;/status</code></td><td>The response replaces the page's candidate data, so the Match Score card and edit controls can vanish until you reload.</td></tr>
+<tr><td>Note textbox + <span class="lbl">Add Note</span></td><td>Saves a note ("Saving..." while working) and shows it at the top. Toast "Recruiter note saved to candidate record".</td><td><code>POST /api/candidates/&lt;id&gt;/notes</code></td><td>Owner only; blank disabled. Notes cannot be edited or deleted, and the author is not shown. Non-owners see the list read-only.</td></tr>
+</tbody></table>
+<p class="small">Not shown anywhere in the UI: the candidate's status history (recorded by a database trigger) and the Egypt-verified flag. Missing candidates show "Candidate not found."; there is no delete button on this page.</p>
+
+<!-- ============ REPORTS ============ -->
+<div class="page-head"><span class="route">/reports</span><h2>Reports</h2><span class="chip admin">Admin</span><span class="chip manager">Manager</span><span class="chip user">User</span></div>
+<p>Four reports with the same controls. What differs is the <b>scope</b>, decided on the server from your role: HR User = "My work"; HR Manager = own team; Admin = whole organization or one chosen team. Full report contents are in section 9.</p>
+<div class="mock">
+  <div class="bar"><i></i><i></i><i></i><span class="url">app / reports?type=performance</span></div>
+  <div class="nav"><b>AI Candidate</b><span>Dashboard</span><span>Jobs</span><span>Candidates</span><span class="on">Reports</span><span>Settings</span><span class="sp"></span><span class="btn out">Log out</span></div>
+  <div class="body" style="height:284px">
+    <div class="hero"><span style="font-size:7pt">Whole organization &middot; Last 30 days</span><b>Team Performance Report</b><span style="font-size:7pt">Admin view: every user in the organization.</span></div>
+    <div style="margin-bottom:5px"><span class="btn">Team Performance</span> <span class="btn out">Activity</span> <span class="btn out">Recruitment Pipeline</span> <span class="btn out">Sourcing Quality</span></div>
+    <div style="margin-bottom:6px">Scope <span class="field">Whole organization</span> Period <span class="field">Last 30 days</span> From <span class="field">--</span> To <span class="field">--</span> <span class="btn">Update report</span> &nbsp; <span class="btn out">CSV</span> <span class="btn out">Excel</span></div>
+    <div class="grid-c"><div class="stat"><small>Members</small><b>7</b></div><div class="stat"><small>Jobs created</small><b>17</b></div><div class="stat"><small>Candidates sourced</small><b>466</b></div><div class="stat"><small>Average match</small><b>68%</b></div></div>
+    <div class="panel"><b>Performance by member</b><table><tr><th>Member</th><th>Jobs</th><th>Sourcing runs</th><th>Candidates</th><th>Shortlisted</th><th>Avg match</th></tr><tr><td>Sara N.</td><td>6</td><td>7</td><td>120</td><td>9</td><td><span class="badge g">74%</span></td></tr></table></div>
+    <span class="callnum" style="left:1%;top:23%">1</span>
+    <span class="callnum" style="left:8%;top:33%">2</span>
+    <span class="callnum" style="left:27%;top:43%">3</span>
+    <span class="callnum" style="left:88%;top:43%">4</span>
+  </div>
+</div>
+<ol class="legend"><li>Report type tabs.</li><li>Scope dropdown (admins only).</li><li>Period, From, To and "Update report".</li><li>CSV / Excel export buttons.</li></ol>
+<table class="buttons">
+<thead><tr><th>Control</th><th>What it does</th><th>API / route</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Tabs: Team Performance / Activity / Recruitment Pipeline / Sourcing Quality</td><td>Switch report; keep the chosen period.</td><td><code>/reports?type=performance|activity|pipeline|quality</code></td><td>Default: performance.</td></tr>
+<tr><td>Scope dropdown</td><td>"Whole organization" or one team. <b>Admins only.</b></td><td><code>/reports?teamId=</code></td><td>Managers' <code>teamId</code> is ignored.</td></tr>
+<tr><td>Period dropdown</td><td>All time, Today, Last 7 days, Last 30 days (default), Last 90 days, Custom range.</td><td><code>range</code></td><td></td></tr>
+<tr><td>From / To dates</td><td>Custom window; entering dates without choosing Custom counts as Custom.</td><td><code>from</code>, <code>to</code></td><td>"To" is inclusive.</td></tr>
+<tr><td><span class="lbl">Update report</span></td><td>Reloads with the chosen filters.</td><td>GET <code>/reports</code></td><td>Viewing writes a "Report viewed" audit entry (deduped for 10 minutes).</td></tr>
+<tr><td><span class="lbl">CSV</span> / <span class="lbl">Excel</span></td><td>Downloads the current report.</td><td><code>GET /api/reports?...&amp;format=csv|xlsx</code></td><td>Rate limit 20/min. Logs "Report exported".</td></tr>
+</tbody></table>
+<p class="small">If a report fails: "This report couldn't be generated. Try again in a moment."</p>
+
+<!-- ============ SETTINGS ============ -->
+<div class="page-head"><span class="route">/settings</span><h2>Settings</h2><span class="chip admin">Admin</span><span class="chip manager">Manager</span><span class="chip user">User</span></div>
+<div class="mock">
+  <div class="bar"><i></i><i></i><i></i><span class="url">app / settings</span></div>
+  <div class="nav"><b>AI Candidate</b><span>Dashboard</span><span>Jobs</span><span>Candidates</span><span>Reports</span><span class="on">Settings</span><span class="sp"></span><span class="btn out">Log out</span></div>
+  <div class="body" style="height:90px"><div class="panel"><b>Account</b>Signed in as <b>zeyad.ragab@example.com</b></div><span class="callnum" style="left:2%;top:10%">1</span></div>
+</div>
+<ol class="legend"><li>The only element: your sign-in email.</li></ol>
+<p>No buttons, dropdowns or filters. There is no way to change a password, name or preferences in the app.</p>
+
+<!-- ============ MANAGER ============ -->
+<div class="page-head"><span class="route">/manager</span><h2>Team dashboard</h2><span class="chip admin">Admin (any team)</span><span class="chip manager">Manager (own team)</span></div>
+<p>A read-only view of a team's output. A Manager is pinned to their own team (the URL <code>teamId</code> is ignored). An Admin sees the first team alphabetically and can switch team with a picker or via links on <code>/admin</code>. HR Users are redirected to <code>/dashboard</code>. Figures are all-time, and everything is read through the viewer's database permissions.</p>
+<div class="mock">
+  <div class="bar"><i></i><i></i><i></i><span class="url">app / manager</span></div>
+  <div class="nav"><b>AI Candidate</b><span>Dashboard</span><span>Jobs</span><span>Candidates</span><span>Reports</span><span>Settings</span><span class="on">Team</span><span class="sp"></span><span>&#128276;</span><span class="btn out">Log out</span></div>
+  <div class="body" style="height:529px">
+    <div class="hero manager"><span style="font-size:7pt">Team view</span><b>Sales Recruiting</b><span style="font-size:7pt">Managed by Omar H. &middot; 3 active members. Team members keep ownership of their files.</span></div>
+    <div class="grid-c"><div class="stat"><small>Team Members</small><b>3 / 4</b></div><div class="stat"><small>Team Jobs</small><b>17</b></div><div class="stat"><small>Avg Match Quality</small><b>68%</b></div><div class="stat"><small>Shortlisted Talent</small><b>9</b></div></div>
+    <div class="row"><div class="panel" style="flex:2"><b>Team Pipeline <span class="badge b">184 total</span></b><div class="bar-h" style="width:80%;background:#86b6ef"></div><div class="bar-h" style="width:50%;background:#2a78d6"></div></div>
+      <div class="panel"><b>Sourcing Runs</b>Running 1 &middot; Completed 14<br>Failed 0 &middot; Unseen by you 22</div></div>
+    <div class="panel" style="margin-bottom:8px"><b>Team Members</b><div class="row" style="margin:0"><div class="stat"><b style="font-size:9pt">Sara N.</b><small>HR User</small>Active 1 &middot; Cand. 120 &middot; Short. 9</div><div class="stat"><b style="font-size:9pt">Omar H.</b><small>Team Manager</small>Active 0 &middot; Cand. 64</div></div></div>
+    <div class="panel" style="margin-bottom:8px"><b>Team Sourcing Files <span class="badge b">14 files</span></b>
+      <div style="margin-bottom:4px">Team member <span class="field">Everyone</span> Job title <span class="field">Any title</span> Status <span class="field">Any</span> Created <span class="field">All time</span> From/To <span class="field">--</span> Min match % <span class="field">--</span> Min cand. <span class="field">--</span> <span class="btn">Apply</span> <span class="btn out">Reset</span></div>
+      <table><tr><th>Job Title</th><th>Status</th><th>Cand.</th><th>Short.</th><th>Unseen</th><th>Match</th><th>Owned By</th><th>Last Accessed By</th><th>Last Activity</th><th></th></tr>
+      <tr><td>Senior Engineer</td><td><span class="badge g">complete</span></td><td>32</td><td>3</td><td>10</td><td><span class="badge g">74%</span></td><td>Sara N.</td><td>Omar H. <span class="badge b">NOT OWNER</span></td><td>2 h ago</td><td><span class="btn out">View</span></td></tr></table></div>
+    <div class="row"><div class="panel" style="flex:2"><b>Member Comparison</b><table><tr><th>User</th><th>Jobs</th><th>Runs</th><th>Cand.</th><th>Avg Match</th><th>Last Login</th></tr><tr><td>Sara N.</td><td>6</td><td>7 / 7</td><td>120</td><td><span class="badge g">74%</span></td><td>1 h ago</td></tr></table></div>
+      <div class="panel"><b>Team Activity</b>Sara completed a sourcing run...</div></div>
+    <span class="callnum" style="left:78%;top:3%">1</span>
+    <span class="callnum" style="left:1%;top:17%">2</span>
+    <span class="callnum" style="left:1%;top:27%">3</span>
+    <span class="callnum" style="left:78%;top:27%">4</span>
+    <span class="callnum" style="left:1%;top:40%">5</span>
+    <span class="callnum" style="left:1%;top:49%">6</span>
+    <span class="callnum" style="left:93%;top:71%">7</span>
+    <span class="callnum" style="left:1%;top:82%">8</span>
+    <span class="callnum" style="left:70%;top:82%">9</span>
+  </div>
+</div>
+<ol class="legend">
+<li>Hero with team name and manager (admins with more than one team also see a "Team" dropdown and "View team" button here).</li>
+<li>Four stat cards.</li>
+<li>Team Pipeline chart.</li>
+<li>Sourcing Runs summary.</li>
+<li>Team Members cards (each links to the member page).</li>
+<li>Filter form for sourcing files.</li>
+<li>"View" button on each sourcing file row.</li>
+<li>Member Comparison table.</li>
+<li>Team Activity feed.</li>
+</ol>
+<h3>Card definitions</h3>
+<table class="compact">
+<thead><tr><th style="width:22%">Card / column</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>Team Members</td><td>Active / all profiles on the team (includes the manager and inactive people).</td></tr>
+<tr><td>Team Jobs</td><td>All-time jobs owned by team members.</td></tr>
+<tr><td>Sourcing Runs card</td><td>Running (pending or running), Completed, Failed, <b>Unseen by you</b>, Contacted and Rejected candidate totals. "Unseen by you" counts candidates <i>you</i> have never opened from the file, not what the owner has seen. It covers only the newest 200 files (500 when filters are on).</td></tr>
+<tr><td>Member card</td><td>Initials, name, "Team Manager" or role, "Inactive" if applicable, mini-stats Active files / Candidates / Shortlisted, "N files, last active ...", and a colored match badge.</td></tr>
+<tr><td>Team Sourcing Files</td><td>One row per sourcing run of any team member, newest first, maximum 200 rows, no sorting, paging or export. Columns: Job Title (with "Created date by starter"), Status, Candidates, Shortlisted, Unseen, Match (average score), Owned By, Last Accessed By (with "Not owner" tag when the last opener is not the owner), Last Activity, Action.</td></tr>
+<tr><td>Member Comparison</td><td>Per member: Jobs, Runs (completed / total), Candidates, Shortlisted, Contacted, Rejected, Avg Match, Last Login, Last Activity.</td></tr>
+<tr><td>Team Activity</td><td>Latest 20 recorded actions by team members, including the manager's own.</td></tr>
+</tbody></table>
+<table class="buttons">
+<thead><tr><th>Control</th><th>What it does</th><th>API / route</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Team dropdown + <span class="lbl">View team</span> <span class="chip admin">Admin</span></td><td>Switch to another team. Only shown when there is more than one team.</td><td>GET <code>/manager?teamId=</code></td><td>Managers never see it.</td></tr>
+<tr><td>Member card (whole card)</td><td>Opens that member's page.</td><td>link to <code>/manager/team/&lt;id&gt;</code></td><td>Also Owned By names and Member Comparison names.</td></tr>
+<tr><td>Team member dropdown</td><td>Everyone or one member.</td><td><code>member</code> parameter</td><td></td></tr>
+<tr><td>Job title</td><td>Contains-match on the job title (max 120 characters).</td><td><code>title</code></td><td></td></tr>
+<tr><td>Status</td><td>Any, Pending, Running, Complete, Failed.</td><td><code>status</code></td><td>Failed = error.</td></tr>
+<tr><td>Created</td><td>All time (default), Today, Last 7/30/90 days, Custom range.</td><td><code>range</code></td><td>Uses server time. Filters on the run's creation date.</td></tr>
+<tr><td>From / To</td><td>Custom dates (YYYY-MM-DD).</td><td><code>from</code>, <code>to</code></td><td>Dates without Custom are treated as Custom.</td></tr>
+<tr><td>Min match %</td><td>0-100; keeps files whose average score is at least this. Unscored files drop out.</td><td><code>minMatch</code></td><td></td></tr>
+<tr><td>Min candidates</td><td>Keeps files with at least N candidates.</td><td><code>minCandidates</code></td><td>Invalid values are silently ignored.</td></tr>
+<tr><td><span class="lbl">Apply</span></td><td>Submits the filter form (full page reload).</td><td>GET <code>/manager</code></td><td></td></tr>
+<tr><td><span class="lbl">Reset</span></td><td>Clears all filters. Appears only when a filter is active.</td><td>link to <code>/manager</code></td><td></td></tr>
+<tr><td><span class="lbl">View</span> (file row)</td><td>Opens the file read-only and records that you accessed it.</td><td>link to <code>/candidates?jobId=&amp;runId=</code></td><td>Logs "Opened a teammate's sourcing file" (deduped 30 min). Ownership never changes.</td></tr>
+</tbody></table>
+<p class="small">Empty and error states: "You're not assigned to a team yet" (manager without a team), "No teams yet" (admin), "Team unavailable", "No sourcing files match these filters", "No team members yet", and the red banner "Some team data failed to load. Figures below may be incomplete." The page does not refresh itself.</p>
+
+<div class="page-head"><span class="route">/manager/team/[userId]</span><h2>Team member page</h2><span class="chip admin">Admin (anyone)</span><span class="chip manager">Manager (own team)</span></div>
+<p>A drill-down on one person. Invalid ids and members of other teams give "Page not found". Managers can open their own page. It is entirely read-only: role, team and access changes are made only on <code>/admin</code>.</p>
+<div class="mock">
+  <div class="bar"><i></i><i></i><i></i><span class="url">app / manager / team / 9c1e...</span></div>
+  <div class="nav"><b>AI Candidate</b><span>Dashboard</span><span>Jobs</span><span>Candidates</span><span>Reports</span><span>Settings</span><span class="on">Team</span><span class="sp"></span><span class="btn out">Log out</span></div>
+  <div class="body" style="height:412px">
+    <div style="margin-bottom:4px;color:#1c5cab">&larr; Back to Sales Recruiting</div>
+    <div class="hero manager"><span style="font-size:7pt">HR User &middot; Sales Recruiting</span><b>Sara N.</b><span style="font-size:7pt">sara.n@example.com &middot; Status: Active &middot; Last login: 1 h ago &middot; Last activity: 20 min ago</span></div>
+    <div class="grid-c"><div class="stat"><small>Jobs Created</small><b>6</b></div><div class="stat"><small>Sourcing Runs</small><b>7 / 7</b></div><div class="stat"><small>Avg Match Quality</small><b>74%</b></div><div class="stat"><small>Shortlisted</small><b>9</b></div></div>
+    <div class="row"><div class="panel" style="flex:2"><b>Candidate Pipeline <span class="badge b">120 total</span></b><div class="bar-h" style="width:70%;background:#86b6ef"></div><div class="bar-h" style="width:40%;background:#2a78d6"></div></div>
+      <div class="panel"><b>Performance Overview</b>Active runs &middot; Completed<br>Failed &middot; Total candidates<br>Contacted &middot; Rejected</div></div>
+    <div class="panel" style="margin-bottom:8px"><b>Sourcing Files <span class="badge b">7 files</span></b><table><tr><th>Job Title</th><th>Status</th><th>Cand.</th><th>Short.</th><th>Unseen</th><th>Match</th><th>Last Accessed</th><th>Activity</th><th></th></tr><tr><td>Senior Engineer</td><td><span class="badge g">complete</span></td><td>32</td><td>3</td><td>10</td><td>74%</td><td>Omar H.</td><td>2 h ago</td><td><span class="btn out">View</span></td></tr></table></div>
+    <div class="row"><div class="panel"><b>Recently Opened</b>Data Analyst &middot; 3 h ago</div><div class="panel" style="flex:2"><b>Recent Activity <span class="badge g">74% avg match</span></b>Sara completed a sourcing run...</div></div>
+    <span class="callnum" style="left:1%;top:3%">1</span>
+    <span class="callnum" style="left:1%;top:12%">2</span>
+    <span class="callnum" style="left:1%;top:47%">3</span>
+    <span class="callnum" style="left:93%;top:71%">4</span>
+    <span class="callnum" style="left:1%;top:88%">5</span>
+  </div>
+</div>
+<ol class="legend"><li>Back link to the team page.</li><li>Profile hero: role, team, email, status, last login, last activity.</li><li>Sourcing files (max 50, no filters, no Owned By column).</li><li>"View" opens the file read-only and records your access.</li><li>Recently Opened (last 8 files this person opened) and Recent Activity (last 25 actions).</li></ol>
+<table class="buttons">
+<thead><tr><th>Control</th><th>What it does</th><th>API / route</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><span class="lbl">Back to &lt;team&gt;</span></td><td>Returns to the team dashboard.</td><td>link to <code>/manager</code> (admin: <code>?teamId=</code>)</td><td></td></tr>
+<tr><td><span class="lbl">View</span> (file row)</td><td>Opens the sourcing file read-only.</td><td>link to <code>/candidates?jobId=&amp;runId=</code></td><td>Records an access by <i>you</i>.</td></tr>
+<tr><td>Recently Opened links</td><td>Open a file that this person opened recently (skipped if you cannot see it).</td><td>link to <code>/candidates?jobId=&amp;runId=</code></td><td>Clicking records an access by you, not by them.</td></tr>
+</tbody></table>
+
+<!-- ============ ADMIN ============ -->
+<div class="page-head"><span class="route">/admin</span><h2>Admin dashboard</h2><span class="chip admin">Admin only</span></div>
+<p>Organization-wide numbers plus every management control. Anyone who is not an active admin is silently redirected to <code>/dashboard</code>. Nothing here asks for confirmation, and nobody affected is notified. All performance figures are all-time.</p>
+<div class="mock">
+  <div class="bar"><i></i><i></i><i></i><span class="url">app / admin</span></div>
+  <div class="nav"><b>AI Candidate</b><span>Dashboard</span><span>Jobs</span><span>Candidates</span><span>Reports</span><span>Settings</span><span>Team</span><span class="on">Admin</span><span class="sp"></span><span>&#128276;</span><span class="btn out">Log out</span></div>
+  <div class="body" style="height:696px">
+    <div class="hero admin"><span style="font-size:7pt">System-wide view</span><b>Admin Dashboard</b><span style="font-size:7pt">Organization-wide sourcing performance across 2 teams and 6 active users.</span></div>
+    <div class="grid-c"><div class="stat"><small>Active Users</small><b>6 / 7</b></div><div class="stat"><small>Total Jobs</small><b>17</b></div><div class="stat"><small>Avg Match Quality</small><b>68%</b></div><div class="stat"><small>Shortlisted Talent</small><b>9</b></div></div>
+    <div class="row"><div class="panel" style="flex:2"><b>Organization Pipeline <span class="badge b">466 total</span></b><div class="bar-h" style="width:80%;background:#86b6ef"></div><div class="bar-h" style="width:30%;background:#2a78d6"></div></div><div class="panel"><b>Sourcing Runs</b>Running &middot; Completed &middot; Failed<br>Contacted &middot; Rejected</div></div>
+    <div class="panel" style="margin-bottom:8px"><b>Teams <span style="float:right"><span class="field">New team name</span> <span class="btn">Add Team</span></span></b>
+      <table><tr><th>Team</th><th>Manager</th><th>Members</th><th>Jobs</th><th>Active Runs</th><th>Candidates</th><th>Shortlisted</th><th>Avg Match</th></tr><tr><td style="color:#1c5cab">Sales Recruiting</td><td><span class="field">Omar H. &#9662;</span></td><td>3 / 4</td><td>17</td><td>1</td><td>184</td><td>9</td><td><span class="badge g">68%</span></td></tr></table></div>
+    <div class="panel" style="margin-bottom:8px"><b>User Performance</b><table><tr><th>User</th><th>Team</th><th>Jobs</th><th>Runs</th><th>Cand.</th><th>Short.</th><th>Avg Match</th><th>Last Login</th></tr><tr><td style="color:#1c5cab">Sara N.</td><td>Sales</td><td>6</td><td>7 / 7</td><td>120</td><td>9</td><td>74%</td><td>1 h ago</td></tr></table></div>
+    <div class="panel" style="margin-bottom:8px"><b>Access &amp; Invitations <span class="badge a">2 requests</span></b>
+      <div style="margin-bottom:4px"><span class="field">name@company.com</span> <span class="field">HR User &#9662;</span> <span class="field">Team &#9662;</span> <span class="btn">Invite</span></div>
+      <b>Access requests (2)</b><div>new.person@x.com &middot; Tried to sign in 1 h ago <span class="field">HR User &#9662;</span> <span class="field">Team &#9662;</span> <span class="btn green">Approve</span></div>
+      <b style="margin-top:4px">Pending invites (1)</b><div>ali@x.com &middot; HR User &middot; Sales &middot; invited 2 d ago <span class="btn out">Withdraw</span></div></div>
+    <div class="panel" style="margin-bottom:8px"><b>User Management</b><table><tr><th>User</th><th>Role</th><th>Team</th><th>Status</th><th>Action</th></tr><tr><td>Sara N.<br><span class="small">sara.n@x.com</span></td><td><span class="field">HR User &#9662;</span></td><td><span class="field">Sales &#9662;</span></td><td><span class="badge g">Active</span></td><td><span class="btn out">Deactivate</span></td></tr></table></div>
+    <div class="panel"><b>Recent Activity</b>Sara completed a sourcing run for "Senior Engineer"... &middot; 20 min ago</div>
+    <span class="callnum" style="left:1%;top:14%">1</span>
+    <span class="callnum" style="left:74%;top:30%">2</span>
+    <span class="callnum" style="left:23%;top:38%">3</span>
+    <span class="callnum" style="left:1%;top:49%">4</span>
+    <span class="callnum" style="left:60%;top:60%">5</span>
+    <span class="callnum" style="left:90%;top:65%">6</span>
+    <span class="callnum" style="left:50%;top:76%">7</span>
+    <span class="callnum" style="left:48%;top:87%">8</span>
+    <span class="callnum" style="left:1%;top:94%">9</span>
+  </div>
+</div>
+<ol class="legend">
+<li>Hero and four stat cards (Active Users active/all, Total Jobs, Average Match Quality, Shortlisted Talent).</li>
+<li>Add Team form (name field + button).</li>
+<li>Manager dropdown for each team; the team name links to that team's dashboard.</li>
+<li>User Performance table (names link to member pages).</li>
+<li>Invite form: email, role, team, Invite.</li>
+<li>Approve button on each access request.</li>
+<li>Withdraw button on each pending invite.</li>
+<li>User Management: role and team dropdowns, Deactivate / Reactivate.</li>
+<li>Recent Activity feed (newest 20 across the organization).</li>
+</ol>
+
+<table class="buttons">
+<thead><tr><th>Control</th><th>What it does</th><th>API / route</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>New team name + <span class="lbl">Add Team</span></td><td>Creates a team. Toast `Created team "&lt;name&gt;".` Field allows 80 characters.</td><td><code>POST /api/teams</code></td><td>No manager picker at creation. Duplicate team names are allowed. Logs "Team created".</td></tr>
+<tr><td>Team name link</td><td>Opens the team's dashboard in admin view.</td><td>link to <code>/manager?teamId=</code></td><td></td></tr>
+<tr><td>Manager dropdown (per team)</td><td>Lists "Unassigned" and every <i>active HR Manager</i>. Choosing one makes them the team's manager. Toast "&lt;Name&gt; now manages &lt;Team&gt;." or "&lt;Team&gt; has no manager."</td><td><code>PATCH /api/teams/&lt;id&gt;</code> {managerId}</td><td>The chosen manager is moved into that team and removed as manager elsewhere. "Unassigned" only clears the label: the old manager keeps the HR Manager role and team, so they still see the team.</td></tr>
+<tr><td>User name link (performance table)</td><td>Opens the member page.</td><td>link to <code>/manager/team/&lt;id&gt;</code></td><td></td></tr>
+<tr><td>Invite: Email, Role, Team</td><td>Email (required), Role (Admin / HR Manager / HR User, default HR User), Team ("No team" or a team; default the first team).</td><td>form fields</td><td>Team default is fixed at first page render.</td></tr>
+<tr><td><span class="lbl">Invite</span></td><td>Grants access. Toast "&lt;email&gt; can sign in as &lt;Role&gt;."</td><td><code>POST /api/admin/invites</code></td><td>Existing active user: error "This person already has access." Existing inactive profile: activated at once. Otherwise a pending invite is stored (overwrites an earlier invite for that email). No email is sent.</td></tr>
+<tr><td>Access request: Role, Team, <span class="lbl">Approve</span></td><td>Activates the requester with the chosen role and team. Toast "&lt;Name&gt; can now sign in as &lt;Role&gt;."</td><td><code>POST /api/admin/invites</code></td><td><b>There is no Reject.</b> To decline, do nothing.</td></tr>
+<tr><td><span class="lbl">Withdraw</span></td><td>Deletes an unused invite. Toast "Invite for &lt;email&gt; withdrawn."</td><td><code>DELETE /api/admin/invites?email=</code></td><td>No confirmation. Invites never expire. Cannot revoke someone who already signed in.</td></tr>
+<tr><td>Role dropdown (per user)</td><td>Changes role. Toast "&lt;Name&gt; is now &lt;Role&gt;."</td><td><code>PATCH /api/admin/users/&lt;id&gt;</code> {role}</td><td>Disabled on your own row. Demoting a manager un-manages their teams. Making a user HR Manager on a team with no manager makes them its manager.</td></tr>
+<tr><td>Team dropdown (per user)</td><td>Moves the user ("No team" removes). Toast "Moved &lt;name&gt; to &lt;Team&gt;." / "Removed &lt;name&gt; from their team."</td><td><code>PATCH /api/admin/users/&lt;id&gt;</code> {teamId}</td><td>Their existing jobs and candidates follow them; the old team's manager loses sight and the new one gains it.</td></tr>
+<tr><td><span class="lbl">Deactivate</span> / <span class="lbl">Reactivate</span></td><td>Toggles access. Toast "Deactivated &lt;name&gt;." / "Reactivated &lt;name&gt;."</td><td><code>PATCH /api/admin/users/&lt;id&gt;</code> {isActive}</td><td>Disabled on your own row; no confirmation. An admin can deactivate another admin, including the last other one.</td></tr>
+</tbody></table>
+<p class="small">Failures show a red toast with the server's message (fallback "The change could not be saved."; network problems: "Network error - the change could not be saved."). Each change is a single request, followed by a page refresh. There is no delete user, edit email, password reset, resend invite, team delete or team rename in the UI. The banner "Some admin data failed to load. Figures below may be incomplete." appears when a query fails.</p>
+
+<!-- ============ 7 ============ -->
+<h1>7. The AI sourcing pipeline end to end</h1>
+<p>From a pasted job description to a shortlist in fifteen steps. Blue steps are yours, purple use OpenAI, amber call outside services. Note the break between step 12 and 13: <b>searching never scores</b>. Scoring is a separate, manual click.</p>
+<figure>
+<svg viewBox="0 0 700 340" width="690" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif"><defs><marker id="a3" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#5b6878"/></marker></defs>
+<rect x="10" y="20" width="120" height="74" rx="9" fill="#e6f0fc" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="23" cy="33" r="9" fill="#2a78d6"/><text x="23" y="37" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">1</text>
+<text x="72" y="50" text-anchor="middle" font-size="11.5" font-weight="700" fill="#16202e">Job description</text>
+<text x="70" y="65" text-anchor="middle" font-size="9" fill="#5b6878">upload PDF/DOCX/TXT or</text>
+<text x="70" y="76" text-anchor="middle" font-size="9" fill="#5b6878">paste</text>
+<rect x="150" y="20" width="120" height="74" rx="9" fill="#f4f7fb" stroke="#5b6878" stroke-width="2"/>
+<circle cx="163" cy="33" r="9" fill="#5b6878"/><text x="163" y="37" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">2</text>
+<text x="212" y="50" text-anchor="middle" font-size="11.5" font-weight="700" fill="#16202e">Extract text</text>
+<text x="210" y="65" text-anchor="middle" font-size="9" fill="#5b6878">pdf-parse / mammoth</text>
+<rect x="290" y="20" width="120" height="74" rx="9" fill="#efe7fd" stroke="#7c3aed" stroke-width="2"/>
+<circle cx="303" cy="33" r="9" fill="#7c3aed"/><text x="303" y="37" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">3</text>
+<text x="352" y="50" text-anchor="middle" font-size="11.5" font-weight="700" fill="#16202e">AI analysis</text>
+<text x="350" y="65" text-anchor="middle" font-size="9" fill="#5b6878">OpenAI: structured</text>
+<text x="350" y="76" text-anchor="middle" font-size="9" fill="#5b6878">requirements</text>
+<rect x="430" y="20" width="120" height="74" rx="9" fill="#e6f0fc" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="443" cy="33" r="9" fill="#2a78d6"/><text x="443" y="37" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">4</text>
+<text x="492" y="50" text-anchor="middle" font-size="11.5" font-weight="700" fill="#16202e">Edit requirements</text>
+<text x="490" y="65" text-anchor="middle" font-size="9" fill="#5b6878">recruiter reviews</text>
+<text x="490" y="76" text-anchor="middle" font-size="9" fill="#5b6878">chips</text>
+<rect x="570" y="20" width="120" height="74" rx="9" fill="#efe7fd" stroke="#7c3aed" stroke-width="2"/>
+<circle cx="583" cy="33" r="9" fill="#7c3aed"/><text x="583" y="37" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">5</text>
+<text x="632" y="50" text-anchor="middle" font-size="11.5" font-weight="700" fill="#16202e">Query generation</text>
+<text x="630" y="65" text-anchor="middle" font-size="9" fill="#5b6878">OpenAI: 2-4 X-ray</text>
+<text x="630" y="76" text-anchor="middle" font-size="9" fill="#5b6878">queries</text>
+<rect x="570" y="130" width="120" height="74" rx="9" fill="#dcfce9" stroke="#059669" stroke-width="2"/>
+<circle cx="583" cy="143" r="9" fill="#059669"/><text x="583" y="147" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">6</text>
+<text x="632" y="160" text-anchor="middle" font-size="11.5" font-weight="700" fill="#16202e">Save job</text>
+<text x="630" y="175" text-anchor="middle" font-size="9" fill="#5b6878">POST /api/jobs (owner</text>
+<text x="630" y="186" text-anchor="middle" font-size="9" fill="#5b6878">= you)</text>
+<rect x="430" y="130" width="120" height="74" rx="9" fill="#fdf1d6" stroke="#b7791f" stroke-width="2"/>
+<circle cx="443" cy="143" r="9" fill="#b7791f"/><text x="443" y="147" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">7</text>
+<text x="492" y="160" text-anchor="middle" font-size="11.5" font-weight="700" fill="#16202e">Search</text>
+<text x="490" y="175" text-anchor="middle" font-size="9" fill="#5b6878">SerpApi Google,</text>
+<text x="490" y="186" text-anchor="middle" font-size="9" fill="#5b6878">queries in parallel</text>
+<rect x="290" y="130" width="120" height="74" rx="9" fill="#fdf1d6" stroke="#b7791f" stroke-width="2"/>
+<circle cx="303" cy="143" r="9" fill="#b7791f"/><text x="303" y="147" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">8</text>
+<text x="352" y="160" text-anchor="middle" font-size="11.5" font-weight="700" fill="#16202e">Enrichment</text>
+<text x="350" y="175" text-anchor="middle" font-size="9" fill="#5b6878">Apify LinkedIn</text>
+<text x="350" y="186" text-anchor="middle" font-size="9" fill="#5b6878">profiles (optional)</text>
+<rect x="150" y="130" width="120" height="74" rx="9" fill="#f4f7fb" stroke="#5b6878" stroke-width="2"/>
+<circle cx="163" cy="143" r="9" fill="#5b6878"/><text x="163" y="147" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">9</text>
+<text x="212" y="160" text-anchor="middle" font-size="11.5" font-weight="700" fill="#16202e">Egypt check</text>
+<text x="210" y="175" text-anchor="middle" font-size="9" fill="#5b6878">keep only people in</text>
+<text x="210" y="186" text-anchor="middle" font-size="9" fill="#5b6878">Egypt</text>
+<rect x="10" y="130" width="120" height="74" rx="9" fill="#f4f7fb" stroke="#5b6878" stroke-width="2"/>
+<circle cx="23" cy="143" r="9" fill="#5b6878"/><text x="23" y="147" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">10</text>
+<text x="72" y="160" text-anchor="middle" font-size="11.5" font-weight="700" fill="#16202e">Data quality</text>
+<text x="70" y="175" text-anchor="middle" font-size="9" fill="#5b6878">drop implausible</text>
+<text x="70" y="186" text-anchor="middle" font-size="9" fill="#5b6878">company / years</text>
+<rect x="10" y="240" width="120" height="74" rx="9" fill="#f4f7fb" stroke="#5b6878" stroke-width="2"/>
+<circle cx="23" cy="253" r="9" fill="#5b6878"/><text x="23" y="257" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">11</text>
+<text x="72" y="270" text-anchor="middle" font-size="11.5" font-weight="700" fill="#16202e">Normalize + dedupe</text>
+<text x="70" y="285" text-anchor="middle" font-size="9" fill="#5b6878">one record per real</text>
+<text x="70" y="296" text-anchor="middle" font-size="9" fill="#5b6878">person</text>
+<rect x="150" y="240" width="120" height="74" rx="9" fill="#dcfce9" stroke="#059669" stroke-width="2"/>
+<circle cx="163" cy="253" r="9" fill="#059669"/><text x="163" y="257" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">12</text>
+<text x="212" y="270" text-anchor="middle" font-size="11.5" font-weight="700" fill="#16202e">Persist + link</text>
+<text x="210" y="285" text-anchor="middle" font-size="9" fill="#5b6878">candidates,</text>
+<text x="210" y="296" text-anchor="middle" font-size="9" fill="#5b6878">job_candidates, run</text>
+<text x="210" y="307" text-anchor="middle" font-size="9" fill="#5b6878">complete</text>
+<rect x="290" y="240" width="120" height="74" rx="9" fill="#efe7fd" stroke="#7c3aed" stroke-width="2"/>
+<circle cx="303" cy="253" r="9" fill="#7c3aed"/><text x="303" y="257" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">13</text>
+<text x="352" y="270" text-anchor="middle" font-size="11.5" font-weight="700" fill="#16202e">Score (manual)</text>
+<text x="350" y="285" text-anchor="middle" font-size="9" fill="#5b6878">click Score</text>
+<text x="350" y="296" text-anchor="middle" font-size="9" fill="#5b6878">Candidates; OpenAI</text>
+<text x="350" y="307" text-anchor="middle" font-size="9" fill="#5b6878">0-100</text>
+<rect x="430" y="240" width="120" height="74" rx="9" fill="#e6f0fc" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="443" cy="253" r="9" fill="#2a78d6"/><text x="443" y="257" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">14</text>
+<text x="492" y="270" text-anchor="middle" font-size="11.5" font-weight="700" fill="#16202e">Review</text>
+<text x="490" y="285" text-anchor="middle" font-size="9" fill="#5b6878">status, notes, filters</text>
+<rect x="570" y="240" width="120" height="74" rx="9" fill="#e6f0fc" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="583" cy="253" r="9" fill="#2a78d6"/><text x="583" y="257" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">15</text>
+<text x="632" y="270" text-anchor="middle" font-size="11.5" font-weight="700" fill="#16202e">Export</text>
+<text x="630" y="285" text-anchor="middle" font-size="9" fill="#5b6878">Excel .xlsx</text>
+<line x1="130" y1="57" x2="148" y2="57" stroke="#5b6878" stroke-width="2" marker-end="url(#a3)"/>
+<line x1="270" y1="57" x2="288" y2="57" stroke="#5b6878" stroke-width="2" marker-end="url(#a3)"/>
+<line x1="410" y1="57" x2="428" y2="57" stroke="#5b6878" stroke-width="2" marker-end="url(#a3)"/>
+<line x1="550" y1="57" x2="568" y2="57" stroke="#5b6878" stroke-width="2" marker-end="url(#a3)"/>
+<line x1="630" y1="94" x2="630" y2="128" stroke="#5b6878" stroke-width="2" marker-end="url(#a3)"/>
+<line x1="570" y1="167" x2="552" y2="167" stroke="#5b6878" stroke-width="2" marker-end="url(#a3)"/>
+<line x1="430" y1="167" x2="412" y2="167" stroke="#5b6878" stroke-width="2" marker-end="url(#a3)"/>
+<line x1="290" y1="167" x2="272" y2="167" stroke="#5b6878" stroke-width="2" marker-end="url(#a3)"/>
+<line x1="150" y1="167" x2="132" y2="167" stroke="#5b6878" stroke-width="2" marker-end="url(#a3)"/>
+<line x1="70" y1="204" x2="70" y2="238" stroke="#5b6878" stroke-width="2" marker-end="url(#a3)"/>
+<line x1="130" y1="277" x2="148" y2="277" stroke="#5b6878" stroke-width="2" marker-end="url(#a3)"/>
+<line x1="270" y1="277" x2="288" y2="277" stroke="#5b6878" stroke-width="2" marker-end="url(#a3)"/>
+<line x1="410" y1="277" x2="428" y2="277" stroke="#5b6878" stroke-width="2" marker-end="url(#a3)"/>
+<line x1="550" y1="277" x2="568" y2="277" stroke="#5b6878" stroke-width="2" marker-end="url(#a3)"/>
+<rect x="10" y="318" width="14" height="14" rx="3" fill="#e6f0fc" stroke="#2a78d6" stroke-width="2"/><text x="30" y="329" font-size="10.5" fill="#16202e">Recruiter action</text>
+<rect x="145" y="318" width="14" height="14" rx="3" fill="#efe7fd" stroke="#7c3aed" stroke-width="2"/><text x="165" y="329" font-size="10.5" fill="#16202e">OpenAI</text>
+<rect x="280" y="318" width="14" height="14" rx="3" fill="#fdf1d6" stroke="#b7791f" stroke-width="2"/><text x="300" y="329" font-size="10.5" fill="#16202e">External service</text>
+<rect x="415" y="318" width="14" height="14" rx="3" fill="#f4f7fb" stroke="#5b6878" stroke-width="2"/><text x="435" y="329" font-size="10.5" fill="#16202e">Server logic</text>
+<rect x="550" y="318" width="14" height="14" rx="3" fill="#dcfce9" stroke="#059669" stroke-width="2"/><text x="570" y="329" font-size="10.5" fill="#16202e">Database write</text>
+<text x="150" y="224" font-size="10" fill="#b7791f" font-weight="700">Steps 7-12 run in the background after the page gets a 202 reply</text>
+</svg>
+<figcaption>Steps 7 to 12 happen in a background task; the browser polls the run's status until it is complete, failed or 10 minutes pass.</figcaption>
+</figure>
+
+<h2>Stage by stage</h2>
+<table class="compact">
+<thead><tr><th style="width:5%">#</th><th style="width:17%">Stage</th><th>What happens</th><th style="width:26%">Limits and behaviour</th></tr></thead>
+<tbody>
+<tr><td>1-2</td><td>Get the text</td><td>The file is read in the server: PDF via <code>pdf-parse</code>, DOCX via <code>mammoth</code>, TXT as UTF-8. The type is decided by file extension only.</td><td>Max 10 MB (server check). No OCR, so image-only PDFs give empty text. Legacy .doc is unsupported. No rate limit.</td></tr>
+<tr><td>3</td><td>AI analysis</td><td>OpenAI reads the description and returns JSON: job title, seniority, employment type, required and preferred skills, years of experience (min/max), education, certifications, languages, industries, keywords, responsibilities. It is told to use only what the text says.</td><td>Min 50 characters. 10 AI calls per minute per user. Location is forced to "Egypt". Up to 5 automatic retries on temporary AI errors.</td></tr>
+<tr><td>4</td><td>Edit requirements</td><td>You correct anything the AI got wrong in the requirements editor.</td><td>Edits feed the queries and later scoring.</td></tr>
+<tr><td>5</td><td>Query generation</td><td>OpenAI writes 2-4 Google X-ray queries of the form <code>(site:linkedin.com/in OR site:linkedin.com/pub) ("Title A" OR "Title B") "skill" "Egypt"</code>: 3-6 title synonyms, 1-2 short skills and a quoted location.</td><td>Counts against the same 10 AI/min. You cannot see or edit the queries. Queries are stored on the job when the run starts.</td></tr>
+<tr><td>6</td><td>Save job</td><td>The job is written to your account with all fields and the full AI analysis.</td><td>Saved <b>before</b> the search. A failed search leaves the job behind.</td></tr>
+<tr><td>7</td><td>Search (SerpApi)</td><td>All queries run in parallel against Google. Country code eg and google.com.eg bias results to Egypt; the optional city becomes the location. Job boards, company pages, agencies and career pages are filtered out.</td><td>5 searches per minute per user. About 10 organic results per query, so roughly up to 40 raw results. 15 s timeout, 3 tries per request. If every query fails the run ends "error".</td></tr>
+<tr><td>8</td><td>Enrichment (Apify)</td><td>LinkedIn profile URLs are sent to an Apify actor to fetch real name, headline, company, location, about text, skills, experience years and photo. These values override the thin search snippet.</td><td>Optional (needs both env variables). 10 URLs per call, 90 s timeout. If it fails the run continues with search-only data and a note is added to the run's error text.</td></tr>
+<tr><td>9</td><td>Egypt verification</td><td>Only for Egypt-scoped jobs. If a location exists, a word match on "Egypt", "EG" or any of 27 governorates decides; non-matches are dropped. With no location, AI judges from the headline and summary. Unknown is kept.</td><td>Candidates whose location text lacks Egypt or a governorate name (e.g. "Alex" alone) are dropped. Green "Egypt verified" badge appears only when confirmed. AI calls here bypass the rate limiter.</td></tr>
+<tr><td>10</td><td>Data-quality scrub</td><td>Removes implausible values: company names equal to the group's own name variants, and experience years below 0 or above 60.</td><td>Values are blanked, not the person.</td></tr>
+<tr><td>11</td><td>Normalize and dedupe</td><td>Maps everything to one shape and merges duplicates. Identity: LinkedIn slug, else profile URL, else name + company. First value wins, skills are unioned.</td><td>People without URL, or name+company, are never merged.</td></tr>
+<tr><td>12</td><td>Persist and link</td><td>Finds each person among your existing candidates; existing records only get empty fields filled and skills added, otherwise a new record is inserted with status New. Everyone is linked to the job and this run. The run is marked complete with counts (found, new).</td><td>Candidates belong to you globally, not to a job. The run keeps the raw results. Credits used = number of queries (0 in mock mode).</td></tr>
+<tr><td>13</td><td>Score candidates</td><td>You click "Score Candidates". For each candidate OpenAI returns match score plus skills, experience, location, education and seniority scores (0-100), matched and missing requirements, strengths, concerns and a summary.</td><td>Manual only. 3 candidates at a time. Re-scores everything each click. There is no weighting formula in code: the overall score is what the model returns. Skills are compared by meaning (JS = JavaScript).</td></tr>
+<tr><td>14</td><td>Review</td><td>Filter, sort, open profiles, set statuses, add notes.</td><td>Owner only.</td></tr>
+<tr><td>15</td><td>Export</td><td>Excel download of the filtered list (section 9).</td><td>20 exports per minute.</td></tr>
+</tbody></table>
+
+<h2>Sourcing run statuses</h2>
+<div class="tl">
+  <div style="background:#b7791f">pending</div><div style="background:#b7791f;opacity:.8">running</div><div style="background:#059669">complete</div>
+</div>
+<p><span class="chip amber">pending</span> created, waiting to start; <span class="chip amber">running</span> searching and saving; <span class="chip green">complete</span> finished (may still carry a note in the error field, for example a failed enrichment); <span class="chip red">error</span> zero results plus at least one query error, or an unexpected crash ("Search failed unexpectedly. Please try again."). A run can also be stuck at "running" if the server stops the background task, and nothing cleans it up.</p>
+
+<h2>Candidate statuses</h2>
+<table class="compact">
+<thead><tr><th style="width:16%">Status</th><th>Meaning / use</th></tr></thead>
+<tbody>
+<tr><td><span class="chip grey">New</span></td><td>Default for every newly found candidate.</td></tr>
+<tr><td><span class="chip user">Reviewed</span></td><td>A recruiter has looked at the profile.</td></tr>
+<tr><td><span class="chip green">Shortlisted</span></td><td>Worth pursuing. Counted on dashboards; notifies the team manager.</td></tr>
+<tr><td><span class="chip amber">Contacted</span></td><td>Outreach done.</td></tr>
+<tr><td><span class="chip green">Hired</span></td><td>Placed. Notifies the team manager. Added late; some pipeline views list it after Contacted.</td></tr>
+<tr><td><span class="chip red">Rejected</span></td><td>Not pursuing.</td></tr>
+</tbody></table>
+<p class="small">Any status can be changed to any other. Each change is stored in a status-history table by a database trigger (not shown in the UI) and written to the activity log.</p>
+
+<h2>Rate limits at a glance</h2>
+<table class="compact">
+<thead><tr><th style="width:28%">Action</th><th>Limit (per user unless noted)</th></tr></thead>
+<tbody>
+<tr><td>AI calls (analyze, generate queries, batch score, single score)</td><td>10 per 60 seconds, shared among them; one batch score counts as one hit</td></tr>
+<tr><td>Start a search</td><td>5 per 60 seconds</td></tr>
+<tr><td>Exports (Excel of candidates, report CSV/Excel)</td><td>20 per 60 seconds</td></tr>
+<tr><td>Failed-login recording</td><td>10 per 60 seconds per IP address</td></tr>
+<tr><td>Everything else (file extract, jobs CRUD, lists, notes, status, admin routes)</td><td>Not limited</td></tr>
+</tbody></table>
+<p class="small">Limits are kept in memory of each server instance, so they are approximate on Vercel. Exceeding one returns HTTP 429 "Too many requests. Please slow down and try again shortly." with a Retry-After header.</p>
+
+<!-- ============ 8 ============ -->
+<h1>8. Ownership, access tracking and read-only viewing</h1>
+<p>Four words describe who touched a sourcing file. They appear as columns on the dashboard and the Team pages, and they are easy to confuse.</p>
+<div class="grid2">
+<div class="card user"><h3>Created by</h3><p>The person who <b>started the sourcing run</b> (stored as the run's <code>created_by_email</code>). Shown as "File Created By" or "by &lt;starter&gt;". Older runs may have none.</p></div>
+<div class="card admin"><h3>Owned by</h3><p>The owner of the <b>job</b> the run belongs to. Only the owner can change the job, its candidates, scores, statuses and notes. Ownership never transfers, even when someone else opens the file.</p></div>
+<div class="card manager"><h3>Accessed by</h3><p>Every time someone opens the candidate list with a <code>runId</code>, a row is written to the access table. "Last Accessed By" shows the latest row, with a "Not owner" tag on Team pages when the opener is not the owner.</p></div>
+<div class="card"><h3>Managed by</h3><p>The team's manager, shown in the Team hero ("Managed by ...") and the Manager column on <code>/admin</code>. Managers can see their team's data because of their <i>role and team</i>, not because of this label.</p></div>
+</div>
+
+<h2>What opening a teammate's file does</h2>
+<ol class="steps">
+<li>A Manager or Admin clicks <b>View</b> on a file (or follows a run notification). The URL is <code>/candidates?jobId=...&amp;runId=...</code>.</li>
+<li>The page asks the server to record the access. A row is added every time (also for owners opening their own file).</li>
+<li>If the opener is not the owner and has not opened this run in the last 30 minutes, the activity log also gets "Opened &lt;owner&gt;'s sourcing file".</li>
+<li>The job reports that you cannot edit it, so the page switches to read-only: a banner "Viewing &lt;Owner&gt;'s sourcing file - read-only" appears, Score Candidates and delete buttons vanish, and statuses become plain badges.</li>
+<li>Filters, sorting, pagination, candidate profiles and Excel export still work.</li>
+</ol>
+<div class="callout ok"><span class="t">Enforced in three layers</span><p>Hidden buttons are only cosmetic. The API also refuses every write from a non-owner with 403 "You can view this job, but only its owner can change it.", and the database's row-level security has no write policy for anyone else. Not even an Admin can edit another person's data.</p></div>
+
+<h2>Other things to know</h2>
+<ul>
+<li><b>Unseen</b> is per viewer. A candidate becomes "seen" for you only when <i>you</i> open the profile with a job context. A manager's Unseen count says nothing about what the owner has seen.</li>
+<li>Opening via the Jobs page, the picker, or job-scored notifications carries no <code>runId</code>, so <b>no access is recorded</b>.</li>
+<li>Recently Opened links on a member's page record an access by you, not by the member.</li>
+<li>Opening a file does not create a notification. It does appear in the team Activity feed and the Activity report ("Teammate files opened").</li>
+<li>Managers' and admins' Excel exports of a teammate's job are not logged.</li>
+<li>HR Users cannot open other people's jobs at all (the API returns 404).</li>
+</ul>
+
+<!-- ============ 9 ============ -->
+<h1>9. Reports and exports</h1>
+<h2>The four reports</h2>
+<table class="compact">
+<thead><tr><th style="width:20%">Report (tab)</th><th style="width:34%">Summary tiles</th><th>Tables</th></tr></thead>
+<tbody>
+<tr><td><b>Team Performance</b><br><span class="small">Jobs, runs and outcomes per member</span></td><td>Members, Jobs created, Sourcing runs, Candidates sourced, Shortlisted, Average match</td><td><i>Performance by member</i>: Jobs, Sourcing runs, Completed, Active, Failed, Candidates, Shortlisted, Contacted, Rejected, Avg match, with a Total row. Counts are for items created in the period; candidate statuses are current.</td></tr>
+<tr><td><b>Activity</b><br><span class="small">Sign-ins and actions per member</span></td><td>Sign-ins, Failed sign-ins, Sourcing runs, Logged actions, Active members (x / n)</td><td><i>Activity by member</i>: Sign-ins, Failed sign-ins, Job actions, Sourcing runs, Teammate files opened, Candidate actions, Team changes, Reports, Logged actions, Last activity. <i>Actions by type</i>: each action, its events and members, most frequent first. The audit log only began recording in September 2026.</td></tr>
+<tr><td><b>Recruitment Pipeline</b><br><span class="small">Where candidates sit now</span></td><td>Total candidates, New, Reviewed, Shortlisted, Contacted, Rejected, Hired</td><td><i>Pipeline by member</i>: Total and each status, plus <b>Progressed %</b> = (Shortlisted + Contacted + Hired) / Total. Only candidates sourced in the period.</td></tr>
+<tr><td><b>Sourcing Quality</b><br><span class="small">AI match quality</span></td><td>Average match, Files evaluated (x / y), Strong files (70% or more), Weak files (below 40%)</td><td><i>By member</i> (evaluated files, average, Team average row), <i>by job</i> (owner, files, evaluated, average, best file), <i>by sourcing file</i> (job, owner, status, created, candidates, shortlisted, average; up to 500 files).</td></tr>
+</tbody></table>
+
+<h3>Scope and period</h3>
+<table class="compact">
+<thead><tr><th style="width:20%">Role</th><th>Scope</th></tr></thead>
+<tbody>
+<tr><td><span class="chip user">HR User</span></td><td>"My work": yourself only.</td></tr>
+<tr><td><span class="chip manager">HR Manager</span></td><td>Everyone on your team (inactive members shown as "Name (inactive)"). A manager with no team falls back to "My work".</td></tr>
+<tr><td><span class="chip admin">Admin</span></td><td>Whole organization (access-request profiles excluded) or one team, chosen in the Scope dropdown.</td></tr>
+</tbody></table>
+<p><b>Period options:</b> All time, Today, Last 7 days, Last 30 days (default), Last 90 days, Custom range (From/To, inclusive). The window filters items by their <i>created</i> date; "last activity" is always all-time. Times use the server's clock.</p>
+
+<h2>Report exports</h2>
+<ul>
+<li><b>CSV</b>: UTF-8 with BOM (opens correctly in Excel). Header lines (title, Scope, Period, Generated), then each section as a title row, header row, data rows and totals. Percent and match columns get a " (%)" suffix. Values starting with <code>= + - @</code> are prefixed with an apostrophe to prevent spreadsheet formula injection.</li>
+<li><b>Excel</b>: sheet "Overview" (header and summary) plus one sheet per section.</li>
+<li>File name: <code>&lt;title&gt;-report-&lt;scope&gt;-&lt;YYYY-MM-DD&gt;.csv|xlsx</code>. Rate limit 20/min. Each export is logged as "Report exported".</li>
+</ul>
+
+<h2>Excel export of a job's candidates</h2>
+<p>From the candidates page (<b>Export Excel</b>). One sheet named "Candidates", one row per candidate matching the applied filters, ignoring paging. Filename <code>candidates-&lt;job-title-slug&gt;-&lt;YYYY-MM-DD&gt;.xlsx</code>.</p>
+<table class="compact">
+<thead><tr><th>#</th><th>Column</th><th>#</th><th>Column</th><th>#</th><th>Column</th><th>#</th><th>Column</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Name</td><td>6</td><td>Skills</td><td>11</td><td>Education Score</td><td>16</td><td>Source</td></tr>
+<tr><td>2</td><td>Headline</td><td>7</td><td>Match Score</td><td>12</td><td>Seniority Score</td><td>17</td><td>Profile URL</td></tr>
+<tr><td>3</td><td>Company</td><td>8</td><td>Skills Score</td><td>13</td><td>Matched Requirements</td><td>18</td><td>Status</td></tr>
+<tr><td>4</td><td>Location</td><td>9</td><td>Experience Score</td><td>14</td><td>Missing Requirements</td><td>19</td><td>Recruiter Notes</td></tr>
+<tr><td>5</td><td>Experience (years)</td><td>10</td><td>Location Score</td><td>15</td><td>AI Summary</td><td>20</td><td>Date Added</td></tr>
+</tbody></table>
+<p class="small">Lists are joined with ", "; notes newest first; scores are blank if the candidate has not been scored. Strengths, concerns and the Egypt-verified flag are not exported. A job title in a non-Latin script produces a file name like <code>candidates--2026-09-29.xlsx</code>.</p>
+
+<!-- ============ 10 ============ -->
+<h1>10. Activity log and audit trail</h1>
+<p>Every meaningful action writes one row to the <code>activity_log</code> table: who, what, on which record, a readable description and extra details. The log powers the Recent Activity feeds, the Activity report and the manager notifications.</p>
+
+<h2>Who can see it</h2>
+<ul>
+<li><span class="chip user">HR User</span> only their own rows. <span class="chip manager">HR Manager</span> rows of their team's members. <span class="chip admin">Admin</span> all rows.</li>
+<li>Feeds show the newest 20 (admin, team), or 25 on a member page. Descriptions read as "&lt;Actor&gt; &lt;description&gt;" with times such as "2 hours ago".</li>
+<li>There is no screen to search the log or export it.</li>
+</ul>
+
+<h2>Immutability</h2>
+<div class="callout ok"><span class="t">Append-only</span><p>The table has no update or delete policy for anyone. Rows can only be added, and an insert must carry the caller's own user id. Failures to write a log entry are recorded in server logs but never block the action itself. Notifications are generated from log rows by a database trigger and only their "read" time can be changed by the recipient.</p></div>
+
+<h2>Every action name</h2>
+<table class="compact">
+<thead><tr><th style="width:24%">Action</th><th style="width:19%">Label shown</th><th>Meaning and where it is written</th></tr></thead>
+<tbody>
+<tr><td><code>auth.login</code></td><td>Signed in</td><td>Successful password login (via the auth events API) or Google login (via the callback; description "Signed in with Google").</td></tr>
+<tr><td><code>auth.logout</code></td><td>Signed out</td><td>Log out button.</td></tr>
+<tr><td><code>auth.login_failed</code></td><td>Failed sign-in</td><td>Wrong password for an existing account. Recorded by a database function; capped at 10 per account per hour; never reveals whether an email exists.</td></tr>
+<tr><td><code>auth.access_requested</code></td><td>Requested access</td><td>An uninvited person signs up. Written by the sign-up trigger; notifies admins.</td></tr>
+<tr><td><code>job.created</code></td><td>Job created</td><td>New job saved (<code>Created job "Title"</code>).</td></tr>
+<tr><td><code>job.updated</code></td><td>Job updated</td><td>Job edited through the API (no screen uses it).</td></tr>
+<tr><td><code>job.deleted</code></td><td>Job deleted</td><td>Job removed from the picker.</td></tr>
+<tr><td><code>job.candidates_scored</code></td><td>Candidates scored</td><td>Batch scoring finished with at least one candidate scored. Details include counts and strong matches (80%+).</td></tr>
+<tr><td><code>sourcing_run.started</code></td><td>Sourcing run started</td><td>A search was queued (query count and provider recorded).</td></tr>
+<tr><td><code>sourcing_run.completed</code></td><td>Sourcing run completed</td><td>Search finished ("N candidates, M new").</td></tr>
+<tr><td><code>sourcing_run.failed</code></td><td>Sourcing run failed</td><td>Search ended in error.</td></tr>
+<tr><td><code>sourcing_file.accessed</code></td><td>Opened a teammate's sourcing file</td><td>A non-owner opened a run; deduped to once per 30 minutes per person and run.</td></tr>
+<tr><td><code>candidate.status_changed</code></td><td>Candidate status changed</td><td>Status changed (old and new status in details). No entry if unchanged.</td></tr>
+<tr><td><code>candidate.note_added</code></td><td>Candidate note added</td><td>Recruiter note saved.</td></tr>
+<tr><td><code>candidate.deleted</code></td><td>Candidate deleted</td><td>Candidate permanently removed.</td></tr>
+<tr><td><code>team.created</code></td><td>Team created</td><td>Add Team.</td></tr>
+<tr><td><code>team.updated</code></td><td>Team updated</td><td>Manager change or rename.</td></tr>
+<tr><td><code>team.user_updated</code></td><td>User role/team changed</td><td>Role, team or active flag changed ("Updated a@b.com: role, team_id"). Deactivation is recorded this way, with is_active in the details.</td></tr>
+<tr><td><code>team.user_invited</code></td><td>User invited</td><td>Pending invite stored.</td></tr>
+<tr><td><code>team.access_granted</code></td><td>Access granted</td><td>Invite or approval that activated an existing profile.</td></tr>
+<tr><td><code>team.invite_withdrawn</code></td><td>Invite withdrawn</td><td>Withdraw button.</td></tr>
+<tr><td><code>report.viewed</code></td><td>Report viewed</td><td>Opening a report; identical entries are deduped for 10 minutes.</td></tr>
+<tr><td><code>report.exported</code></td><td>Report exported</td><td>CSV or Excel report download.</td></tr>
+</tbody></table>
+<p class="small"><b>Not logged:</b> the invited-user sign-up path, automatic manager assignment, opening the admin page, and Excel exports of candidates. Unknown action codes display as the raw code.</p>
+
+<!-- ============ 11 ============ -->
+<h1>11. Data model</h1>
+<p>Everything lives in one Supabase Postgres database. All 16 tables in the <code>public</code> schema have Row Level Security switched on. Below, the key relationships; the base tables (jobs, candidates and so on) predate the migration folder and were created directly in Supabase.</p>
+<figure>
+<svg viewBox="0 0 760 360" width="700" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
+<line x1="222.0" y1="40.0" x2="62.0" y2="40.0" stroke="#8a97a8" stroke-width="1.6"/>
+<line x1="62.0" y1="130.0" x2="62.0" y2="40.0" stroke="#8a97a8" stroke-width="1.6"/>
+<line x1="222.0" y1="40.0" x2="222.0" y2="130.0" stroke="#8a97a8" stroke-width="1.6"/>
+<line x1="382.0" y1="130.0" x2="222.0" y2="130.0" stroke="#8a97a8" stroke-width="1.6"/>
+<line x1="222.0" y1="130.0" x2="62.0" y2="220.0" stroke="#8a97a8" stroke-width="1.6"/>
+<line x1="222.0" y1="130.0" x2="222.0" y2="220.0" stroke="#8a97a8" stroke-width="1.6"/>
+<line x1="222.0" y1="130.0" x2="382.0" y2="220.0" stroke="#8a97a8" stroke-width="1.6"/>
+<line x1="542.0" y1="220.0" x2="382.0" y2="220.0" stroke="#8a97a8" stroke-width="1.6"/>
+<line x1="222.0" y1="220.0" x2="382.0" y2="220.0" stroke="#8a97a8" stroke-width="1.6"/>
+<line x1="222.0" y1="130.0" x2="342.0" y2="320.0" stroke="#8a97a8" stroke-width="1.6"/>
+<line x1="542.0" y1="220.0" x2="342.0" y2="320.0" stroke="#8a97a8" stroke-width="1.6"/>
+<line x1="542.0" y1="220.0" x2="462.0" y2="320.0" stroke="#8a97a8" stroke-width="1.6"/>
+<line x1="542.0" y1="220.0" x2="582.0" y2="320.0" stroke="#8a97a8" stroke-width="1.6"/>
+<line x1="542.0" y1="220.0" x2="702.0" y2="320.0" stroke="#8a97a8" stroke-width="1.6"/>
+<line x1="222.0" y1="220.0" x2="222.0" y2="320.0" stroke="#8a97a8" stroke-width="1.6"/>
+<line x1="482.0" y1="40.0" x2="642.0" y2="40.0" stroke="#8a97a8" stroke-width="1.6"/>
+<line x1="222.0" y1="40.0" x2="482.0" y2="40.0" stroke="#8a97a8" stroke-width="1.6"/>
+<rect x="10" y="20" width="104" height="40" rx="7" fill="#efe7fd" stroke="#7c3aed" stroke-width="2"/>
+<text x="62.0" y="45" text-anchor="middle" font-size="10.5" font-weight="700" fill="#16202e">teams</text>
+<rect x="170" y="20" width="104" height="40" rx="7" fill="#efe7fd" stroke="#7c3aed" stroke-width="2"/>
+<text x="222.0" y="45" text-anchor="middle" font-size="10.5" font-weight="700" fill="#16202e">profiles</text>
+<rect x="430" y="20" width="104" height="40" rx="7" fill="#fdf1d6" stroke="#b7791f" stroke-width="2"/>
+<text x="482.0" y="45" text-anchor="middle" font-size="10.5" font-weight="700" fill="#16202e">activity_log</text>
+<rect x="590" y="20" width="104" height="40" rx="7" fill="#fdf1d6" stroke="#b7791f" stroke-width="2"/>
+<text x="642.0" y="45" text-anchor="middle" font-size="10.5" font-weight="700" fill="#16202e">notifications</text>
+<rect x="10" y="110" width="104" height="40" rx="7" fill="#efe7fd" stroke="#7c3aed" stroke-width="2"/>
+<text x="62.0" y="127" text-anchor="middle" font-size="10" font-weight="700" fill="#16202e">pending</text><text x="62.0" y="140" text-anchor="middle" font-size="10" font-weight="700" fill="#16202e">role_assignments</text>
+<rect x="170" y="110" width="104" height="40" rx="7" fill="#e6f0fc" stroke="#2a78d6" stroke-width="2"/>
+<text x="222.0" y="135" text-anchor="middle" font-size="10.5" font-weight="700" fill="#16202e">jobs</text>
+<rect x="330" y="110" width="104" height="40" rx="7" fill="#e6f0fc" stroke="#2a78d6" stroke-width="2"/>
+<text x="382.0" y="135" text-anchor="middle" font-size="10.5" font-weight="700" fill="#16202e">companies</text>
+<rect x="10" y="200" width="104" height="40" rx="7" fill="#e6f0fc" stroke="#2a78d6" stroke-width="2"/>
+<text x="62.0" y="217" text-anchor="middle" font-size="10" font-weight="700" fill="#16202e">search</text><text x="62.0" y="230" text-anchor="middle" font-size="10" font-weight="700" fill="#16202e">queries</text>
+<rect x="170" y="200" width="104" height="40" rx="7" fill="#e6f0fc" stroke="#2a78d6" stroke-width="2"/>
+<text x="222.0" y="225" text-anchor="middle" font-size="10.5" font-weight="700" fill="#16202e">search_runs</text>
+<rect x="330" y="200" width="104" height="40" rx="7" fill="#dcfce9" stroke="#059669" stroke-width="2"/>
+<text x="382.0" y="217" text-anchor="middle" font-size="10" font-weight="700" fill="#16202e">job</text><text x="382.0" y="230" text-anchor="middle" font-size="10" font-weight="700" fill="#16202e">candidates</text>
+<rect x="490" y="200" width="104" height="40" rx="7" fill="#dcfce9" stroke="#059669" stroke-width="2"/>
+<text x="542.0" y="225" text-anchor="middle" font-size="10.5" font-weight="700" fill="#16202e">candidates</text>
+<rect x="170" y="300" width="104" height="40" rx="7" fill="#e6f0fc" stroke="#2a78d6" stroke-width="2"/>
+<text x="222.0" y="317" text-anchor="middle" font-size="10" font-weight="700" fill="#16202e">search</text><text x="222.0" y="330" text-anchor="middle" font-size="10" font-weight="700" fill="#16202e">run_access</text>
+<rect x="290" y="300" width="104" height="40" rx="7" fill="#dcfce9" stroke="#059669" stroke-width="2"/>
+<text x="342.0" y="317" text-anchor="middle" font-size="10" font-weight="700" fill="#16202e">candidate</text><text x="342.0" y="330" text-anchor="middle" font-size="10" font-weight="700" fill="#16202e">matches</text>
+<rect x="410" y="300" width="104" height="40" rx="7" fill="#dcfce9" stroke="#059669" stroke-width="2"/>
+<text x="462.0" y="317" text-anchor="middle" font-size="10" font-weight="700" fill="#16202e">candidate</text><text x="462.0" y="330" text-anchor="middle" font-size="10" font-weight="700" fill="#16202e">notes</text>
+<rect x="530" y="300" width="104" height="40" rx="7" fill="#dcfce9" stroke="#059669" stroke-width="2"/>
+<text x="582.0" y="317" text-anchor="middle" font-size="10" font-weight="700" fill="#16202e">candidate</text><text x="582.0" y="330" text-anchor="middle" font-size="10" font-weight="700" fill="#16202e">status_history</text>
+<rect x="650" y="300" width="104" height="40" rx="7" fill="#dcfce9" stroke="#059669" stroke-width="2"/>
+<text x="702.0" y="317" text-anchor="middle" font-size="10" font-weight="700" fill="#16202e">candidate</text><text x="702.0" y="330" text-anchor="middle" font-size="10" font-weight="700" fill="#16202e">views</text>
+<rect x="10" y="348" width="12" height="12" rx="3" fill="#efe7fd" stroke="#7c3aed" stroke-width="2"/><text x="28" y="358" font-size="10.5" fill="#16202e">Access and teams</text>
+<rect x="160" y="348" width="12" height="12" rx="3" fill="#e6f0fc" stroke="#2a78d6" stroke-width="2"/><text x="178" y="358" font-size="10.5" fill="#16202e">Jobs and sourcing</text>
+<rect x="310" y="348" width="12" height="12" rx="3" fill="#dcfce9" stroke="#059669" stroke-width="2"/><text x="328" y="358" font-size="10.5" fill="#16202e">Candidates</text>
+<rect x="460" y="348" width="12" height="12" rx="3" fill="#fdf1d6" stroke="#b7791f" stroke-width="2"/><text x="478" y="358" font-size="10.5" fill="#16202e">Audit and alerts</text>
+</svg>
+<figcaption>Lines mean "belongs to / references". A job links to many candidates through job_candidates; scores live in candidate_matches per job and candidate.</figcaption>
+</figure>
+
+<h2>Tables</h2>
+<table class="compact">
+<thead><tr><th style="width:24%">Table</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>profiles</code></td><td>One row per person (id = login id): email, role, team, <code>is_active</code>. Created only by the sign-up trigger. Access to the app equals an active profile.</td></tr>
+<tr><td><code>teams</code></td><td>Team name and manager id. Names are not unique.</td></tr>
+<tr><td><code>pending_role_assignments</code></td><td>Invites for people who have not signed in: lowercase email, role, team, who created it. Consumed on first sign-in.</td></tr>
+<tr><td><code>companies</code></td><td>The eight group companies used in the job form; read-only to the app.</td></tr>
+<tr><td><code>jobs</code></td><td>A role: title, description, Egypt location, optional city, employment type, arrangement, seniority, skills and other lists, experience range, the full AI analysis, company, owner.</td></tr>
+<tr><td><code>search_queries</code></td><td>The Google queries used for a job and the provider.</td></tr>
+<tr><td><code>search_runs</code></td><td>One sourcing run (= sourcing file): status, counts (total results, found, new), credits used, raw results, error text, start and end, who started it.</td></tr>
+<tr><td><code>candidates</code></td><td>A person, owned by one user: name, headline, company, location, profile URL, source, summary, skills, experience years, raw provider data, <code>status</code>, Egypt-verified flag, photo.</td></tr>
+<tr><td><code>job_candidates</code></td><td>Links a candidate to a job (once) and remembers which run first found them.</td></tr>
+<tr><td><code>candidate_matches</code></td><td>AI scoring per job and candidate: overall and five sub-scores, matched / missing requirements, strengths, concerns, summary, run id. One row per pair; re-scoring overwrites it.</td></tr>
+<tr><td><code>candidate_notes</code></td><td>Recruiter notes.</td></tr>
+<tr><td><code>candidate_status_history</code></td><td>Old and new status for every change, filled by a trigger (not displayed).</td></tr>
+<tr><td><code>candidate_views</code></td><td>Which candidate a user has opened for which job; drives "Unseen".</td></tr>
+<tr><td><code>search_run_access</code></td><td>Who opened a run's candidate list and when; drives "Last Accessed By".</td></tr>
+<tr><td><code>activity_log</code></td><td>The append-only audit trail (section 10).</td></tr>
+<tr><td><code>notifications</code></td><td>One row per recipient and activity entry, with a read time. Created only by trigger.</td></tr>
+</tbody></table>
+
+<h2>Database helper functions</h2>
+<table class="compact">
+<thead><tr><th style="width:32%">Function</th><th>Role</th></tr></thead>
+<tbody>
+<tr><td><code>current_profile_role()</code>, <code>current_profile_team_id()</code>, <code>is_admin()</code></td><td>Return the caller's live role, team, or admin flag; return nothing for deactivated users.</td></tr>
+<tr><td><code>managed_user_ids()</code></td><td>Ids of the members of an active HR Manager's team. Powers manager visibility.</td></tr>
+<tr><td><code>handle_new_user</code> (trigger)</td><td>Creates the profile on sign-up and applies a pending invite; logs access requests.</td></tr>
+<tr><td><code>notify_on_activity</code> (trigger)</td><td>Creates notifications from qualifying log entries.</td></tr>
+<tr><td><code>record_candidate_status_change</code> (trigger)</td><td>Writes the status history.</td></tr>
+<tr><td><code>user_performance_stats</code>, <code>activity_summary</code>, <code>sourcing_files</code>, <code>team_sourcing_files</code></td><td>Aggregations behind dashboards and reports; run with the caller's permissions.</td></tr>
+<tr><td><code>profile_last_sign_ins()</code></td><td>Last sign-in times for admins (all), managers (team) or yourself.</td></tr>
+<tr><td><code>record_failed_login(email)</code></td><td>Records failed logins for known accounts; callable before sign-in.</td></tr>
+</tbody></table>
+
+<!-- ============ 12 ============ -->
+<h1>12. Security model</h1>
+<h2>Layers of protection</h2>
+<div class="grid2">
+<div class="card user"><h3>1. Middleware (route guard)</h3><p>Protects <code>/dashboard /jobs /candidates /settings /admin /manager /reports</code>. No session goes to <code>/login</code>; a session without an active profile is signed out and sent to <code>/login?error=not_allowed</code>. The home page, login, auth callback and <code>/api/*</code> are not covered here.</p></div>
+<div class="card manager"><h3>2. Page checks</h3><p>Server pages re-check the role: <code>/admin</code> redirects non-admins to the dashboard, <code>/manager</code> redirects HR Users, and the team member page returns "not found" outside the manager's team.</p></div>
+<div class="card admin"><h3>3. API guards</h3><p>Every route calls <code>requireUser</code> (401 if no user or profile inactive). Admin routes use <code>requireRole(["admin"])</code> (403). Writes call the owner check (403). Bodies are validated with zod (400). Some routes are rate limited.</p></div>
+<div class="card"><h3>4. Row Level Security</h3><p>The database itself filters rows for every query, regardless of what the app asks for. It is the last line of defense and cannot be bypassed from the browser.</p></div>
+</div>
+
+<h2>What RLS allows, by table group</h2>
+<table class="compact">
+<thead><tr><th style="width:26%">Tables</th><th>Owner</th><th>HR Manager</th><th>Admin</th></tr></thead>
+<tbody>
+<tr><td>jobs, candidates</td><td>Full read and write of own rows</td><td>Read rows of own team's members</td><td>Read all</td></tr>
+<tr><td>job_candidates, candidate_matches, search_queries, search_runs</td><td>Full (through own job)</td><td>Read via team jobs</td><td>Read all</td></tr>
+<tr><td>candidate_notes, candidate_status_history</td><td>Own</td><td>Read team</td><td>Read all</td></tr>
+<tr><td>search_run_access, candidate_views</td><td>Insert own; read own</td><td>Read access rows of visible runs</td><td>Read all</td></tr>
+<tr><td>profiles</td><td>Read own</td><td>Read own team's</td><td>Read and update all</td></tr>
+<tr><td>teams</td><td>Read own team</td><td>Read own team</td><td>Read, create, update (no delete)</td></tr>
+<tr><td>pending_role_assignments</td><td>-</td><td>-</td><td>Full</td></tr>
+<tr><td>companies</td><td colspan="3">Any signed-in user may read; no writes from the app</td></tr>
+<tr><td>activity_log</td><td>Insert and read own</td><td>Read team's</td><td>Read all</td></tr>
+<tr><td>notifications</td><td colspan="3">Recipient reads own and may set only the read time; rows are created by trigger</td></tr>
+</tbody></table>
+<div class="callout"><span class="t">Deactivation reaches the database</span><p>The role helper functions ignore inactive profiles, so a deactivated admin or manager immediately loses elevated data access, not only app access. The original hard-coded email allow-list was removed; only four bootstrap accounts were kept active when access control moved into the database.</p></div>
+
+<h2>Other protections</h2>
+<ul>
+<li><b>Secrets</b>: the service-role key and provider keys stay on the server. Errors returned to users are safe generic messages; every response carries an <code>X-Request-Id</code> for support.</li>
+<li><b>Sign-in abuse</b>: failed-login recording is rate limited per IP and per account and never confirms whether an email exists.</li>
+<li><b>CSV injection</b>: exported cells starting with <code>= + - @</code>, tab or carriage return are neutralised.</li>
+<li><b>Export and AI limits</b> protect cost and stability (section 7). The limiter is per server instance, in memory.</li>
+<li><b>No email is ever sent</b> by the system, including invites; nothing to phish or misdeliver, but people must be told out of band.</li>
+</ul>
+
+<h2>Error responses</h2>
+<table class="compact">
+<thead><tr><th style="width:9%">Status</th><th style="width:38%">Message</th><th>When</th></tr></thead>
+<tbody>
+<tr><td>400</td><td>First validation message, or "Request body must be valid JSON."</td><td>Body fails validation; also file extraction errors (own message, e.g. "File is too large. Maximum size is 10MB.").</td></tr>
+<tr><td>401</td><td>Unauthorized</td><td>Not signed in, or profile missing or deactivated.</td></tr>
+<tr><td>403</td><td>Forbidden / "You can view this job, but only its owner can change it."</td><td>Wrong role, or write on someone else's record.</td></tr>
+<tr><td>404</td><td>"Job not found.", "Candidate not found.", "Sourcing run not found." ...</td><td>Missing, or hidden from you by RLS.</td></tr>
+<tr><td>409</td><td>"This person already has access." / "This record already exists."</td><td>Duplicate invite target, or unique-constraint clash.</td></tr>
+<tr><td>429</td><td>"Too many requests. Please slow down and try again shortly."</td><td>Rate limit hit (Retry-After header).</td></tr>
+<tr><td>500</td><td>"A database error occurred." / "Something went wrong. Please try again." / route-specific "Failed to ..."</td><td>Unexpected failure.</td></tr>
+<tr><td>502</td><td>"The AI service is currently unavailable...", "The AI returned an unexpected response...", "The search provider is currently unavailable..."</td><td>An outside service failed or returned garbage (after retries).</td></tr>
+<tr><td>504</td><td>"The request took too long. Please try again."</td><td>Timeout.</td></tr>
+</tbody></table>
+
+<!-- ============ 13 ============ -->
+<h1>13. Common workflows</h1>
+
+<h2>A. Recruiter runs a search <span class="chip user">HR User</span></h2>
+<ol class="steps">
+<li>Open <b>Jobs &rarr; New Job</b> (or the dashboard button).</li>
+<li>Fill Job Title, Company, Employment Type, Work Arrangement.</li>
+<li>Upload the job description (PDF, DOCX, TXT) or paste at least 50 characters.</li>
+<li>Click <b>Analyze Job with AI</b> and wait for "Requirements successfully extracted".</li>
+<li>Review the requirements: fix seniority, pick a City if the role is city-specific, trim or add skills, education and keywords.</li>
+<li>Click <b>Generate Queries &amp; Find Candidates</b>. Do not click again if it fails after "Saving role": the job already exists, so check <b>Jobs</b> first.</li>
+<li>Wait for the "Candidate Sourcing Complete!" dialog and click <b>Show Candidates</b>.</li>
+<li>Click <b>Score Candidates</b> and wait for the toast. Sort by Match Score.</li>
+<li>Open promising people, set statuses (Reviewed, Shortlisted...), add notes.</li>
+<li>Use <b>Export Excel</b> to share the shortlist (apply filters first, for example Status = Shortlisted).</li>
+</ol>
+
+<h2>B. Manager reviews a teammate's file <span class="chip manager">HR Manager</span></h2>
+<ol class="steps">
+<li>Click the bell if you have notifications, or open <b>Team</b> in the menu.</li>
+<li>On <b>Team Sourcing Files</b> filter by member, status, dates or minimum match.</li>
+<li>Click <b>View</b> on the file. Your access is recorded and the page opens read-only.</li>
+<li>Sort by Match Score, open candidates with the eye icon to read scores, strengths, concerns and notes.</li>
+<li>Use <b>Export Excel</b> if you need a copy.</li>
+<li>To give feedback or ask for changes, talk to the owner: you cannot change statuses, notes or scores.</li>
+<li>For a broader view use <b>Team &rarr; Member page</b> and <b>Reports</b> (team scope).</li>
+</ol>
+
+<h2>C. Admin onboards a person <span class="chip admin">Admin</span></h2>
+<ol class="steps">
+<li>Open <b>Admin &rarr; Access &amp; Invitations</b>.</li>
+<li>Enter the person's exact work email, pick Role and Team (pick a team first if needed; see workflow D).</li>
+<li>Click <b>Invite</b>. A green toast confirms.</li>
+<li>Tell the person yourself to open the app and sign up (email and password, or Google) with that exact email. Nothing is emailed.</li>
+<li>They confirm their email if using a password, then log in. They arrive on the dashboard with the role and team you chose.</li>
+<li>If they signed in before you invited them, they are in <b>Access requests</b>: choose role and team and click <b>Approve</b> (or invite them, which activates them at once).</li>
+<li>To remove access later, use <b>Deactivate</b> in User Management.</li>
+</ol>
+
+<h2>D. Admin creates a team and assigns a manager <span class="chip admin">Admin</span></h2>
+<ol class="steps">
+<li>In the <b>Teams</b> card type the name next to "New team name" and click <b>Add Team</b>.</li>
+<li>Make sure the future manager exists with the role HR Manager and is active (Invite as HR Manager, or change their role in User Management).</li>
+<li>In the Teams table open the <b>Manager</b> dropdown for the new team and pick them. They are moved into the team automatically and removed as manager of any other.</li>
+<li>Move the team's recruiters into it using the <b>Team</b> dropdown in User Management. Their existing work moves with them.</li>
+<li>Click the team name to open the team dashboard and check members, then confirm the manager sees a Team link and the bell.</li>
+</ol>
+
+<!-- ============ 14 ============ -->
+<h1>14. Known limitations and gotchas</h1>
+<p>An honest list of behaviours a new owner should know about. None stop the system from working, but each can surprise people.</p>
+
+<h2>Sourcing and scoring</h2>
+<table class="compact">
+<thead><tr><th style="width:30%">Gotcha</th><th>Details</th></tr></thead>
+<tbody>
+<tr><td>Search does not score</td><td>The UI says "computing AI match scores" and "evaluated N candidates", but scores exist only after clicking Score Candidates. Dashboards show "No evaluated files yet" until then.</td></tr>
+<tr><td>Job is saved before the search</td><td>If starting the search fails (for example the 5/min limit), the job stays and clicking again creates a duplicate job.</td></tr>
+<tr><td>Queries are invisible</td><td>Generated queries are stored but never shown, and cannot be edited. The <code>SearchQueries</code> editor component exists but is unused.</td></tr>
+<tr><td>Score has no formula</td><td>The overall match score is whatever the AI returns. A fractional score would fail to save that candidate (reported as a failure).</td></tr>
+<tr><td>Score button re-scores everything</td><td>No confirmation, overwrites earlier scores, costs one AI call per candidate and runs synchronously with no time limit configured.</td></tr>
+<tr><td>Non-durable background search</td><td>Runs after the HTTP reply with no retry. If the server stops it, the run can stay "running" forever; nothing cleans it up. The page stops watching after 10 minutes.</td></tr>
+<tr><td>Egypt filter is text-based</td><td>Candidates whose location lacks "Egypt" or a governorate name (e.g. "Alex") are dropped.</td></tr>
+<tr><td>Default search provider is mock</td><td>Unless <code>SEARCH_PROVIDER=serpapi</code>, results are 8 fixture people. <code>serper</code> throws "not implemented".</td></tr>
+<tr><td>Complete runs can carry errors</td><td>A "complete" run may hold a note (failed enrichment, link errors) that the UI does not display.</td></tr>
+<tr><td>Employment Type / Title duplicated</td><td>The requirements editor's copies of these are ignored for the saved job once the Job Details section is filled.</td></tr>
+<tr><td>Scanned PDFs</td><td>Produce empty text; Analyze stays disabled with no explanation. The 10 MB check is server-side only, and hosting limits may reject large uploads earlier.</td></tr>
+</tbody></table>
+
+<h2>Candidates and data</h2>
+<table class="compact">
+<thead><tr><th style="width:30%">Gotcha</th><th>Details</th></tr></thead>
+<tbody>
+<tr><td>Candidate delete is global</td><td>Deleting removes the candidate from every job, with notes, history and matches, though the toast says "removed from this job".</td></tr>
+<tr><td>Status is global</td><td>A candidate's status is shared across all jobs they are linked to.</td></tr>
+<tr><td>No confirmations</td><td>Status changes, Score Candidates, Approve, Deactivate, Withdraw, role and team changes and Log out all act on first click. Only deleting a job or candidate asks.</td></tr>
+<tr><td>Picker shows 20 jobs</td><td>The Candidates job picker lists only your 20 newest jobs and has no pager; use the Jobs page for older ones.</td></tr>
+<tr><td>Dashboard "today" links</td><td>Candidate links in "Today's Searched Candidates" open the profile without job context (no Match card, not marked seen).</td></tr>
+<tr><td>Export is a plain link</td><td>Errors (like a 429) navigate to raw JSON. Filters typed but not applied are not exported.</td></tr>
+<tr><td>Status change on profile</td><td>Can hide the Match Score card and edit controls until reload.</td></tr>
+<tr><td>Notes are permanent</td><td>Cannot be edited, deleted, and do not show the author.</td></tr>
+<tr><td>Average match differs</td><td>The average excludes scores without a run id, while the distribution chart includes all scores.</td></tr>
+<tr><td>Shortlisted counts</td><td>Dashboard shortlisted counts ignore Hired and Contacted.</td></tr>
+</tbody></table>
+
+<h2>Access and administration</h2>
+<table class="compact">
+<thead><tr><th style="width:30%">Gotcha</th><th>Details</th></tr></thead>
+<tbody>
+<tr><td>No reject for access requests</td><td>Admins can only Approve. Unwanted requests stay listed forever.</td></tr>
+<tr><td>No emails or notices</td><td>Invites, approvals, role changes and deactivations are not communicated to the person.</td></tr>
+<tr><td>Deactivated lookalike</td><td>A deactivated HR User with no team is shown as an access request.</td></tr>
+<tr><td>No last-admin guard</td><td>You cannot demote or deactivate yourself, but you can do it to another admin, even the last other one.</td></tr>
+<tr><td>Team management is thin</td><td>No rename or delete team in the UI; duplicate team names are allowed; Add Team has no manager picker; "Unassigned" keeps the old manager's team and permissions.</td></tr>
+<tr><td>Multi-step changes are not atomic</td><td>User and team updates run several statements; a failure midway can leave partial changes, and creating a team with an invalid manager returns an error but leaves the team.</td></tr>
+<tr><td>Invite defaults</td><td>The Team dropdown's default is fixed when the page first renders; teams created later require a reload. Invites never expire; a mistyped email sits until withdrawn.</td></tr>
+<tr><td>Sign-in redirect</td><td>The <code>redirectTo</code> set by the route guard is ignored by password login; you always land on the dashboard.</td></tr>
+<tr><td>Settings are empty</td><td>Only shows your email. No password change or profile editing.</td></tr>
+<tr><td>Companies have no UI</td><td>Changed only in the database.</td></tr>
+</tbody></table>
+
+<h2>Platform</h2>
+<table class="compact">
+<thead><tr><th style="width:30%">Gotcha</th><th>Details</th></tr></thead>
+<tbody>
+<tr><td>In-memory rate limiter</td><td>Each server instance counts separately, so limits are soft on a serverless host and reset on restart. Admin routes are not limited at all.</td></tr>
+<tr><td>Time zones</td><td>"Today" and report windows use the server clock (UTC on Vercel), not the viewer's.</td></tr>
+<tr><td>Team dashboards are snapshots</td><td>No auto-refresh; caps of 200 files (500 with filters) apply to team KPIs, 20 items to activity feeds and notifications.</td></tr>
+<tr><td>Manager sees only their team</td><td>A manager without a team, or an inactive one, sees nothing of the team.</td></tr>
+</tbody></table>
+
+<!-- ============ 15 ============ -->
+<h1>15. Glossary</h1>
+<table>
+<thead><tr><th style="width:22%">Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>Access request</td><td>An inactive profile created when an uninvited person signs up; waits for an admin to approve.</td></tr>
+<tr><td>Active / Inactive</td><td>Whether a profile may use the app. Inactive users are blocked everywhere.</td></tr>
+<tr><td>Admin</td><td>Highest role: manages people and teams, sees the whole organization, cannot edit others' sourcing data.</td></tr>
+<tr><td>AI analysis</td><td>Structured requirements OpenAI extracts from a job description.</td></tr>
+<tr><td>Apify</td><td>Service that fetches full LinkedIn profile details from URLs.</td></tr>
+<tr><td>Bell</td><td>Notification dropdown for Admins and HR Managers.</td></tr>
+<tr><td>Candidate</td><td>A person found by a search, owned by one user.</td></tr>
+<tr><td>Dedupe</td><td>Merging records that describe the same person.</td></tr>
+<tr><td>Egypt verified</td><td>Green badge: the candidate's location was confirmed to be in Egypt.</td></tr>
+<tr><td>File / Sourcing file</td><td>A single sourcing run for a job.</td></tr>
+<tr><td>HR Manager</td><td>Leader of a team; read-only visibility of the team's work.</td></tr>
+<tr><td>HR User</td><td>Recruiter; sees only own work.</td></tr>
+<tr><td>Invite / Pending invite</td><td>A stored role and team for an email that has not signed in yet.</td></tr>
+<tr><td>Job</td><td>A role being hired for, owned by its creator.</td></tr>
+<tr><td>Match score</td><td>AI rating 0-100 of how well a candidate fits a specific job. Green 70+, amber 40-69, red below 40; 80+ is a "strong match" for notifications.</td></tr>
+<tr><td>Owner</td><td>The user who created a job or candidate; the only one who can change it.</td></tr>
+<tr><td>Read-only mode</td><td>What a Manager or Admin sees when opening someone else's file.</td></tr>
+<tr><td>RLS</td><td>Row Level Security: database rules that decide which rows each user can read or write.</td></tr>
+<tr><td>Sourcing run</td><td>One execution of the search-and-collect process for a job.</td></tr>
+<tr><td>SerpApi</td><td>Service that runs Google searches and returns the results.</td></tr>
+<tr><td>Strong match</td><td>A match score of 80% or higher.</td></tr>
+<tr><td>Team</td><td>A named group of users with at most one recorded manager.</td></tr>
+<tr><td>Unseen</td><td>Candidates in a file that you have not opened (per viewer).</td></tr>
+<tr><td>X-ray search</td><td>A Google query limited to a site (here LinkedIn profile URLs) with title and skill keywords.</td></tr>
+</tbody></table>
+<p class="small" style="margin-top:14px">End of the System Guide.</p>
+</body></html>

@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Admin Role Guide</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="style.css">
+<style>
+  .three { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+  .col { border-radius:8px; padding:10px 12px; border:1px solid var(--line); }
+  .col h3 { margin:0 0 6px; font-size:12.5pt; }
+  .col ul { padding-left:16px; margin:0; font-size:9.2pt; }
+  .col.see { background:var(--blue-soft); border-top:5px solid var(--blue); } .col.see h3{color:var(--blue-dark);}
+  .col.do { background:var(--green-soft); border-top:5px solid var(--green); } .col.do h3{color:var(--green);}
+  .col.no { background:var(--red-soft); border-top:5px solid var(--red); } .col.no h3{color:var(--red);}
+  .tip { border-left:4px solid var(--admin); background:var(--admin-soft); padding:8px 12px; margin:10px 0; border-radius:0 6px 6px 0; break-inside:avoid; }
+  .tip b.k { color:var(--admin); }
+  .mock .body.tall { min-height: 205mm; }
+  .mock .grid-in { display:grid; gap:8px; }
+  h1 .num { color:var(--admin); }
+  h1 { color:#5b21b6; border-color:var(--admin); }
+  h3 { color:#5b21b6; }
+  th { background:#4c1d95; }
+  .steps li::before { background:var(--admin); }
+  .kv td:first-child { width:34%; font-weight:600; }
+  table.buttons{table-layout:fixed} table.buttons td:first-child{white-space:normal !important} table.buttons td{word-wrap:break-word}
+  table.buttons code{font-size:7.6pt;word-break:break-all}
+  .toc-two { columns:2; column-gap:18px; }
+</style></head>
+<body>
+
+<!-- ================= COVER ================= -->
+<section class="cover">
+  <div class="band admin">
+    <div class="kicker">AI Candidate Sourcing Platform</div>
+    <h1 class="title">Admin Role Guide</h1>
+    <div class="subtitle">Everything the system-wide administrator sees, does, and cannot do: access control, teams, managers, reports, and safety limits.</div>
+    <div class="meta"><span>Audience: Admin</span><span>Scope: whole organization</span><span>Print-ready A4</span></div>
+  </div>
+  <div class="toc-mini">
+    <h2>Contents</h2>
+    <ol class="toc toc-two">
+      <li><span class="n">1</span>Role at a glance</li>
+      <li><span class="n">2</span>What the admin sees</li>
+      <li><span class="n">3</span>Signing in and access control</li>
+      <li><span class="n">4</span>The Admin Dashboard (/admin)</li>
+      <li><span class="n">5</span>Button and control reference</li>
+      <li><span class="n">6</span>Step-by-step tasks</li>
+      <li><span class="n">7</span>Team and manager rules</li>
+      <li><span class="n">8</span>Reports and exports</li>
+      <li><span class="n">9</span>Read-only access to others' work</li>
+      <li><span class="n">10</span>Notifications an admin gets</li>
+      <li><span class="n">11</span>Activity you generate</li>
+      <li><span class="n">12</span>Limits and safety</li>
+      <li><span class="n">13</span>Troubleshooting FAQ</li>
+      <li><span class="n">14</span>Permission matrix</li>
+    </ol>
+    <div class="callout warn"><span class="t">Read section 12 before your first change</span>Admin actions take effect immediately, ask for no confirmation, and send no email or notice to the person affected.</div>
+  </div>
+  <div class="foot">Companion guides: HR Manager Role Guide and HR User Role Guide. Facts in this guide were verified against the application code and database migrations.</div>
+</section>
+
+<!-- ================= 1 ================= -->
+<h1 class="first"><span class="num">1</span> Role at a glance</h1>
+<p><span class="chip admin">Admin</span> is the highest of three roles (<b>Admin</b>, <b>HR Manager</b>, <b>HR User</b>). An admin is the organization's gatekeeper: nobody can use the platform unless an admin has invited or approved them, and only an admin can create teams, choose managers, change roles, or deactivate accounts.</p>
+
+<div class="grid2">
+  <div class="card admin"><h3>Scope</h3><p>The <b>whole organization</b>: every team, every user, every sourcing file. The admin reads all of it, but writes only to <i>their own</i> jobs and candidates.</p></div>
+  <div class="card admin"><h3>Main workplaces</h3><p><code>/admin</code> for people and teams, <code>/manager</code> for one team's dashboard, <code>/reports</code> for org-wide or per-team reports, plus the normal personal pages.</p></div>
+</div>
+
+<h2>Can see / Can do / Cannot do</h2>
+<div class="three">
+  <div class="col see"><h3>CAN SEE</h3>
+    <ul>
+      <li>Every user, role, team, status, last login and last activity</li>
+      <li>Org-wide pipeline: New, Reviewed, Shortlisted, Contacted, Hired, Rejected</li>
+      <li>Status of every sourcing run (running, completed, failed)</li>
+      <li>Every team's dashboard, member pages and sourcing files</li>
+      <li>Any job, candidate, score, note and status history, opened read-only</li>
+      <li>The latest 20 recorded actions across the organization</li>
+      <li>Pending invites and access requests</li>
+      <li>Org-wide or per-team reports (4 types)</li>
+      <li>Own personal dashboard, jobs and candidates</li>
+    </ul></div>
+  <div class="col do"><h3>CAN DO</h3>
+    <ul>
+      <li>Invite a person with a role and team</li>
+      <li>Approve an access request (choose role and team)</li>
+      <li>Withdraw an unused invite</li>
+      <li>Change a user's role (Admin, HR Manager, HR User)</li>
+      <li>Move a user to a team or to "No team"</li>
+      <li>Deactivate and reactivate accounts</li>
+      <li>Create teams</li>
+      <li>Assign or clear a team's manager</li>
+      <li>Export reports (CSV, Excel) and any readable job (Excel)</li>
+      <li>Create and manage own jobs and searches, like any user</li>
+    </ul></div>
+  <div class="col no"><h3>CANNOT DO</h3>
+    <ul>
+      <li>Reject or delete an access request</li>
+      <li>Delete a user or edit an email address</li>
+      <li>Demote or deactivate <b>their own</b> account</li>
+      <li>Rename or delete a team from the UI</li>
+      <li>Edit, delete, re-score, re-run or annotate anyone else's jobs and candidates</li>
+      <li>Resend an invite (no email is ever sent)</li>
+      <li>Reset a password or force a sign-out</li>
+      <li>Be a team's manager (only an active HR Manager can)</li>
+      <li>Undo an action with a button: there is no undo or confirmation</li>
+    </ul></div>
+</div>
+
+<div class="callout"><span class="t">Identity in one line</span>People are identified by <b>email only</b>. The display name shown everywhere is derived from the part before the @, split on <code>.</code> <code>-</code> <code>_</code> and Title-Cased: <code>zeyad.ragab@company.com</code> appears as "Zeyad Ragab".</div>
+
+<!-- ================= 2 ================= -->
+<h1><span class="num">2</span> What the admin sees</h1>
+<h2>The navigation bar</h2>
+<div class="mock"><div class="bar"><i></i><i></i><i></i><span class="url">top navigation, signed in as Admin</span></div>
+  <div class="nav"><b>AI Candidate</b><span>Dashboard</span><span>Jobs</span><span>Candidates</span><span>Reports</span><span>Settings</span><span>Team</span><span class="on">Admin</span><span class="sp"></span><span>&#128276; 2</span><span class="btn out" style="color:#1c5cab">Log out</span></div>
+</div>
+<table>
+<thead><tr><th style="width:17%">Item</th><th style="width:18%">Goes to</th><th>Notes for the admin</th></tr></thead>
+<tr><td>Dashboard</td><td><code>/dashboard</code></td><td><b>Personal</b>: only the admin's own jobs, candidates and runs (not the organization).</td></tr>
+<tr><td>Jobs</td><td><code>/jobs</code></td><td><b>Personal</b>: lists only jobs the admin created. Other people's jobs are reached through links, not this list.</td></tr>
+<tr><td>Candidates</td><td><code>/candidates</code></td><td>Job picker lists own jobs; any job can be opened through a link (<code>?jobId=</code>) read-only.</td></tr>
+<tr><td>Reports</td><td><code>/reports</code></td><td>Admin-only scope selector: "Whole organization" or one team.</td></tr>
+<tr><td>Settings</td><td><code>/settings</code></td><td>One "Account" card showing "Signed in as" + email. No admin settings exist.</td></tr>
+<tr><td>Team</td><td><code>/manager</code></td><td>Shown to admins and HR Managers. Admins can switch between all teams.</td></tr>
+<tr><td>Admin</td><td><code>/admin</code></td><td>Admin only. Non-admins who type the URL are silently redirected to <code>/dashboard</code>.</td></tr>
+<tr><td>Bell</td><td>dropdown</td><td>Shown to admins and HR Managers. For admins it carries access-request alerts (section 10).</td></tr>
+<tr><td>Log out</td><td>-</td><td>Records "Signed out", ends the session, returns to <code>/login</code>. No confirmation.</td></tr>
+</table>
+<div class="callout warn"><span class="t">Common surprise</span>The nav is display-only. It is filled in after the page loads by asking the database for your role; every page and API re-checks the role on the server. Until the role loads you briefly see only the five base links.</div>
+
+<h2>Personal pages versus organization pages</h2>
+<div class="grid2">
+  <div class="card"><h3>Personal (yours only)</h3><ul><li><code>/dashboard</code>: Active Jobs, Total Candidates, Average Match Quality, Shortlisted Talent, pipeline stages, score distribution, today's candidates, your sourcing files</li><li><code>/jobs</code> and the job picker on <code>/candidates</code></li><li>Buttons "New Job Opening", "Browse Candidates", "New Job"</li></ul></div>
+  <div class="card admin"><h3>Organization (everyone's data)</h3><ul><li><code>/admin</code>: whole-organization figures and controls</li><li><code>/manager?teamId=...</code>: one team at a time</li><li><code>/manager/team/{userId}</code>: any single user</li><li><code>/reports</code>: org-wide or per-team</li></ul></div>
+</div>
+<p class="small">Because the admin dashboard figures are personal, do not compare <code>/dashboard</code> numbers with <code>/admin</code> numbers: they cover different people.</p>
+
+<!-- ================= 3 ================= -->
+<h1><span class="num">3</span> Signing in and being the last line of access</h1>
+<h2>The access model</h2>
+<p><b>Access is a single fact: the person has an active profile.</b> There is no email allowlist any more. Anyone can create an account or use Google sign-in, but without an active profile they are signed straight back out.</p>
+<table class="kv">
+<tr><td>Middleware rule</td><td>Protected pages (<code>/dashboard /jobs /candidates /settings /admin /manager /reports</code>): not signed in goes to <code>/login?redirectTo=...</code>; signed in without an active profile is signed out and sent to <code>/login?error=not_allowed</code>.</td></tr>
+<tr><td>API and database rule</td><td>Every API call checks the caller: no user or inactive profile gives <code>401 Unauthorized</code>, wrong role <code>403 Forbidden</code>. Admin and manager powers in the database also require an active profile.</td></tr>
+<tr><td>Message the person sees</td><td>"Your account doesn't have access yet. Ask an admin to invite you or approve your access request."</td></tr>
+<tr><td>After password sign-up</td><td>"Account created. Check your email to confirm, then log in. If you weren't invited, an admin will need to approve your access first." (This email is Supabase's confirmation mail; the platform itself sends none.)</td></tr>
+</table>
+
+<h2>The four account states</h2>
+<figure>
+<svg viewBox="0 0 760 330" width="470" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif" font-size="12">
+  <defs><marker id="a" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#475569"/></marker>
+  <marker id="g" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#059669"/></marker>
+  <marker id="r" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#d03b3b"/></marker></defs>
+  <rect x="10" y="20" width="150" height="62" rx="9" fill="#efe7fd" stroke="#7c3aed" stroke-width="2"/>
+  <text x="85" y="43" text-anchor="middle" font-weight="700" fill="#5b21b6">INVITED</text><text x="85" y="60" text-anchor="middle" fill="#334155">pending_role_assignments</text><text x="85" y="74" text-anchor="middle" fill="#334155" font-size="10.5">no account yet</text>
+  <rect x="10" y="230" width="150" height="62" rx="9" fill="#fdf1d6" stroke="#b7791f" stroke-width="2"/>
+  <text x="85" y="253" text-anchor="middle" font-weight="700" fill="#b7791f">ACCESS REQUEST</text><text x="85" y="270" text-anchor="middle" fill="#334155">inactive, no team, HR User</text><text x="85" y="284" text-anchor="middle" fill="#334155" font-size="10.5">signed out on arrival</text>
+  <rect x="300" y="125" width="170" height="70" rx="9" fill="#dcfce9" stroke="#059669" stroke-width="2.5"/>
+  <text x="385" y="152" text-anchor="middle" font-weight="700" fill="#059669" font-size="14">ACTIVE</text><text x="385" y="170" text-anchor="middle" fill="#334155">can sign in, role + team apply</text><text x="385" y="184" text-anchor="middle" fill="#334155" font-size="10.5">badge "Active"</text>
+  <rect x="590" y="125" width="160" height="70" rx="9" fill="#e9edf3" stroke="#5b6878" stroke-width="2"/>
+  <text x="670" y="152" text-anchor="middle" font-weight="700" fill="#334155" font-size="14">DEACTIVATED</text><text x="670" y="170" text-anchor="middle" fill="#334155">blocked, data kept</text><text x="670" y="184" text-anchor="middle" fill="#334155" font-size="10.5">badge "Inactive"</text>
+  <rect x="300" y="250" width="170" height="52" rx="9" fill="#fff" stroke="#94a3b8" stroke-dasharray="5 4"/>
+  <text x="385" y="272" text-anchor="middle" fill="#334155">Stranger / new person</text><text x="385" y="288" text-anchor="middle" fill="#334155" font-size="10.5">signs up or uses Google</text>
+  <!-- arrows -->
+  <path d="M160 40 C 230 40 250 130 298 148" fill="none" stroke="#059669" stroke-width="2" marker-end="url(#g)"/>
+  <text x="170" y="34" fill="#059669" font-size="11">first sign-in (auto-active)</text>
+  <path d="M385 250 L385 199" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#a)"/>
+  <text x="392" y="222" fill="#475569" font-size="11">no invite found</text>
+  <path d="M300 285 L164 262" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#a)"/>
+  <path d="M120 230 C 150 190 240 170 298 165" fill="none" stroke="#059669" stroke-width="2" marker-end="url(#g)"/>
+  <text x="112" y="200" fill="#059669" font-size="11">Approve / Invite</text>
+  <path d="M470 150 L588 150" fill="none" stroke="#d03b3b" stroke-width="2" marker-end="url(#r)"/>
+  <text x="500" y="143" fill="#d03b3b" font-size="11">Deactivate</text>
+  <path d="M588 172 L472 172" fill="none" stroke="#059669" stroke-width="2" marker-end="url(#g)"/>
+  <text x="500" y="188" fill="#059669" font-size="11">Reactivate</text>
+  <path d="M85 20 C 85 4 300 4 385 4 L385 124" fill="none" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#a)" opacity="0"/>
+  <path d="M85 82 L85 226" fill="none" stroke="#b7791f" stroke-width="1.5" stroke-dasharray="4 4" opacity="0"/>
+  <path d="M670 195 C 670 260 560 290 476 285" fill="none" stroke="#b7791f" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="540" y="318" fill="#b7791f" font-size="10.5" text-anchor="middle">Edge case: a deactivated HR User with no team looks like an access request</text>
+  <text x="20" y="110" fill="#5b6878" font-size="10.5">Typo in invite email: stays</text><text x="20" y="123" fill="#5b6878" font-size="10.5">INVITED until withdrawn</text>
+</svg>
+<figcaption>Account lifecycle. Green arrows are admin actions that grant access; the red arrow removes it.</figcaption></figure>
+
+<table>
+<thead><tr><th style="width:16%">State</th><th style="width:34%">How it is stored</th><th>What the person experiences</th><th style="width:22%">Where you see it</th></tr></thead>
+<tr><td><span class="chip admin">Invited</span></td><td>A row in the invites table (email, role, team). No account exists.</td><td>On first sign-in (Google or password sign-up) the account is created <b>already active</b> with the invited role and team.</td><td>Access &amp; Invitations, "Pending invites"</td></tr>
+<tr><td><span class="chip amber">Access request</span></td><td>Inactive profile, role HR User, no team.</td><td>Signs up or signs in without an invite: immediately signed out with "not_allowed". Waits until approved.</td><td>"Access requests" list, badge count, bell alert</td></tr>
+<tr><td><span class="chip green">Active</span></td><td>Active profile with role and optional team.</td><td>Full use of the app for their role.</td><td>User Management, status "Active"</td></tr>
+<tr><td><span class="chip grey">Deactivated</span></td><td>Profile kept, active flag off. Role and team kept.</td><td>Every API call returns 401; on the next page load they are signed out with "not_allowed".</td><td>User Management, status "Inactive", button "Reactivate"</td></tr>
+</table>
+<div class="callout danger"><span class="t">Edge case to remember</span>An access request is defined as "inactive + HR User + no team". A deactivated HR User who has <b>no team</b> matches that definition, so they appear under <b>Access requests</b> (with an Approve button) and are hidden from User Management, User Performance and reports. Approving them is how you reactivate them.</div>
+
+<!-- ================= 4 ================= -->
+<h1><span class="num">4</span> The Admin Dashboard (<code>/admin</code>)</h1>
+
+<div class="mock"><div class="bar"><i></i><i></i><i></i><span class="url">/admin</span></div>
+  <div class="nav"><b>AI Candidate</b><span>Dashboard</span><span>Jobs</span><span>Candidates</span><span>Reports</span><span>Settings</span><span>Team</span><span class="on">Admin</span><span class="sp"></span><span>&#128276;</span><span>Log out</span></div>
+  <div class="body">
+    <div class="hero admin" style="position:relative"><span class="callnum" style="left:-6px;top:-6px">1</span><span class="badge b" style="background:#efe7fd;color:#7c3aed">System-wide view</span><b>Admin Dashboard</b><span style="font-size:7pt">Organization-wide sourcing performance across 3 teams and 12 active users. Manage roles, teams, and managers below.</span></div>
+    <div class="row" style="position:relative"><span class="callnum" style="right:-6px;top:-6px">2</span>
+      <div class="stat"><small>Active Users</small><b>12 / 14</b></div><div class="stat"><small>Total Jobs</small><b>41</b></div><div class="stat"><small>Average Match Quality</small><b>67%</b></div><div class="stat"><small>Shortlisted Talent</small><b>58</b></div></div>
+    <div class="row">
+      <div class="panel" style="flex:2;position:relative"><span class="callnum" style="left:-6px;top:-6px">3</span><b>Organization Pipeline <span class="badge b">466 total</span></b>
+        <div style="display:grid;grid-template-columns:60px 1fr;gap:2px;align-items:center"><span>New</span><div class="bar-h" style="width:90%"></div><span>Reviewed</span><div class="bar-h" style="width:55%"></div><span>Shortlisted</span><div class="bar-h" style="width:30%"></div><span>Contacted</span><div class="bar-h" style="width:18%"></div></div></div>
+      <div class="panel" style="position:relative"><span class="callnum" style="right:-6px;top:-6px">4</span><b>Sourcing Runs</b>Running <span class="badge a">1</span><br>Completed <span class="badge g">30</span><br>Failed <span class="badge r">2</span><br>Contacted 21 &middot; Rejected 44</div></div>
+    <div class="panel" style="position:relative;margin-bottom:8px"><span class="callnum" style="left:-6px;top:-6px">5</span><span class="callnum" style="right:-6px;top:-6px">6</span><b>Teams <span style="float:right"><span class="field">New team name</span> <span class="btn">+ Add Team</span></span></b>
+      <table><tr><th>Team</th><th>Manager</th><th>Members</th><th>Jobs</th><th>Active Runs</th><th>Candidates</th><th>Shortlisted</th><th>Avg Match</th></tr>
+      <tr><td style="color:#1c5cab;text-decoration:underline">Sourcing East</td><td style="position:relative"><span class="field">Amr Fayez &#9662;</span><span class="callnum" style="right:-4px;top:2px">7</span></td><td>4 / 5</td><td>18</td><td>1</td><td>240</td><td>30</td><td><span class="badge g">72%</span></td></tr>
+      <tr><td style="color:#1c5cab;text-decoration:underline">Sourcing West</td><td><span class="field">Unassigned &#9662;</span></td><td>3</td><td>9</td><td>0</td><td>90</td><td>11</td><td><span class="badge a">58%</span></td></tr></table></div>
+    <div class="panel" style="position:relative;margin-bottom:8px"><span class="callnum" style="left:-6px;top:-6px">8</span><b>User Performance</b>
+      <table><tr><th>User</th><th>Team</th><th>Jobs</th><th>Runs</th><th>Cand.</th><th>Short.</th><th>Cont.</th><th>Rej.</th><th>Match</th><th>Last Login</th><th>Last Activity</th></tr>
+      <tr><td style="color:#1c5cab;text-decoration:underline">Amr Fayez<br><span class="small">HR Manager</span></td><td>Sourcing East</td><td>7</td><td>9 / 10</td><td>120</td><td>14</td><td>5</td><td>20</td><td><span class="badge g">71%</span></td><td>2 hours ago</td><td>1 hour ago</td></tr></table></div>
+    <div class="panel" style="position:relative;margin-bottom:8px"><span class="callnum" style="left:-6px;top:-6px">9</span><b>Access &amp; Invitations <span class="badge a" style="float:right">1 request</span></b>
+      <div style="border:1px solid #c6d0de;border-radius:4px;padding:3px 5px;margin-bottom:3px"><span class="field">name@company.com</span> <span class="field">HR User &#9662;</span> <span class="field">Team &#9662;</span> <span class="btn">Invite</span></div>
+      <b style="font-size:7.5pt">Access requests (1)</b><div>new.person@company.com &middot; Tried to sign in 5 min ago &nbsp;<span class="field">HR User &#9662;</span> <span class="field">Sourcing East &#9662;</span> <span class="btn green">Approve</span></div>
+      <b style="font-size:7.5pt">Pending invites (1)</b><div>lina@company.com &middot; HR User &middot; Sourcing West &middot; invited 2 days ago <span class="btn out">Withdraw</span></div></div>
+    <div class="panel" style="position:relative;margin-bottom:8px"><span class="callnum" style="left:-6px;top:-6px">10</span><b>User Management</b>
+      <table><tr><th>User</th><th>Role</th><th>Team</th><th>Status</th><th>Action</th></tr>
+      <tr><td>Zeyad Ragab (you)</td><td><span class="field" style="opacity:.5">Admin &#9662;</span></td><td><span class="field">No team &#9662;</span></td><td><span class="badge g">Active</span></td><td><span class="btn out" style="opacity:.5">Deactivate</span></td></tr>
+      <tr><td>Amr Fayez</td><td><span class="field">HR Manager &#9662;</span></td><td><span class="field">Sourcing East &#9662;</span></td><td><span class="badge g">Active</span></td><td><span class="btn out">Deactivate</span></td></tr></table></div>
+    <div class="panel" style="position:relative"><span class="callnum" style="left:-6px;top:-6px">11</span><b>Recent Activity</b>Amr Fayez started a sourcing run for "Senior Accountant" &middot; 3 min ago<br>Zeyad Ragab updated a user's team &middot; 1 hour ago</div>
+  </div>
+</div>
+<ol class="legend" style="columns:3;column-gap:14px">
+  <li>Hero banner (System-wide view)</li><li>Four stat cards</li><li>Organization Pipeline</li><li>Sourcing Runs</li><li>Teams table (team-name links)</li><li>Add Team form</li><li>Manager dropdown per team</li><li>User Performance table</li><li>Access &amp; Invitations (Invite, Requests, Pending)</li><li>User Management (Role, Team, Deactivate)</li><li>Recent Activity feed</li>
+</ol>
+
+<p>A server-rendered page that loads every row as the admin. It is reached from the "Admin" nav link. Non-admins are redirected to <code>/dashboard</code> without any message. While it loads, a skeleton (banner + 4 cards + 3 panels) is shown.</p>
+<div class="callout warn"><span class="t">Load-error banner</span>If any of the underlying queries (user statistics, last sign-ins, profiles, teams, activity log, pending invites) fails, a red banner reads: <i>"Some admin data failed to load. Figures below may be incomplete."</i> Reload before trusting the numbers.</div>
+<h2>4.1 Hero banner</h2>
+<p>Chip "System-wide view", title "Admin Dashboard", and the sentence <i>"Organization-wide sourcing performance across {N} team(s) and {M} active user(s). Manage roles, teams, and managers below."</i> N is the number of teams; M is the number of active users (access requests never count).</p>
+
+<h2>4.2 The four stat cards (all-time, organization-wide, no date filter)</h2>
+<table>
+<thead><tr><th style="width:22%">Card</th><th style="width:22%">Shows</th><th>Exactly how it is computed</th></tr></thead>
+<tr><td>Active Users</td><td><code>12 / 14</code></td><td>Active profiles / all profiles, <b>excluding access requests</b>. Deactivated users count in the denominator.</td></tr>
+<tr><td>Total Jobs</td><td>number</td><td>Sum of the jobs owned by every non-request user.</td></tr>
+<tr><td>Average Match Quality</td><td><code>67%</code> or "No evaluated files yet"</td><td>The average of each sourcing file's average match score, so every scored file counts equally regardless of size: round(sum of file averages / number of files). Files with no scored candidates are excluded.</td></tr>
+<tr><td>Shortlisted Talent</td><td>number</td><td>Candidates whose status is currently "Shortlisted". Contacted and Hired candidates are <b>not</b> included.</td></tr>
+</table>
+
+<h2>4.3 Organization Pipeline</h2>
+<p>Description "Candidate status breakdown across every team". The badge "{n} total" is the sum of all candidates. Horizontal bars in fixed order: <b>New, Reviewed, Shortlisted, Contacted, Hired, Rejected</b>. Empty state: "No candidates yet — run a search to start building your pipeline." The chart is not interactive.</p>
+
+<h2>4.4 Sourcing Runs</h2>
+<table class="compact">
+<tr><td style="width:28%"><b>Running</b></td><td>Runs with status pending or running. Warning colour when above zero.</td></tr>
+<tr><td><b>Completed</b></td><td>Runs with status complete.</td></tr>
+<tr><td><b>Failed</b></td><td>Runs with status error. Critical colour when above zero.</td></tr>
+<tr><td><b>Contacted candidates</b> / <b>Rejected candidates</b></td><td>Plain totals of candidates currently in those statuses.</td></tr>
+</table>
+<p class="small">Unlike the manager's version of this card, there is no "Unseen by you" row on <code>/admin</code>.</p>
+
+<h2>4.5 Teams</h2>
+<p>Title "Teams", description "Each team's manager and combined output". The header holds the <b>Add Team</b> form; the body is the table (empty state: "No teams yet — Create a team to start grouping HR users under a manager."). Teams are ordered by name.</p>
+<table class="compact">
+<thead><tr><th style="width:16%">Column</th><th>Meaning</th></tr></thead>
+<tr><td>Team</td><td>Name; a link to <code>/manager?teamId={id}</code>, the team dashboard in admin view.</td></tr>
+<tr><td>Manager</td><td>Dropdown (see section 5). "Unassigned" when no manager is set.</td></tr>
+<tr><td>Members</td><td>Active members, followed by " / total" only when they differ. Counts profiles whose team is this team (access requests excluded; inactive included in the total; admins placed on a team are counted).</td></tr>
+<tr><td>Jobs, Active Runs, Candidates, Shortlisted</td><td>Sums over the team's members' all-time stats.</td></tr>
+<tr><td>Avg Match</td><td>Coloured badge, or blank when nothing is scored.</td></tr>
+</table>
+<div class="callout warn"><span class="t">Teams cannot be renamed or deleted from the interface</span>A rename is supported by the API but no button calls it, and no delete exists at all. Team names are <b>not unique</b>: two teams can have the same name and look identical in dropdowns. Pick names carefully.</div>
+
+<h2>4.6 User Performance</h2>
+<p>Description "Jobs, sourcing runs (completed / total), and candidate outcomes per user". One row per non-request user, sorted by display name; no sorting, filtering or pagination; all-time.</p>
+<table class="compact">
+<thead><tr><th style="width:17%">Column</th><th>Meaning</th></tr></thead>
+<tr><td>User</td><td>Name link to <code>/manager/team/{userId}</code>; second line = role label, plus " · Inactive" if deactivated.</td></tr>
+<tr><td>Team</td><td>Team name or blank.</td></tr>
+<tr><td>Jobs / Runs / Candidates</td><td>Jobs owned; sourcing runs as <code>completed / total</code>; candidates owned.</td></tr>
+<tr><td>Shortlisted, Contacted, Rejected</td><td>Candidates currently in that status.</td></tr>
+<tr><td>Avg Match</td><td>Average of the user's per-file averages (badge) or blank.</td></tr>
+<tr><td>Last Login</td><td>The authentication system's last sign-in time, shown as relative time (for example "2 hours ago"). Admins see it for everyone.</td></tr>
+<tr><td>Last Activity</td><td>Latest of: newest job, run or candidate update, activity-log entry, or a sourcing file they opened. Relative time.</td></tr>
+</table>
+
+<h2>4.7 Access &amp; Invitations</h2>
+<p>Description "Only people you invite or approve can sign in". A warning badge "{n} request(s)" appears only when requests are waiting. Three parts:</p>
+<div class="grid3">
+  <div class="card admin"><h3>Invite form</h3><p>Email, Role (Admin / HR Manager / HR User; default HR User), Team ("No team" + all teams), button <b>Invite</b>. For people who have never signed in, or to activate someone who has.</p></div>
+  <div class="card admin"><h3>Access requests (n)</h3><p>"People who signed in without an invite. They can't use the app until approved." Row: email, "Tried to sign in {time}", Role, Team, <b>Approve</b>. No reject button. Empty: "No pending requests."</p></div>
+  <div class="card admin"><h3>Pending invites (n)</h3><p>"Invited people who haven't signed in yet. Their role and team apply on first sign-in." Row: email, "{Role} · {Team} · invited {time}", <b>Withdraw</b>. No expiry. Empty: "No pending invites."</p></div>
+</div>
+<div class="callout warn"><span class="t">Quirk: default team in the Team dropdowns</span>The Team dropdown defaults to the first team (alphabetically) if any team existed when the page loaded. If you create the first team on this same page visit, the default stays "No team" until you reload. Always check the Team selection before clicking Invite or Approve.</div>
+
+<h2>4.8 User Management</h2>
+<p>Description "Assign roles and teams, or deactivate access". Columns: <b>User | Role | Team | Status | Action</b>. Rows are every non-request user sorted by name; your own row is marked "(you)". Every change is one request for one field, applied on selection, followed by a refresh. If a change fails, a red toast shows the reason and the control snaps back to the stored value.</p>
+<table class="compact">
+<tr><td style="width:18%"><b>Role</b> select</td><td>Disabled on your own row and while that row is saving.</td></tr>
+<tr><td><b>Team</b> select</td><td>"No team" + all teams. <b>Enabled</b> even on your own row.</td></tr>
+<tr><td><b>Status</b></td><td>Badge "Active" or "Inactive".</td></tr>
+<tr><td><b>Action</b></td><td>"Deactivate" / "Reactivate". Disabled on your own row.</td></tr>
+</table>
+
+<h2>4.9 Recent Activity</h2>
+<p>"Latest recorded actions across the organization": the last 20 rows of the activity log, newest first, each rendered as <i>"{Actor} {description}"</i> with relative time. The actor shows as "Unknown user" if the person is not in the list (for example an access requester). Empty state: "No activity recorded yet — Job creation, status changes, and team changes will appear here."</p>
+
+<!-- ================= 5 ================= -->
+<h1><span class="num">5</span> Button and control reference</h1>
+<p>All toasts appear top-right for 4 seconds and can be closed. If an action fails, the toast shows the API's message; fallbacks are <i>"The change could not be saved."</i> and, for connection problems, <i>"Network error — the change could not be saved."</i> Buttons are disabled while their own request is in flight. <b>None of the admin controls ask for confirmation.</b></p>
+
+<h2>5.1 Access &amp; Invitations</h2>
+<table class="buttons compact">
+<thead><tr><th style="width:14%">Control</th><th style="width:24%">What it does</th><th style="width:21%">API</th><th style="width:8%">Confirm?</th><th>Success / error message</th></tr></thead>
+<tr><td><span class="lbl">Invite</span> (with Email, Role, Team fields)</td><td>Unknown email: saves an invite that applies on first sign-in. Known inactive profile: activates immediately with the chosen role and team. Disabled while inviting or when email is blank.</td><td><code>POST /api/admin/invites</code></td><td>No</td><td>Success: "{email} can sign in as {Role}." then the email box clears. Errors: "Enter a valid email address.", "Team not found.", 409 "This person already has access.", "Failed to look up the user.", "Failed to grant access.", "Failed to save the invite."</td></tr>
+<tr><td><span class="lbl">Approve</span> (with row Role and Team selects)</td><td>Activates the waiting person with the selected role (default HR User) and team (default first team).</td><td><code>POST /api/admin/invites</code> (same endpoint)</td><td>No</td><td>Success: "{Name} can now sign in as {Role}." Errors as for Invite.</td></tr>
+<tr><td><span class="lbl">Withdraw</span></td><td>Deletes an unused invite. Cannot revoke someone who is already active. Does not touch an existing access-request profile.</td><td><code>DELETE /api/admin/invites?email=</code></td><td>No</td><td>Success: "Invite for {email} withdrawn." Errors: "A valid email is required.", 404 "Invite not found.", "Failed to withdraw the invite."</td></tr>
+</table>
+
+<h2>5.2 User Management</h2>
+<table class="buttons compact">
+<thead><tr><th style="width:14%">Control</th><th style="width:24%">What it does</th><th style="width:21%">API</th><th style="width:8%">Confirm?</th><th>Success / error message</th></tr></thead>
+<tr><td><span class="lbl">Role</span> select</td><td>Sets the role at once. Runs manager sync (section 7). Disabled on own row.</td><td><code>PATCH /api/admin/users/{id}</code> <code>{role}</code></td><td>No</td><td>"{name} is now {Role}." Errors: "You can't remove your own admin access. Ask another admin." (API guard), "User not found.", "Failed to update user.", "Failed to update team manager."</td></tr>
+<tr><td><span class="lbl">Team</span> select</td><td>Moves the user to a team or "No team". Runs manager sync.</td><td>PATCH <code>{teamId}</code></td><td>No</td><td>"Moved {name} to {Team}." or "Removed {name} from their team." A non-existent team fails as "Failed to update user."</td></tr>
+<tr><td><span class="lbl">Deactivate</span></td><td>Turns access off immediately. Un-manages any team they managed.</td><td>PATCH <code>{isActive:false}</code></td><td>No</td><td>"Deactivated {name}." Disabled on own row; API still refuses with the same self-protection message.</td></tr>
+<tr><td><span class="lbl">Reactivate</span></td><td>Turns access back on. An HR Manager with a manager-less team becomes its manager again.</td><td>PATCH <code>{isActive:true}</code></td><td>No</td><td>"Reactivated {name}."</td></tr>
+</table>
+
+<h2>5.3 Teams</h2>
+<table class="buttons compact">
+<thead><tr><th style="width:14%">Control</th><th style="width:24%">What it does</th><th style="width:21%">API</th><th style="width:8%">Confirm?</th><th>Success / error message</th></tr></thead>
+<tr><td><span class="lbl">Add Team</span> (input "New team name", 80 characters)</td><td>Creates an empty team. There is no manager picker on this form. Duplicate names are allowed. Disabled while saving or blank.</td><td><code>POST /api/teams</code></td><td>No</td><td>Success: Created team "{name}". Errors: "Team name is required.", "Failed to create team."</td></tr>
+<tr><td><span class="lbl">Manager</span> dropdown ("Manager for {team}")</td><td>Lists "Unassigned" plus every <b>active HR Manager</b> (from any team). Choosing one moves them into this team and removes them as manager elsewhere. "Unassigned" only clears the team's manager field.</td><td><code>PATCH /api/teams/{id}</code> <code>{managerId}</code></td><td>No</td><td>"{Name} now manages {Team}." or "{Team} has no manager." Error: "The selected manager must be an active HR Manager."</td></tr>
+<tr><td><span class="lbl">Team name</span> link</td><td>Opens that team's dashboard in admin view.</td><td>page <code>/manager?teamId=</code></td><td>-</td><td>-</td></tr>
+<tr><td><span class="lbl">User name</span> link</td><td>Opens the read-only member page.</td><td>page <code>/manager/team/{id}</code></td><td>-</td><td>Invalid id: 404 page.</td></tr>
+</table>
+
+<h2>5.4 Team dashboard (<code>/manager</code>) and files</h2>
+<table class="buttons compact">
+<thead><tr><th style="width:15%">Control</th><th style="width:33%">What it does</th><th>Notes</th></tr></thead>
+<tr><td><span class="lbl">Team</span> select + <span class="lbl">View team</span></td><td>Team picker: switch the dashboard to another team (page reload via <code>?teamId=</code>).</td><td>Admin only, and only when more than one team exists. Unknown teamId falls back to the first team by name.</td></tr>
+<tr><td><span class="lbl">Apply</span> / <span class="lbl">Reset</span></td><td>Filter "Team Sourcing Files": Team member, Job title (120), Status (Any, Pending, Running, Complete, Failed), Created (All time, Today, Last 7/30/90 days, Custom), From, To, Min match %, Min candidates. Reset appears only when a filter is active.</td><td>Invalid values are silently ignored. Table shows at most 200 files; no sorting, pagination or export.</td></tr>
+<tr><td><span class="lbl">View</span></td><td>Opens the file at <code>/candidates?jobId=..&amp;runId=..</code>, read-only, and records the access.</td><td>See section 9.</td></tr>
+</table>
+
+<h2>5.5 Reports, bell and sign-in</h2>
+<table class="buttons compact">
+<thead><tr><th style="width:15%">Control</th><th style="width:33%">What it does</th><th>API / notes</th></tr></thead>
+<tr><td><span class="lbl">Scope</span> select</td><td>"Whole organization" or one team. Admin only.</td><td>Applied with Update report.</td></tr>
+<tr><td><span class="lbl">Update report</span></td><td>Reloads with Scope, Period (All time, Today, Last 7/30/90 days, Custom; default Last 30 days), From, To. Dates entered without "Custom" are treated as custom.</td><td><code>GET /reports</code></td></tr>
+<tr><td>Report type tabs</td><td>Team Performance, Activity, Recruitment Pipeline, Sourcing Quality.</td><td>Default: Team Performance.</td></tr>
+<tr><td><span class="lbl">CSV</span> / <span class="lbl">Excel</span></td><td>Downloads the current report.</td><td><code>GET /api/reports?type=&amp;range=&amp;from=&amp;to=&amp;teamId=&amp;format=csv|xlsx</code>; 20 per minute per user.</td></tr>
+<tr><td><span class="lbl">Export</span> (candidates page)</td><td>Excel of a job's candidates with current filters. Works for any job you can open.</td><td><code>GET /api/jobs/{id}/export</code>; 20 per minute.</td></tr>
+<tr><td>Bell / <span class="lbl">Mark all as read</span></td><td>Opens the last 20 notifications; marks all read.</td><td><code>GET/PATCH /api/notifications</code>; polls every 60 s.</td></tr>
+<tr><td><span class="lbl">Log out</span></td><td>Records sign-out and ends the session.</td><td><code>POST /api/auth/events</code></td></tr>
+<tr><td><span class="lbl">Log in</span> / <span class="lbl">Continue with Google</span></td><td>Sign in with password or Google. Failed password attempts for known emails are logged.</td><td>Both routes end in the same access check.</td></tr>
+</table>
+<p class="small">Unhandled server errors surface as: 409 "This record already exists.", 500 "A database error occurred.", or 500 "Something went wrong. Please try again." Invalid JSON gives 400 "Request body must be valid JSON." Admin routes themselves are not rate limited.</p>
+
+<!-- ================= 6 ================= -->
+<h1><span class="num">6</span> Step-by-step tasks</h1>
+
+<h2>6.1 Onboard a person you have invited</h2>
+<ol class="steps">
+<li>Open <b>Admin</b>, scroll to <b>Access &amp; Invitations</b>.</li>
+<li>Type the person's email (lower or upper case, it is normalised).</li>
+<li>Pick the <b>Role</b> and the <b>Team</b> (check it: the default may be wrong).</li>
+<li>Click <b>Invite</b>. Toast: "{email} can sign in as {Role}."</li>
+<li>The person appears under <b>Pending invites</b>. <b>Tell them yourself</b> to go to the login page and use Google or create an email and password account. No email is sent.</li>
+<li>On their first sign-in they become active with the invited role and team, and the invite disappears from the list.</li>
+</ol>
+<div class="callout"><span class="t">Behind the scenes</span>A password sign-up needs Supabase's email confirmation first, then a normal login. Re-inviting the same email overwrites the earlier invite (this is how you edit one). If you invite an HR Manager to a team, they replace that team's current manager when they arrive.</div>
+
+<h2>6.2 Approve an access request</h2>
+<ol class="steps">
+<li>A bell notification "{Name} requested access to the app" or the badge "{n} request(s)" tells you someone is waiting.</li>
+<li>In <b>Access requests</b>, read the email and "Tried to sign in {time}". Confirm you recognise the person.</li>
+<li>Set the row's <b>Role</b> and <b>Team</b>.</li>
+<li>Click <b>Approve</b>. Toast: "{Name} can now sign in as {Role}."</li>
+<li>Tell the person to sign in again.</li>
+</ol>
+<div class="callout warn"><span class="t">There is no Reject</span>To decline a request, do nothing: it stays in the list indefinitely. Never approve an unknown email just to clear the list.</div>
+
+<h2>6.3 Create a team and assign a manager</h2>
+<ol class="steps">
+<li>In the <b>Teams</b> card type the name in "New team name" and click <b>Add Team</b>. Toast: Created team "{name}".</li>
+<li>Make sure the future manager exists as an <b>active HR Manager</b>. If not, promote them first in User Management (6.5) or invite them as HR Manager.</li>
+<li>In the new team's row, open the <b>Manager</b> dropdown and choose the person. Toast: "{Name} now manages {Team}."</li>
+<li>Add team members by choosing the team in each user's <b>Team</b> select (6.6), or by inviting/approving with that team selected.</li>
+<li>Reload and check the row: Manager filled, Members counts correct.</li>
+</ol>
+<div class="callout"><span class="t">Behind the scenes</span>Choosing a manager <b>moves that person into the team</b> and clears them as manager of any other team. If the team already had a manager, the new choice replaces it, but the previous manager stays an HR Manager in the same team.</div>
+
+<h2>6.4 Promote or demote a user</h2>
+<ol class="steps">
+<li>In <b>User Management</b> find the person (sorted by name).</li>
+<li>Open the <b>Role</b> select and pick Admin, HR Manager or HR User. It saves instantly.</li>
+<li>Toast: "{name} is now {Role}." The person's access changes on their next request; no message is sent to them.</li>
+</ol>
+<div class="callout"><span class="t">Behind the scenes (manager sync)</span><p><b>To HR Manager</b> with a team and no current manager: they become the team's manager. <b>From HR Manager</b>: they are cleared as manager of every team. <b>To Admin</b>: full read access to the organization at once. You cannot change your own role.</p></div>
+
+<h2>6.5 Move a user between teams</h2>
+<ol class="steps">
+<li>In <b>User Management</b>, open the person's <b>Team</b> select.</li>
+<li>Choose the new team (or "No team"). Toast: "Moved {name} to {Team}." or "Removed {name} from their team."</li>
+<li>Check the Teams table for the effect on both teams' manager and member counts.</li>
+</ol>
+<div class="callout"><span class="t">Behind the scenes</span>The user's jobs and candidates stay owned by them and <b>follow them</b>: the old team's manager loses sight of them and the new team's manager gains it. A moved HR Manager is cleared as manager of teams they left; if the new team has no manager they become its manager, otherwise they are a co-manager by role only (both see the team, but the Manager column shows only the first).</div>
+
+<h2>6.6 Deactivate and reactivate</h2>
+<ol class="steps">
+<li>In <b>User Management</b> click <b>Deactivate</b> on the row. It happens immediately: toast "Deactivated {name}." The badge turns to "Inactive".</li>
+<li>The person's API calls fail at once; on their next page load they are signed out with "not_allowed". Their data stays and still counts in totals.</li>
+<li>To restore, click <b>Reactivate</b> (toast "Reactivated {name}.") or re-invite them through the Invite form to set a new role and team in the same step.</li>
+</ol>
+<div class="callout danger"><span class="t">Watch out</span>If the person is an HR User with <b>no team</b>, they will not appear in User Management after deactivation. They reappear under <b>Access requests</b>. Use Approve there to restore them.</div>
+
+<h2>6.7 Reassign or clear a manager</h2>
+<ol class="steps">
+<li>In the <b>Teams</b> table open the <b>Manager</b> dropdown of the team.</li>
+<li>Pick another active HR Manager to replace the current one, or <b>Unassigned</b> to clear it.</li>
+<li>Check the outcome. The previous manager <b>keeps</b> the HR Manager role and their team membership, so they can still see the whole team. To remove their oversight, change their role or move them (6.4, 6.5).</li>
+</ol>
+
+<h2>6.8 Review a team's work through <code>/manager</code></h2>
+<ol class="steps">
+<li>Click <b>Team</b> in the nav, or a team-name link in the Teams table. If you have several teams, use the <b>Team</b> picker and <b>View team</b>.</li>
+<li>Read the banner: team name, "Managed by {name}" (or "No manager assigned"), active members. The chip says "Admin view · Team".</li>
+<li>Check the four cards (Team Members active/total, Team Jobs, Average Match Quality, Shortlisted Talent), Team Pipeline and Sourcing Runs.</li>
+<li>Use <b>Team Sourcing Files</b> and its filters to find work; click <b>View</b> to open a file.</li>
+<li>Use <b>Member Comparison</b> and <b>Team Activity</b> for people and recent actions.</li>
+</ol>
+<p class="small">"Unseen by you" in this page's Sourcing Runs card and Unseen column count candidates <i>you</i> have not opened, not what the team has seen.</p>
+
+<h2>6.9 Open a member's file (read-only)</h2>
+<ol class="steps">
+<li>On <code>/admin</code>, click a user's name in User Performance, or in <code>/manager</code> click a member card.</li>
+<li>On the member page review the Status, Last login, cards, pipeline and Sourcing Files (up to 50) and "Recently Opened" (last 8 files they opened).</li>
+<li>Click <b>View</b> on a file. The candidates page opens with the banner "Viewing {Owner}'s sourcing file · read-only".</li>
+</ol>
+
+<h2>6.10 Run reports and export</h2>
+<ol class="steps">
+<li>Click <b>Reports</b> in the nav.</li>
+<li>Pick the <b>Scope</b> ("Whole organization" or a team) and the <b>Period</b>, then <b>Update report</b>.</li>
+<li>Switch the report type tab as needed (section 8).</li>
+<li>Click <b>CSV</b> or <b>Excel</b>. The file downloads as <code>{title}-report-{scope}-{YYYY-MM-DD}.{ext}</code>.</li>
+</ol>
+
+<!-- ================= 7 ================= -->
+<h1><span class="num">7</span> Team and manager rules explained</h1>
+<div class="callout"><span class="t">Two facts kept in step</span><p><b>1. Who can see a team's data</b> is decided by the database from the user's <i>role = HR Manager, active, and team_id = that team</i>. <b>2. Who is shown as "the manager"</b> is the team's <code>manager_id</code> field. The admin screens keep the two consistent, but they are updated in separate steps and can drift.</p></div>
+<h2>One manager, one team</h2>
+<ul>
+<li>A team has at most <b>one</b> shown manager; a person can be shown as manager of at most <b>one</b> team.</li>
+<li>Only an <b>active HR Manager</b> can be chosen. An admin can never be a team's manager.</li>
+<li>More than one HR Manager can sit in the same team. All of them see the team's data and get its notifications, but the Manager column shows only one.</li>
+</ul>
+
+<figure>
+<svg viewBox="0 0 760 400" width="760" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif" font-size="11.5">
+  <defs><marker id="b" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#475569"/></marker></defs>
+  <rect x="290" y="10" width="180" height="46" rx="8" fill="#efe7fd" stroke="#7c3aed" stroke-width="2"/>
+  <text x="380" y="30" text-anchor="middle" font-weight="700" fill="#5b21b6">You change a user (PATCH)</text><text x="380" y="46" text-anchor="middle" fill="#334155" font-size="10.5">profile is updated first</text>
+  <line x1="380" y1="56" x2="380" y2="76" stroke="#475569" stroke-width="2" marker-end="url(#b)"/>
+  <rect x="60" y="78" width="640" height="52" rx="8" fill="#fff" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="380" y="98" text-anchor="middle" font-weight="700">Step 1 - un-manage</text><text x="380" y="115" text-anchor="middle" fill="#334155" font-size="10.5">clear manager_id on every team they manage, except their own current team if they are still an active HR Manager there</text>
+  <line x1="380" y1="130" x2="380" y2="150" stroke="#475569" stroke-width="2" marker-end="url(#b)"/>
+  <rect x="60" y="152" width="640" height="52" rx="8" fill="#fff" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="380" y="172" text-anchor="middle" font-weight="700">Step 2 - auto-fill (only if an active HR Manager with a team)</text><text x="380" y="189" text-anchor="middle" fill="#334155" font-size="10.5">become the team's manager only if it has NO manager; never replaces an existing one</text>
+  <text x="380" y="232" text-anchor="middle" font-weight="700" fill="#5b21b6" font-size="12.5">What each admin action does</text>
+  <g font-size="10.8">
+  <rect x="10" y="244" width="178" height="146" rx="8" fill="#fde4e4" stroke="#d03b3b"/>
+  <text x="99" y="262" text-anchor="middle" font-weight="700" fill="#d03b3b">Deactivate a manager</text>
+  <text x="18" y="282">- teams they led: Unassigned</text><text x="18" y="298">- role and team kept</text><text x="18" y="314">- team data stays visible to</text><text x="24" y="328">other managers and admin</text><text x="18" y="346">- reactivating restores them as</text><text x="24" y="360">manager only if team still</text><text x="24" y="374">has no manager</text>
+  <rect x="198" y="244" width="178" height="146" rx="8" fill="#fdf1d6" stroke="#b7791f"/>
+  <text x="287" y="262" text-anchor="middle" font-weight="700" fill="#b7791f">Demote (role change)</text>
+  <text x="206" y="282">- no longer HR Manager:</text><text x="212" y="298">cleared as manager of all teams</text><text x="206" y="316">- keeps their team as a member</text><text x="206" y="334">- loses team-wide visibility</text><text x="206" y="352">- own files remain theirs</text>
+  <rect x="386" y="244" width="178" height="146" rx="8" fill="#e6f0fc" stroke="#2a78d6"/>
+  <text x="475" y="262" text-anchor="middle" font-weight="700" fill="#1c5cab">Move (Team select)</text>
+  <text x="394" y="282">- cleared from teams they left</text><text x="394" y="300">- new team has no manager:</text><text x="400" y="314">they become manager</text><text x="394" y="332">- new team has a manager:</text><text x="400" y="346">co-manager by role only</text><text x="394" y="364">- their files follow them</text>
+  <rect x="574" y="244" width="176" height="146" rx="8" fill="#dcfce9" stroke="#059669"/>
+  <text x="662" y="262" text-anchor="middle" font-weight="700" fill="#059669">Manager dropdown</text>
+  <text x="582" y="282">- person moved INTO team</text><text x="582" y="298">- cleared from other teams</text><text x="582" y="314">- old manager of this team is</text><text x="588" y="328">replaced but stays in the team</text><text x="582" y="346">- "Unassigned": only clears the</text><text x="588" y="360">field; old manager keeps role</text><text x="588" y="374">and team, still sees the team</text>
+  </g>
+</svg>
+<figcaption>Manager synchronisation. Steps 1 and 2 run after the profile change; the whole sequence is not atomic (a failure reports "Failed to update team manager." after the profile has already changed).</figcaption></figure>
+
+<h2>Consequences worth knowing</h2>
+<table>
+<thead><tr><th style="width:26%">Event</th><th>Result</th></tr></thead>
+<tr><td>Deactivate an HR Manager</td><td>Teams show "Unassigned". They lose all manager powers instantly (the database ignores inactive profiles).</td></tr>
+<tr><td>Reactivate an HR Manager</td><td>They regain their powers. They are re-shown as manager only if their team has no manager.</td></tr>
+<tr><td>Set "Unassigned" on a team</td><td>Cosmetic for oversight: the former manager still leads the team by role and team membership. Notifications keep flowing to them.</td></tr>
+<tr><td>Invite or Approve as HR Manager with a team</td><td>The person is placed in the team and becomes its manager, <b>replacing the current manager</b>. If the person is not a valid active HR Manager, the manager step is skipped silently.</td></tr>
+<tr><td>Create a team with a manager via the API</td><td>Not offered in the UI. (If the API is called with an invalid manager, the team is still created.)</td></tr>
+<tr><td>Admin placed on a team</td><td>Allowed by the UI. They are then counted as a team member in the team dashboard and totals.</td></tr>
+</table>
+
+<!-- ================= 8 ================= -->
+<h1><span class="num">8</span> Reports and exports as admin</h1>
+<p>The Reports page (<code>/reports</code>) is shared by all roles but the admin gets the widest scope. HR Managers are fixed to their team; HR Users to themselves.</p>
+<div class="grid2">
+<div class="card admin"><h3>Scope select (admin only)</h3><ul><li><b>Whole organization</b> (default): every non-request user</li><li><b>One team</b>: everyone in that team</li></ul><p class="small">Hero hint: "Admin view: every user in the organization." or "Everyone in {team}."</p></div>
+<div class="card admin"><h3>Period</h3><p>All time, Today, Last 7 days, Last 30 days (default), Last 90 days, Custom range (From / To). The hero chip shows "{scope} · {period}".</p></div>
+</div>
+<h2>The four reports</h2>
+<table>
+<thead><tr><th style="width:20%">Report</th><th style="width:36%">Summary tiles</th><th>Tables</th></tr></thead>
+<tr><td><b>Team Performance</b></td><td>Members, Jobs created, Sourcing runs, Candidates sourced, Shortlisted, Average match</td><td>Performance by member with a totals row: Jobs, Sourcing runs, Completed, Active, Failed runs, Candidates, Shortlisted, Contacted, Rejected, Avg match</td></tr>
+<tr><td><b>Activity</b></td><td>Sign-ins, Failed sign-ins, Sourcing runs, Logged actions, Active members x/y</td><td>Activity by member (Sign-ins, Failed sign-ins, Job actions, Sourcing runs, Teammate files opened, Candidate actions, Team changes, Reports, Logged actions, Last activity) and Actions by type</td></tr>
+<tr><td><b>Recruitment Pipeline</b></td><td>Total candidates, New, Reviewed, Shortlisted, Contacted, Rejected, Hired</td><td>Pipeline by member, including Progressed % = (Shortlisted + Contacted + Hired) / total</td></tr>
+<tr><td><b>Sourcing Quality</b></td><td>Average match, Files evaluated x/y, Strong files (70% or more), Weak files (below 40%)</td><td>Match quality by member, by job, and by sourcing file (up to 500 files)</td></tr>
+</table>
+<p>Inactive members are shown as "Name (inactive)". In the Activity report, "Team changes" counts every logged action whose type starts with <code>team.</code>; it is the way to audit who has been invited, approved, moved or promoted.</p>
+<h2>Exporting</h2>
+<table class="kv">
+<tr><td>CSV</td><td>Header lines (title, Scope, Period, Generated), then each section. A leading apostrophe neutralises cells that start like spreadsheet formulas. Includes a byte-order mark so Excel reads it correctly.</td></tr>
+<tr><td>Excel (xlsx)</td><td>An "Overview" sheet plus one sheet per section.</td></tr>
+<tr><td>File name</td><td><code>{title}-report-{scope}-{YYYY-MM-DD}.{csv|xlsx}</code>; never cached.</td></tr>
+<tr><td>Limits</td><td>20 exports per minute per person (per server instance). Failure messages: page "This report couldn't be generated. Try again in a moment."; API "Failed to load report statistics."</td></tr>
+<tr><td>Also logged</td><td>Viewing a report logs "Viewed the {title} report ({scope}, {period})" (once per 10 minutes for identical views). Exporting logs "Exported the {title} report ({scope}, {period}) as CSV|XLSX". Both appear in the Activity report's "Reports" column.</td></tr>
+</table>
+<div class="callout warn"><span class="t">Not available</span>There is no export of users, the activity log, or the Team Sourcing Files table, and no bulk user import. Access requests are excluded from every report scope.</div>
+
+<!-- ================= 9 ================= -->
+<h1><span class="num">9</span> Read-only access to others' work and how access is recorded</h1>
+<p>The admin can open anybody's job, candidates, scores, notes and status history by following a link (View buttons, member pages, notifications). Data is visible because the database grants admins read access to every sourcing table; it has <b>no</b> write access to them.</p>
+<h2>What the admin sees on someone else's file</h2>
+<ul>
+<li>An indigo banner: <b>"Viewing {Owner}'s sourcing file · read-only"</b> (falls back to "a teammate's").</li>
+<li>Candidate status appears as a plain badge, not a dropdown.</li>
+<li>"Score Candidates" and delete buttons are hidden.</li>
+</ul>
+<div class="callout danger"><span class="t">Server enforcement</span>Even if a request is forged, edits are refused with 403: <i>"You can view this {job|candidate}, but only its owner can change it."</i> This applies to editing or deleting a job, running a search, scoring, changing status, adding notes, and editing or deleting a candidate.</div>
+<h2>How opening is recorded</h2>
+<figure>
+<svg viewBox="0 0 760 130" width="760" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif" font-size="11.5">
+  <defs><marker id="c" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#475569"/></marker></defs>
+  <rect x="5" y="30" width="130" height="60" rx="8" fill="#efe7fd" stroke="#7c3aed" stroke-width="2"/><text x="70" y="55" text-anchor="middle" font-weight="700" fill="#5b21b6">Admin clicks</text><text x="70" y="72" text-anchor="middle">View / link with runId</text>
+  <rect x="160" y="30" width="175" height="60" rx="8" fill="#fff" stroke="#94a3b8" stroke-width="1.5"/><text x="247" y="55" text-anchor="middle" font-weight="700">Candidates page</text><text x="247" y="72" text-anchor="middle" font-size="10.5">records the access (POST)</text>
+  <rect x="375" y="8" width="180" height="46" rx="8" fill="#e6f0fc" stroke="#2a78d6"/><text x="465" y="27" text-anchor="middle" font-weight="700" fill="#1c5cab">Access row (always)</text><text x="465" y="43" text-anchor="middle" font-size="10.5">who + when, feeds "Last Accessed By"</text>
+  <rect x="375" y="68" width="180" height="54" rx="8" fill="#fdf1d6" stroke="#b7791f"/><text x="465" y="86" text-anchor="middle" font-weight="700" fill="#b7791f">Activity log entry</text><text x="465" y="101" text-anchor="middle" font-size="10.5">only if you are not the owner</text><text x="465" y="114" text-anchor="middle" font-size="10.5">and not opened in prior 30 min</text>
+  <rect x="595" y="30" width="160" height="60" rx="8" fill="#dcfce9" stroke="#059669"/><text x="675" y="52" text-anchor="middle" font-weight="700" fill="#059669">Visible to</text><text x="675" y="68" text-anchor="middle" font-size="10.5">owner's manager and</text><text x="675" y="81" text-anchor="middle" font-size="10.5">other admins</text>
+  <line x1="135" y1="60" x2="158" y2="60" stroke="#475569" stroke-width="2" marker-end="url(#c)"/>
+  <line x1="335" y1="52" x2="373" y2="34" stroke="#475569" stroke-width="2" marker-end="url(#c)"/>
+  <line x1="335" y1="68" x2="373" y2="90" stroke="#475569" stroke-width="2" marker-end="url(#c)"/>
+  <line x1="555" y1="34" x2="593" y2="52" stroke="#475569" stroke-width="2" marker-end="url(#c)"/>
+  <line x1="555" y1="95" x2="593" y2="72" stroke="#475569" stroke-width="2" marker-end="url(#c)"/>
+</svg>
+<figcaption>Opening a file records an access; it never changes ownership.</figcaption></figure>
+<p>The log line reads <i>Opened {Owner}'s sourcing file "{title}"</i>, labelled "Opened a teammate's sourcing file". Your own opens of other people's files are therefore visible to other admins in Recent Activity and reports. In the Team Sourcing Files table, the "Last Accessed By" column shows the latest opener with a "Not owner" tag when it is not the owner.</p>
+<div class="callout"><span class="t">Other things you can and cannot see</span>You can export any job you can open (Excel, 20 per minute). You cannot see other users' "unseen" state: it is per viewer, so any "Unseen" figure you see is about <i>your</i> own opens.</div>
+
+<!-- ================= 10 ================= -->
+<h1><span class="num">10</span> Notifications an admin gets</h1>
+<p>The bell in the nav is shown to admins and HR Managers. It lists the latest 20 items, marks unread ones with a dot, polls every 60 seconds while the tab is visible, and refreshes when opened. Panel title "Notifications"; button "Mark all as read"; empty text "You're all caught up. Team sourcing runs, shortlists, hires, strong matches, and access requests will show up here."</p>
+<table>
+<thead><tr><th style="width:30%">Notification</th><th style="width:22%">Recipients</th><th>Detail</th></tr></thead>
+<tr><td><b>"{Name} requested access to the app"</b></td><td><span class="chip admin">All active admins</span> except the requester</td><td>Created by the sign-up trigger when an email with no invite signs up or signs in. Click goes to <code>/admin</code>.</td></tr>
+<tr><td>Sourcing runs, shortlists/hires, strong matches</td><td><span class="chip manager">Team managers only</span></td><td><b>Admins do not receive these.</b> Use <code>/manager</code> or Reports to see that activity.</td></tr>
+</table>
+<p><b>What a sign-up triggers:</b> with no invite, the database records "Requested access to the app" and every active admin except the requester gets the alert above. With an invite, no alert is created and no log entry is written; if the invite was for an HR Manager with a team, the new person becomes that team's manager on the spot, replacing any existing manager.</p>
+<div class="callout warn"><span class="t">Not notified</span>Admins are <b>not</b> alerted about invites, withdrawals, role or team changes made by other admins. The affected people (invitees, promoted, moved or deactivated users) receive <b>no notification and no email</b>. Announce changes yourself.</div>
+
+<!-- ================= 11 ================= -->
+<h1><span class="num">11</span> Activity you generate</h1>
+<p>The activity log is append-only: entries cannot be edited or deleted by anyone. If writing an entry fails, the action still succeeds.</p>
+<table>
+<thead><tr><th style="width:22%">Log label</th><th style="width:38%">Written when</th><th>Description text</th></tr></thead>
+<tr><td>User invited</td><td>Invite for an email with no account</td><td>"Invited {email} as {Role}"</td></tr>
+<tr><td>Access granted</td><td>Invite or Approve for an inactive profile</td><td>"Granted {email} access as {Role}"</td></tr>
+<tr><td>Invite withdrawn</td><td>Withdraw</td><td>"Withdrew the invite for {email}"</td></tr>
+<tr><td>User role/team changed</td><td>Any Role, Team, Deactivate or Reactivate change</td><td>"Updated {email}: role, team_id, is_active" (only the fields changed)</td></tr>
+<tr><td>Team created</td><td>Add Team</td><td>Created team "{name}"</td></tr>
+<tr><td>Team updated</td><td>Manager dropdown (or rename via API)</td><td>Updated team "{name}"</td></tr>
+<tr><td>Signed in / Signed out</td><td>Login, Google sign-in, Log out</td><td>"Signed in", "Signed in with Google", "Signed out"</td></tr>
+<tr><td>Opened a teammate's sourcing file</td><td>Viewing another user's file (30-minute dedup)</td><td>Opened {Owner}'s sourcing file "{title}"</td></tr>
+<tr><td>Report viewed / exported</td><td>Opening or exporting a report</td><td>See section 8</td></tr>
+<tr><td>Job created, searches, scoring, status changes</td><td>Your own normal work</td><td>As for any user</td></tr>
+</table>
+<div class="callout warn"><span class="t">What is NOT recorded</span>Deactivation is not a separate entry: it is a "User role/team changed" entry with is_active in its details. Automatic manager assignment or clearing (the sync side effects) is not logged. Opening <code>/admin</code> is not logged. Only the newest 20 entries are shown on the dashboard; use the Activity report for history, where "Team changes" counts every <code>team.*</code> action.</div>
+
+<!-- ================= 12 ================= -->
+<h1><span class="num">12</span> Limits and safety</h1>
+<h2>What an admin cannot do</h2>
+<table>
+<thead><tr><th style="width:34%">Limitation</th><th>Exactly how it behaves</th></tr></thead>
+<tr><td>No self-demotion or self-deactivation</td><td>Role select and Deactivate are disabled on your own row. The API refuses with 400 "You can't remove your own admin access. Ask another admin." You can still change your own team.</td></tr>
+<tr><td>No "last admin" check</td><td>The only protection is the self-rule. One admin <b>can</b> demote or deactivate another admin, including the only other admin. Two admins acting on each other at the same moment could leave zero admins.</td></tr>
+<tr><td>No confirmation dialogs</td><td>Deactivate, Withdraw, role and team changes all apply at the first click or selection.</td></tr>
+<tr><td>No reject or delete for access requests</td><td>Only Approve exists. Unapproved requests stay listed.</td></tr>
+<tr><td>No delete user, edit email, password reset, force sign-out</td><td>Deactivation is the only way to block a person. A deactivated user is signed out on their next page load, not instantly on the open page.</td></tr>
+<tr><td>No emails sent</td><td>The platform sends no email of its own. Invitees and affected users are told nothing. Invites have no resend and no expiry.</td></tr>
+<tr><td>Team names not unique; no rename or delete in the UI</td><td>Duplicate names are accepted. Mistakes cannot be corrected from the interface.</td></tr>
+<tr><td>Team creation has no manager picker</td><td>Assign the manager afterwards from the Manager dropdown.</td></tr>
+<tr><td>Manager choices are limited</td><td>Only active HR Managers appear. Admins cannot be managers.</td></tr>
+<tr><td>Cannot write to others' work</td><td>No edit, delete, re-score, re-run, status change or notes on files owned by someone else.</td></tr>
+<tr><td>Not atomic</td><td>User updates run in steps. A failure in the manager-sync step returns "Failed to update team manager." even though the profile change already took effect. Refresh and check both the user row and the team row.</td></tr>
+<tr><td>Admin routes are not rate limited</td><td>Repeated clicks send repeated requests.</td></tr>
+</table>
+
+<h2>Practical advice</h2>
+<div class="tip"><b class="k">Tip</b> Keep at least <b>two</b> active admins you trust. You cannot demote yourself, and nobody guards against demoting the other admin. Never deactivate another admin without confirming that a third person still has admin access.</div>
+<div class="tip"><b class="k">Tip</b> Before clicking Invite or Approve, re-read the <b>Role</b> and <b>Team</b> selects on that row. The Team default may be the first team, not the one you intend, and inviting an HR Manager to a team replaces that team's manager. Type or paste emails carefully: a typo creates an invite nobody can use, which sits in Pending invites until you Withdraw it.</div>
+<div class="tip"><b class="k">Tip</b> After any invite, approval, deactivation or role change, <b>tell the person</b> yourself. They receive nothing from the platform.</div>
+<div class="tip"><b class="k">Tip</b> Give teams distinct, descriptive names (for example "Sourcing - Cairo") because they cannot be renamed or removed from the UI and duplicates look identical.</div>
+<div class="tip"><b class="k">Tip</b> Deactivate rather than "removing": their data, jobs and history stay intact for audit. Give a team-less user a team before deactivating them so they remain in User Management. After any manager change, reload /admin and check the Teams table for a team left without a manager.</div>
+
+<!-- ================= 13 ================= -->
+<h1><span class="num">13</span> Troubleshooting FAQ</h1>
+<table>
+<thead><tr><th style="width:30%">Problem</th><th>Cause and fix</th></tr></thead>
+<tr><td><b>A user says they cannot sign in</b> (or sees "Your account doesn't have access yet...")</td><td>They have no active profile. Check Access requests (Approve), Pending invites (are they using the same email as invited?), and User Management (is the status Inactive? Reactivate). Compare spelling: Google sign-in uses the Google account's email, which may differ from the address you invited.</td></tr>
+<tr><td><b>I invited someone but they still show under Pending invites</b></td><td>They have not signed in yet with that exact email. Ask them to sign in. If the email was mistyped, Withdraw and invite the correct one.</td></tr>
+<tr><td><b>Invite says "This person already has access."</b></td><td>An active profile exists. Change role or team in User Management instead.</td></tr>
+<tr><td><b>A manager sees an empty team</b> ("You're not assigned to a team yet" or no members)</td><td>The manager's profile has no team, or the team has no members. Set their Team in User Management, then add members. Managers see teams through their profile's team, not the Manager field.</td></tr>
+<tr><td><b>Team row shows Manager "Unassigned" but someone still sees the team</b></td><td>Expected. The former manager keeps the HR Manager role and team. Change their role or move them to remove oversight.</td></tr>
+<tr><td><b>A team shows one manager but two people act as managers</b></td><td>A second HR Manager was added to the same team. Both see the team; only the first is shown. Demote or move one if this is unintended.</td></tr>
+<tr><td><b>A deactivated user appears under Access requests</b></td><td>They are an HR User with no team, which the app treats as an access request. Click Approve (choose role and team) to reactivate.</td></tr>
+<tr><td><b>Role or Deactivate is greyed out for me</b></td><td>It is your own row. Ask another admin.</td></tr>
+<tr><td><b>"Failed to update team manager."</b></td><td>The profile change worked but the manager sync failed. Reload; then set the Manager dropdown of the affected team by hand.</td></tr>
+<tr><td><b>"The selected manager must be an active HR Manager."</b></td><td>The chosen person is not an active HR Manager. Promote or reactivate them first.</td></tr>
+<tr><td><b>Manager dropdown has no names</b></td><td>No active HR Managers exist. Promote a user to HR Manager first.</td></tr>
+<tr><td><b>I see the red banner about incomplete data</b></td><td>One of the queries failed. Reload; if it persists, the figures may be partial.</td></tr>
+<tr><td><b>My /dashboard numbers differ from /admin</b></td><td>/dashboard is personal; /admin is organization-wide.</td></tr>
+<tr><td><b>I cannot edit a colleague's candidate</b></td><td>By design: read-only. Ask the owner, or change the owner's situation (role/team) if the work should belong elsewhere.</td></tr>
+<tr><td><b>Export returns "Too many requests. Please slow down and try again shortly."</b></td><td>More than 20 exports a minute. Wait and retry.</td></tr>
+<tr><td><b>Non-admin colleague opens /admin and lands on Dashboard</b></td><td>Expected, silent redirect. APIs answer 403 "Forbidden".</td></tr>
+<tr><td><b>Approve did nothing for an HR Manager + team</b></td><td>If the manager step fails validation it is skipped silently; the person is still active. Check the Teams table and set the Manager by hand.</td></tr>
+</table>
+
+<!-- ================= 14 ================= -->
+<h1><span class="num">14</span> Permission matrix: Admin versus the other roles</h1>
+<table class="matrix">
+<thead><tr><th style="width:38%">Capability</th><th><span class="chip admin" style="background:#fff">Admin</span></th><th><span class="chip manager" style="background:#fff">HR Manager</span></th><th><span class="chip user" style="background:#fff">HR User</span></th></tr></thead>
+<tr><td>Open <code>/admin</code> dashboard</td><td class="y-c">Yes</td><td class="n-c">No (redirect)</td><td class="n-c">No (redirect)</td></tr>
+<tr><td>Open <code>/manager</code> team dashboard</td><td class="y-c">Any team</td><td class="r-c">Own team</td><td class="n-c">No (redirect)</td></tr>
+<tr><td>Open a member page</td><td class="y-c">Any user</td><td class="r-c">Own team members</td><td class="n-c">No</td></tr>
+<tr><td>Invite users / approve access requests</td><td class="y-c">Yes</td><td class="n-c">No</td><td class="n-c">No</td></tr>
+<tr><td>Change role, team, active status</td><td class="y-c">Yes (not own role/status)</td><td class="n-c">No</td><td class="n-c">No</td></tr>
+<tr><td>Create teams / assign managers</td><td class="y-c">Yes</td><td class="n-c">No</td><td class="n-c">No</td></tr>
+<tr><td>Create jobs, run searches, score, manage own candidates</td><td class="y-c">Yes</td><td class="y-c">Yes</td><td class="y-c">Yes</td></tr>
+<tr><td>See others' jobs and candidates</td><td class="y-c">All (read-only)</td><td class="r-c">Own team (read-only)</td><td class="n-c">Own only</td></tr>
+<tr><td>Edit or delete others' work</td><td class="n-c">No</td><td class="n-c">No</td><td class="n-c">No</td></tr>
+<tr><td>Reports scope</td><td class="y-c">Organization or one team</td><td class="r-c">Own team</td><td class="r-c">Self ("My work")</td></tr>
+<tr><td>Export reports (CSV / Excel)</td><td class="y-c">Yes</td><td class="y-c">Yes (team)</td><td class="y-c">Yes (self)</td></tr>
+<tr><td>Export a job's candidates (Excel)</td><td class="y-c">Any readable job</td><td class="r-c">Team's jobs</td><td class="r-c">Own</td></tr>
+<tr><td>Notification bell</td><td class="r-c">Access requests only</td><td class="y-c">Team activity</td><td class="n-c">No bell</td></tr>
+<tr><td>Recent Activity of the organization</td><td class="y-c">Yes</td><td class="r-c">Own team</td><td class="n-c">No</td></tr>
+<tr><td>Read-only banner when viewing others' files</td><td class="y-c">Yes</td><td class="y-c">Yes</td><td class="n-c">n/a</td></tr>
+<tr><td>Loses powers when deactivated</td><td class="y-c">Yes, immediately</td><td class="y-c">Yes, immediately</td><td class="y-c">Yes, immediately</td></tr>
+</table>
+<p class="small">Legend: green = allowed, amber = allowed within a narrower scope, red = not allowed. The matrix reflects the application at the time of writing; the database enforces the same rules independently of the screens.</p>
+<div class="callout ok"><span class="t">In short</span>The admin controls <i>who</i> is in and <i>where</i> they sit; managers watch <i>their</i> team; users own <i>their</i> work. Nobody, including the admin, edits somebody else's files.</div>
+
+</body></html>

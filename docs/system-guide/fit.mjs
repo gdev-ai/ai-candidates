@@ -1,0 +1,15 @@
+import { createRequire } from "node:module";
+import { readFileSync, writeFileSync } from "node:fs";
+const require = createRequire("C:/Users/zeyad/AI-Candidate/package.json");
+const { chromium } = require("playwright");
+const f="C:/Users/zeyad/AI-Candidate/docs/system-guide/src/00_System_Guide.html";
+const b = await chromium.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe" });
+const p = await b.newPage({viewport:{width:794,height:1100}});
+await p.goto("file:///"+f);
+await p.emulateMedia({media:"print"});
+const hs = await p.evaluate(()=>[...document.querySelectorAll(".mock .body")].map(e=>{const o=e.style.height;e.style.height="auto";const h=e.offsetHeight;e.style.height=o;return [o,h]}));
+await b.close();
+let html=readFileSync(f,"utf8");let i=0;
+html=html.replace(/(<div class="body" style=")height:(\d+)px/g,(m,a,g)=>{const [o,h]=hs[i++];return `${a}height:${h}px`});
+console.log(hs.length,i,JSON.stringify(hs));
+writeFileSync(f,html);

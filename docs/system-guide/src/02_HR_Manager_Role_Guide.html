@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HR Manager Role Guide</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .three { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+  .three .card ul { padding-left:16px; margin:0; font-size:9.2pt; }
+  .three .card.g { border-top:4px solid var(--green); }
+  .three .card.b { border-top:4px solid var(--blue); }
+  .three .card.rd { border-top:4px solid var(--red); }
+  .kv td:first-child { width:34%; font-weight:600; }
+  .mock .body .callnum.c1 { top:6px; left:6px; }
+  .mock .panel { margin-bottom:0; }
+  .mock .sm { font-size:6.8pt; color:var(--muted); }
+  .mock .mini { display:flex; gap:6px; font-size:6.8pt; margin-top:3px; }
+  .mock .mini span { flex:1; background:#f1f5fa; border-radius:4px; padding:1px 4px; text-align:center; }
+  .mock .tag { background:var(--indigo-soft); color:var(--indigo); border-radius:6px; padding:0 4px; font-size:6pt; font-weight:700; text-transform:uppercase; }
+  .mock .ro { background:var(--indigo-soft); color:var(--indigo); border:1px solid #c9c6f5; border-radius:5px; padding:3px 8px; margin-bottom:6px; }
+  .toc-cols { columns:2; column-gap:20px; }
+  .toc-cols li { break-inside:avoid; }
+.mock .panel,.mock .stat,.mock .hero,.mock .ro,.mock .nav span.pos{position:relative}
+  .mock .row.f > *{flex:none}
+  .legend.two{columns:2;column-gap:18px}.legend.two li{break-inside:avoid}
+  h1.nb{break-before:auto;margin-top:26px}
+</style>
+</head>
+<body>
+
+<!-- ===================== COVER ===================== -->
+<section class="cover">
+  <div class="band manager">
+    <div class="kicker">AI Candidate Sourcing Platform &middot; Role Guide</div>
+    <h1 class="title">HR Manager</h1>
+    <div class="subtitle">Everything a team-level manager can see, do and cannot do: the Team Dashboard, teammate files in read-only mode, reports and notifications.</div>
+    <div class="meta"><span>Role: HR Manager</span><span>Scope: your own team only</span><span>Read-only over teammates</span><span>Print-ready A4</span></div>
+  </div>
+  <div class="toc-mini">
+    <h2>Contents</h2>
+    <ol class="toc toc-cols">
+      <li><span class="n">1</span>Role at a glance</li>
+      <li><span class="n">2</span>Navigation and what you get on top of an HR User</li>
+      <li><span class="n">3</span>Your own workspace</li>
+      <li><span class="n">4</span>The Team Dashboard (/manager)</li>
+      <li><span class="n">5</span>Team member page</li>
+      <li><span class="n">6</span>Opening a teammate's file</li>
+      <li><span class="n">7</span>Reports</li>
+      <li><span class="n">8</span>Notifications</li>
+      <li><span class="n">9</span>Button and control reference</li>
+      <li><span class="n">10</span>Step-by-step tasks</li>
+      <li><span class="n">11</span>What you cannot do, and how it is enforced</li>
+      <li><span class="n">12</span>Troubleshooting FAQ</li>
+      <li><span class="n">13</span>Good-to-know limitations</li>
+    </ol>
+  </div>
+  <div class="foot">Based on the application code and the live database policies. Terms: a <b>sourcing file</b> is one sourcing run on a job; its <b>owner</b> is the owner of that job. Names shown in the app are derived from e-mail addresses (zeyad.ragab@... becomes "Zeyad Ragab").</div>
+</section>
+
+<!-- ===================== 1 ===================== -->
+<h1 class="first">1&nbsp; Role at a glance</h1>
+<p>The <span class="chip manager">HR Manager</span> role is the middle level of the platform. A manager is a normal recruiter who additionally has <b>management-level visibility over one team</b>: the team they are assigned to by an Admin. Team members keep ownership of their own jobs, candidates and files; the manager can look at everything but change none of it.</p>
+
+<div class="callout"><span class="t">Scope in one sentence</span><p>Everything you see about other people is limited to <b>your own team</b> (the profiles that share your team assignment, including yourself and any inactive members). Other teams do not exist for you: their pages return "not found" and their data is blocked by the database.</p></div>
+
+<div class="three">
+  <div class="card g"><h3>Can see</h3><ul>
+    <li>Team Dashboard: totals, pipeline, runs, member cards, comparison, activity</li>
+    <li>Every sourcing file owned by your team</li>
+    <li>Each teammate's page: stats, pipeline, files, recent activity</li>
+    <li>Teammates' jobs, candidates, match scores and recruiter notes (read-only)</li>
+    <li>Sign-in and last-activity times of teammates</li>
+    <li>Team reports (4 types) with CSV / Excel export</li>
+    <li>Notification bell for team milestones</li>
+  </ul></div>
+  <div class="card b"><h3>Can do</h3><ul>
+    <li>Everything an HR User does with <b>your own</b> jobs and candidates: create jobs, run sourcing, score, change status, add notes, export</li>
+    <li>Open a teammate's file or candidate in read-only mode</li>
+    <li>Filter the team files table; filter and page a teammate's candidate list</li>
+    <li>Export a teammate's candidate list to Excel</li>
+    <li>Filter, view and export team reports</li>
+    <li>Mark notifications read</li>
+  </ul></div>
+  <div class="card rd"><h3>Cannot do</h3><ul>
+    <li>Edit, delete, re-score or change the status of a teammate's jobs or candidates; add notes to them</li>
+    <li>Run a search on a teammate's job</li>
+    <li>Change roles, teams, activation; invite people; use /admin</li>
+    <li>See another team, or the whole organization</li>
+    <li>Use the team picker or organization-wide report scope</li>
+    <li>Delete or edit the activity log</li>
+  </ul></div>
+</div>
+
+<h2>The mental model</h2>
+<figure>
+<svg viewBox="0 0 700 190" width="700" font-family="Segoe UI, Arial" font-size="12">
+  <rect x="8" y="8" width="684" height="174" rx="10" fill="#f4f7fb" stroke="#dde3ec"/>
+  <text x="22" y="28" font-weight="700" fill="#5b6878">ORGANIZATION</text>
+  <rect x="30" y="40" width="430" height="132" rx="10" fill="#d9f1f6" stroke="#0e7490" stroke-width="2"/>
+  <text x="44" y="60" font-weight="700" fill="#0e7490">YOUR TEAM (what you can see)</text>
+  <rect x="48" y="72" width="120" height="86" rx="8" fill="#fff" stroke="#0e7490"/>
+  <text x="108" y="94" text-anchor="middle" font-weight="700" fill="#0e7490">You (manager)</text>
+  <text x="108" y="112" text-anchor="middle" fill="#16202e">full control of</text>
+  <text x="108" y="128" text-anchor="middle" fill="#16202e">your OWN data</text>
+  <rect x="184" y="72" width="128" height="86" rx="8" fill="#fff" stroke="#2a78d6"/>
+  <text x="248" y="94" text-anchor="middle" font-weight="700" fill="#1c5cab">Teammate A</text>
+  <text x="248" y="112" text-anchor="middle" fill="#16202e">you: read-only</text>
+  <text x="248" y="128" text-anchor="middle" fill="#16202e">owner edits</text>
+  <rect x="328" y="72" width="120" height="86" rx="8" fill="#fff" stroke="#2a78d6"/>
+  <text x="388" y="94" text-anchor="middle" font-weight="700" fill="#1c5cab">Teammate B</text>
+  <text x="388" y="112" text-anchor="middle" fill="#16202e">you: read-only</text>
+  <text x="388" y="128" text-anchor="middle" fill="#16202e">owner edits</text>
+  <rect x="490" y="40" width="190" height="60" rx="10" fill="#fde4e4" stroke="#d03b3b" stroke-dasharray="5 4"/>
+  <text x="585" y="66" text-anchor="middle" font-weight="700" fill="#d03b3b">Other teams</text>
+  <text x="585" y="84" text-anchor="middle" fill="#16202e">invisible (404 / blocked)</text>
+  <rect x="490" y="112" width="190" height="60" rx="10" fill="#efe7fd" stroke="#7c3aed" stroke-dasharray="5 4"/>
+  <text x="585" y="138" text-anchor="middle" font-weight="700" fill="#7c3aed">Admin area</text>
+  <text x="585" y="156" text-anchor="middle" fill="#16202e">/admin is admin only</text>
+</svg>
+<figcaption>Figure 1. The three zones of a manager's world.</figcaption>
+</figure>
+
+<div class="callout warn"><span class="t">A team is assigned by an Admin</span><p>If no team is assigned to your profile, the Team Dashboard shows "You're not assigned to a team yet" and reports fall back to "My work" (only yourself). Ask an Admin to assign you.</p></div>
+
+<!-- ===================== 2 ===================== -->
+<h1>2&nbsp; Navigation and what a manager gets on top of an HR User</h1>
+<p>The top navigation bar is shared by all roles. Your role is looked up after sign-in; until it loads only the base links appear, so the <b>Team</b> link may show up a moment after the page opens.</p>
+
+<div class="mock">
+  <div class="bar"><i></i><i></i><i></i><span class="url">/dashboard</span></div>
+  <div class="nav" style="padding:10px 10px">
+    <b>AI Candidate</b><span class="on">Dashboard</span><span>Jobs</span><span>Candidates</span><span>Reports</span><span>Settings</span><span class="pos" style="color:#0e7490;font-weight:700">Team<span class="callnum" style="top:-11px;left:-12px">1</span></span>
+    <span class="sp"></span><span class="pos" style="font-size:11pt">&#128276;<span class="callnum" style="top:-10px;left:-10px">2</span></span><span class="badge b" style="background:#d03b3b;color:#fff">3</span><span class="btn out">Log out</span>
+  </div>
+</div>
+<ol class="legend">
+  <li><b>Team</b> link (to /manager). Shown to HR Managers and Admins only. An HR User never sees it and is redirected to /dashboard if they type the address.</li>
+  <li><b>Notification bell</b> with a red unread count. Shown to HR Managers and Admins only.</li>
+</ol>
+
+<table>
+  <thead><tr><th>Item</th><th>HR User</th><th>HR Manager</th><th>Admin</th></tr></thead>
+  <tbody>
+    <tr><td>Dashboard, Jobs, Candidates, Reports, Settings</td><td class="y-c">Yes</td><td class="y-c">Yes</td><td class="y-c">Yes</td></tr>
+    <tr><td>Team link (/manager)</td><td class="n-c">No</td><td class="y-c">Yes</td><td class="y-c">Yes</td></tr>
+    <tr><td>Notification bell</td><td class="n-c">No</td><td class="y-c">Yes</td><td class="y-c">Yes</td></tr>
+    <tr><td>Admin link (/admin)</td><td class="n-c">No</td><td class="n-c">No</td><td class="y-c">Yes</td></tr>
+    <tr><td>Read-only access to teammates' files</td><td class="n-c">No</td><td class="y-c">Own team</td><td class="y-c">Yes</td></tr>
+  </tbody>
+</table>
+
+<div class="callout"><span class="t">Behind the scenes</span><p>Every manager page re-checks your role and team on the server; your team comes from your profile, never from the web address.</p></div>
+
+<!-- ===================== 3 ===================== -->
+<h1 class="nb">3&nbsp; Your own workspace</h1>
+<p>A manager is also a recruiter. All personal pages behave <b>exactly like the HR User's</b>; see the <i>HR User Role Guide</i> for the full detail. They never show team data, even for a manager: every query is filtered to your own user.</p>
+
+<table>
+  <thead><tr><th style="width:18%">Page</th><th>What it shows for a manager</th></tr></thead>
+  <tbody>
+    <tr><td><code>/dashboard</code></td><td>Personal "Candidate Sourcing Hub": four stat cards, pipeline stages, match score distribution, today's searched candidates and a "Sourcing Files" table of your 20 latest runs (no owner column, no "Not owner" tag).</td></tr>
+    <tr><td><code>/jobs</code></td><td>Your own jobs only (10 per page) with "New Job" and "View Candidates". Team jobs are <b>not</b> listed here.</td></tr>
+    <tr><td><code>/jobs/new</code></td><td>Create a job: upload or paste a job description, AI analysis, edit requirements, then "Generate Queries &amp; Find Candidates".</td></tr>
+    <tr><td><code>/candidates</code></td><td>Candidate list per job with filters, "Score Candidates", status changes and "Export Excel". Without a job in the address you get a job picker listing <b>only your own jobs</b>.</td></tr>
+    <tr><td><code>/reports</code></td><td>For a manager this is the <b>team</b> report scope (section 7).</td></tr>
+    <tr><td><code>/settings</code></td><td>Account card only.</td></tr>
+  </tbody>
+</table>
+
+<div class="callout warn"><span class="t">Two different views of "your" numbers</span><p>On files you own you keep every power of an HR User; the read-only rules in section 6 apply only to other people's files. The personal dashboard counts only what <b>you own</b>. The Team Dashboard counts what <b>everyone in the team owns, including you</b>. The numbers on the two screens will therefore differ, and both are correct.</p></div>
+
+
+<!-- ===================== 4 ===================== -->
+<h1>4&nbsp; The Team Dashboard</h1>
+<div class="page-head"><span class="chip manager">Manager</span><span class="route">/manager</span><h2>Team Dashboard</h2></div>
+<p>Open it with the <b>Team</b> link. It is server-rendered (no auto-refresh; reload the page to see new data) and every figure is read with your own permissions.</p>
+
+<div class="mock">
+  <div class="bar"><i></i><i></i><i></i><span class="url">/manager</span></div>
+  <div class="nav"><b>AI Candidate</b><span>Dashboard</span><span>Jobs</span><span>Candidates</span><span>Reports</span><span>Settings</span><span class="on">Team</span><span class="sp"></span><span>&#128276;</span><span class="btn out">Log out</span></div>
+  <div class="body">
+    <div class="hero manager"><span class="callnum" style="top:-6px;left:-6px">1</span><span style="font-size:6.5pt;background:rgba(255,255,255,.2);border-radius:8px;padding:0 6px">Team view</span><b>Sales Recruiting</b><span style="font-size:7.5pt">Managed by Sara Ahmed &middot; 3 active members. Team members keep ownership of their files &mdash; you have management-level visibility.</span></div>
+    <div class="row">
+      <div class="stat"><span class="callnum" style="top:-6px;left:-6px">2</span><small>Team Members</small><b>3 / 4</b></div>
+      <div class="stat"><small>Team Jobs</small><b>17</b></div>
+      <div class="stat"><small>Average Match Quality</small><b>68%</b></div>
+      <div class="stat"><small>Shortlisted Talent</small><b>24</b></div>
+    </div>
+    <div class="row">
+      <div class="panel" style="flex:2"><span class="callnum" style="top:-6px;left:-6px">3</span><b>Team Pipeline <span class="badge b" style="float:right">466 total</span></b>
+        <div class="sm">New</div><div class="bar-h" style="width:80%"></div>
+        <div class="sm">Reviewed</div><div class="bar-h" style="width:50%"></div>
+        <div class="sm">Shortlisted</div><div class="bar-h" style="width:30%"></div>
+        <div class="sm">Contacted / Hired / Rejected</div><div class="bar-h" style="width:18%"></div></div>
+      <div class="panel"><span class="callnum" style="top:-6px;left:-6px">4</span><b>Sourcing Runs</b>
+        <div class="sm">Running <span class="badge a">1</span></div><div class="sm">Completed <span class="badge g">14</span></div><div class="sm">Failed <span class="badge r">1</span></div>
+        <div class="sm">Unseen by you <b style="font-size:7.5pt">120</b></div><div class="sm">Contacted candidates 9</div><div class="sm">Rejected candidates 31</div></div>
+    </div>
+    <div class="panel" style="margin-bottom:8px"><span class="callnum" style="top:-6px;left:-6px">5</span><b>Team Members</b>
+      <div class="row" style="margin:0">
+        <div class="stat"><b style="font-size:8pt">AH &nbsp;Sara Ahmed</b><div class="sm">Team Manager</div><div class="mini"><span>Active 0</span><span>Cand. 120</span><span>Short. 9</span></div><div class="sm">4 files &middot; last active 2 hours ago <span class="badge g">72% match</span></div></div>
+        <div class="stat"><b style="font-size:8pt">KM &nbsp;Karim Mostafa</b><div class="sm">HR User</div><div class="mini"><span>Active 1</span><span>Cand. 210</span><span>Short. 11</span></div><div class="sm">7 files &middot; last active 1 day ago <span class="badge a">55% match</span></div></div>
+        <div class="stat"><b style="font-size:8pt">NH &nbsp;Nour Hassan</b><div class="sm">HR User &middot; Inactive</div><div class="mini"><span>Active 0</span><span>Cand. 40</span><span>Short. 2</span></div><div class="sm">2 files &middot; last active 12 days ago</div></div>
+      </div></div>
+    <div class="panel" style="margin-bottom:8px"><span class="callnum" style="top:-6px;left:-6px">6</span><b>Team Sourcing Files <span class="badge b" style="float:right">12 files</span></b>
+      <div class="row f" style="margin:0 0 4px;align-items:center"><span class="field">Member: Everyone</span><span class="field">Job title</span><span class="field">Status</span><span class="field">Created</span><span class="field">Min match %</span><span class="field">Min cand.</span><span class="btn">Apply</span><span class="btn out">Reset</span></div>
+      <div style="position:relative"><span class="callnum" style="top:-4px;left:-14px">7</span></div><table><tr><th>Job Title</th><th>Status</th><th>Cand.</th><th>Short.</th><th>Unseen</th><th>Match</th><th>Owned By</th><th>Last Accessed By</th><th>Last Activity</th><th></th></tr>
+      <tr><td>Sales Manager<br><span class="sm">Created Sep 3 by Karim</span></td><td><span class="badge g">complete</span></td><td>52</td><td>4</td><td>52</td><td><span class="badge g">74%</span></td><td>Karim Mostafa</td><td>Sara Ahmed <span class="tag">Not owner</span></td><td>2 hours ago</td><td><span class="btn out">View</span></td></tr></table></div>
+    <div class="row">
+      <div class="panel" style="flex:2"><span class="callnum" style="top:-6px;left:-6px">8</span><b>Member Comparison</b><table><tr><th>User</th><th>Jobs</th><th>Runs</th><th>Cand.</th><th>Short.</th><th>Avg</th><th>Last Login</th><th>Last Activity</th></tr><tr><td>Karim Mostafa</td><td>6</td><td>6/7</td><td>210</td><td>11</td><td><span class="badge a">55%</span></td><td>today</td><td>1 day ago</td></tr></table></div>
+      <div class="panel"><span class="callnum" style="top:-6px;left:-6px">9</span><b>Team Activity</b><div class="sm">Karim started a sourcing run &hellip;</div><div class="sm">Sara opened Karim's file &hellip;</div></div>
+    </div>
+  </div>
+</div>
+<ol class="legend two">
+  <li><b>Hero banner</b>: team name, manager name, active member count.</li>
+  <li><b>Four stat cards</b>: Team Members, Team Jobs, Average Match Quality, Shortlisted Talent.</li>
+  <li><b>Team Pipeline</b>: status breakdown of all team candidates.</li>
+  <li><b>Sourcing Runs</b>: run health plus "Unseen by you".</li>
+  <li><b>Team Members</b> cards: click to open a member.</li>
+  <li><b>Team Sourcing Files</b>: filter form.</li>
+  <li><b>Team Sourcing Files</b>: results table with "View".</li>
+  <li><b>Member Comparison</b> table.</li>
+  <li><b>Team Activity</b> feed.</li>
+</ol>
+
+<h2>4.1 Hero banner and error states</h2>
+<ul>
+  <li>Pill "Team view", the team name as title, and the text "Managed by <i>name</i> &middot; N active member(s)". The managing person is the member recorded as the team's manager; otherwise "No manager assigned".</li>
+  <li>A red banner "Some team data failed to load. Figures below may be incomplete." appears if any underlying query failed. Reload; if it persists, tell an Admin.</li>
+  <li>Full-page states: "You're not assigned to a team yet" (no team on your profile) and "Team unavailable" ("This team doesn't exist or you don't have access to it.").</li>
+</ul>
+
+<h2>4.2 The four stat cards and how they are computed</h2>
+<table>
+  <thead><tr><th style="width:22%">Card</th><th>How it is computed</th></tr></thead>
+  <tbody>
+    <tr><td>Team Members</td><td>"active / total", for example <b>3 / 4</b>. Total = every profile assigned to your team (you, active and inactive members). Active = those switched on.</td></tr>
+    <tr><td>Team Jobs</td><td>Sum of the jobs owned by all team members, <b>all-time</b> (no date window).</td></tr>
+    <tr><td>Average Match Quality</td><td>Each sourcing file gets an average of its candidates' match scores; the card averages those file averages, so every file counts equally regardless of size. Files with no scored candidate are left out. Shows "No evaluated files yet" when there are none.</td></tr>
+    <tr><td>Shortlisted Talent</td><td>Candidates whose status is <b>currently</b> "Shortlisted". Contacted and Hired candidates are not counted here.</td></tr>
+  </tbody>
+</table>
+
+<h2>4.3 Team Pipeline</h2>
+<p>Description: "Candidate status breakdown across your team's files". Bars appear in the order <b>New, Reviewed, Shortlisted, Contacted, Hired, Rejected</b>, each with its count; the badge on the right ("N total") is the number of team candidates, all-time. It is a static chart (not clickable). Empty text: "No candidates yet &mdash; run a search to start building your pipeline."</p>
+
+<h2>4.4 Sourcing Runs</h2>
+<table>
+  <thead><tr><th style="width:24%">Row</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>Running</td><td>Runs in status pending or running. Amber badge when above zero.</td></tr>
+    <tr><td>Completed</td><td>Runs with status complete (green).</td></tr>
+    <tr><td>Failed</td><td>Runs with status error (red when above zero).</td></tr>
+    <tr><td>Unseen by you</td><td>See the box below.</td></tr>
+    <tr><td>Contacted candidates / Rejected candidates</td><td>Candidates currently in those statuses.</td></tr>
+  </tbody>
+</table>
+<div class="callout warn"><span class="t">Exact meaning of "Unseen by you"</span>
+<p>It counts the candidates in your team's files for which <b>you personally</b> have not yet opened the candidate detail page from that job (the address contains <code>?jobId=</code>). It is <b>not</b> what the file owner has or has not seen; the owner's own unseen numbers appear on the owner's dashboard. Only opening a candidate's detail page (via the eye icon or the name link in a job's candidate list) marks it seen for you. Merely opening the file list does not.</p>
+<p>Because this counts the newest team files only (see section 13), it is a "how much of the team's output have I personally reviewed" indicator, not a workload measure.</p></div>
+
+<h2>4.5 Team Members cards</h2>
+<p>Description: "Open a member to see their performance, files, and activity". The whole card is a link to the member page (section 5). The team manager's card comes first, the rest by name.</p>
+<ul>
+  <li><b>Header</b>: initials avatar, name, subtitle "Team Manager" or the role label, plus " &middot; Inactive" for switched-off accounts.</li>
+  <li><b>Three mini-stats</b>: Active files (runs pending or running), Candidates, Shortlisted.</li>
+  <li><b>Footer</b>: "N file(s) &middot; last active <i>relative time</i>" (the latest of jobs, runs, candidate updates, logged activity and file opens, all-time; "&mdash;" if none) and a match badge "N% match": green from 70%, amber 40-69%, red below 40%, hidden when there is no score.</li>
+  <li>Empty: "No team members yet".</li>
+</ul>
+
+<h2>4.6 Team Sourcing Files: filters</h2>
+<p>Description: "Every sourcing file owned by your team. Opening one is recorded as an access by you, not a change of owner." The badge shows how many rows are displayed. The form uses plain web-address parameters, so a filtered view can be bookmarked.</p>
+<table>
+  <thead><tr><th style="width:20%">Filter</th><th>Behaviour</th></tr></thead>
+  <tbody>
+    <tr><td>Team member</td><td>"Everyone" or one person (includes yourself).</td></tr>
+    <tr><td>Job title</td><td>Text, "Any title"; matches part of the title, ignoring case; max 120 characters.</td></tr>
+    <tr><td>Status</td><td>Any status, Pending, Running, Complete, Failed.</td></tr>
+    <tr><td>Created</td><td>All time (default on this screen), Today, Last 7 days, Last 30 days, Last 90 days, Custom range. Windows count whole days including today; a custom range includes both end dates.</td></tr>
+    <tr><td>From / To</td><td>Dates. Entering dates without choosing Custom is treated as a custom range.</td></tr>
+    <tr><td>Min match %</td><td>0-100. Files whose average match is at least this value. Files without any score are excluded when this is set.</td></tr>
+    <tr><td>Min candidates</td><td>Files with at least this many linked candidates.</td></tr>
+    <tr><td>Apply / Reset</td><td>Apply reloads with the filters. Reset appears only when a filter is active and returns to /manager.</td></tr>
+  </tbody>
+</table>
+<p class="small">Invalid values (unknown status, bad numbers) are silently ignored rather than reported.</p>
+
+<h2>4.7 Team Sourcing Files: table columns</h2>
+<table class="compact">
+  <thead><tr><th style="width:18%">Column</th><th>What it shows</th></tr></thead>
+  <tbody>
+    <tr><td>Job Title</td><td>Job title plus "Created <i>Mon D</i>" and " by <i>starter</i>" when the person who started the run differs from the job owner (older runs may lack this).</td></tr>
+    <tr><td>Status</td><td>pending / running / complete / error, colour coded.</td></tr>
+    <tr><td>Candidates</td><td>Candidates linked to that run.</td></tr>
+    <tr><td>Shortlisted</td><td>Of those, currently Shortlisted.</td></tr>
+    <tr><td>Unseen</td><td>Of those, not yet opened by <b>you</b> (same meaning as above).</td></tr>
+    <tr><td>Match</td><td>Average match score of the run as a coloured badge, or "&mdash;".</td></tr>
+    <tr><td>Owned By</td><td>Owner, as a link to the member page.</td></tr>
+    <tr><td>Last Accessed By</td><td>Person who opened the file most recently (anyone), with an indigo <b>Not owner</b> tag when that person is not the owner. "&mdash;" if never opened.</td></tr>
+    <tr><td>Last Activity</td><td>Most recent of completion, start, creation or last open, as relative time.</td></tr>
+    <tr><td>Action</td><td>"View" opens the file read-only (section 6) and records your access.</td></tr>
+  </tbody>
+</table>
+<p>Empty states: "No sourcing files match these filters" (with the hint to widen the date range or clear a filter) or "No sourcing files yet".</p>
+
+<h2>4.8 Member Comparison</h2>
+<p>Description: "Output per team member &mdash; runs shown as completed / total". Columns: <b>User</b> (link to the member page, with role and "Inactive"), <b>Jobs</b>, <b>Runs</b> ("completed / total"), <b>Candidates</b>, <b>Shortlisted</b>, <b>Contacted</b>, <b>Rejected</b>, <b>Avg Match</b>, <b>Last Login</b>, <b>Last Activity</b>. All values are all-time.</p>
+
+<h2>4.9 Team Activity</h2>
+<p>Description: "Latest recorded actions by your team". The 20 newest logged actions of all team members including yours, newest first, written as "<i>Actor</i> <i>what they did</i>" with a relative time. Typical entries: job created, run started/completed/failed, candidate status changed, note added, candidates scored, sign-ins, report viewed/exported and "Opened <i>Owner</i>'s sourcing file". Empty: "No activity recorded yet".</p>
+
+<!-- ===================== 5 ===================== -->
+<h1>5&nbsp; Team member page</h1>
+<div class="page-head"><span class="chip manager">Manager</span><span class="route">/manager/team/[userId]</span><h2>One teammate in depth</h2></div>
+<p>Reached from a member card, the Member Comparison link or the "Owned By" link. Someone outside your team (or an invalid id) gives a "not found" page.</p>
+
+<div class="mock">
+  <div class="bar"><i></i><i></i><i></i><span class="url">/manager/team/&lt;userId&gt;</span></div>
+  <div class="body">
+    <div class="sm" style="margin-bottom:4px;position:relative;padding-left:14px"><span class="callnum" style="top:-2px;left:-6px">1</span>&larr; Back to Sales Recruiting</div>
+    <div class="hero manager"><span class="callnum" style="top:-6px;left:-6px">2</span><span style="font-size:6.5pt;background:rgba(255,255,255,.2);border-radius:8px;padding:0 6px">HR User &middot; Sales Recruiting</span><b>Karim Mostafa</b><span style="font-size:7.5pt">karim.mostafa@company.com &nbsp;|&nbsp; Status: Active &nbsp;|&nbsp; Last login: 3 hours ago &nbsp;|&nbsp; Last activity: 1 day ago</span></div>
+    <div class="row">
+      <div class="stat"><span class="callnum" style="top:-6px;left:-6px">3</span><small>Jobs Created</small><b>6</b></div><div class="stat"><small>Sourcing Runs</small><b>6 / 7</b></div><div class="stat"><small>Average Match Quality</small><b>55%</b></div><div class="stat"><small>Shortlisted</small><b>11</b></div>
+    </div>
+    <div class="row">
+      <div class="panel" style="flex:2"><span class="callnum" style="top:-6px;left:-6px">4</span><b>Candidate Pipeline <span class="badge b" style="float:right">210 total</span></b><div class="bar-h" style="width:75%"></div><div class="bar-h" style="width:45%"></div><div class="bar-h" style="width:25%"></div></div>
+      <div class="panel"><span class="callnum" style="top:-6px;left:-6px">5</span><b>Performance Overview</b><div class="sm">Active sourcing runs &middot; Completed runs &middot; Failed runs &middot; Total candidates &middot; Contacted &middot; Rejected</div></div>
+    </div>
+    <div class="panel" style="margin-bottom:8px"><span class="callnum" style="top:-6px;left:-6px">6</span><b>Sourcing Files <span class="badge b" style="float:right">7 files</span></b>
+      <table><tr><th>Job Title</th><th>Status</th><th>Cand.</th><th>Short.</th><th>Unseen</th><th>Match</th><th>Last Accessed By</th><th>Last Activity</th><th></th></tr><tr><td>Sales Manager</td><td><span class="badge g">complete</span></td><td>52</td><td>4</td><td>52</td><td><span class="badge g">74%</span></td><td>Sara Ahmed <span class="tag">Not owner</span></td><td>2 h ago</td><td><span class="btn out">View</span></td></tr></table></div>
+    <div class="row">
+      <div class="panel"><span class="callnum" style="top:-6px;left:-6px">7</span><b>Recently Opened</b><div class="sm">Marketing Lead &middot; 3 hours ago<br>Sales Manager &middot; yesterday</div></div>
+      <div class="panel" style="flex:2"><b>Recent Activity <span class="badge g" style="float:right">55% avg match</span></b><div class="sm">Karim changed a candidate's status &hellip;</div></div>
+    </div>
+  </div>
+</div>
+<ol class="legend">
+  <li><b>Back link</b> to the Team Dashboard.</li>
+  <li><b>Hero</b>: "Role &middot; team" pill, name, e-mail, Status (Active/Inactive), Last login, Last activity.</li>
+  <li><b>Four stat cards</b> (all-time): Jobs Created, Sourcing Runs (completed / total), Average Match Quality ("N%" or "No evaluated files yet"), Shortlisted.</li>
+  <li><b>Candidate Pipeline</b>: "Status of candidates owned by <i>name</i>", total badge, same six status bars.</li>
+  <li><b>Performance Overview</b>: "Totals across all of this member's work": Active sourcing runs, Completed runs, Failed runs, Total candidates, Contacted, Rejected.</li>
+  <li><b>Sourcing Files</b>: "Files owned by <i>name</i>, newest first". Same columns as the team table but without "Owned By"; latest 50 files; no filter form.</li>
+  <li><b>Recently Opened</b> and <b>Recent Activity</b> (below).</li>
+</ol>
+
+<h3>Recently Opened</h3>
+<p>"Sourcing files <i>name</i> opened most recently": up to 8 distinct files taken from the member's latest 30 file opens, each a link to the file with a relative time. Only files you are allowed to see are listed (a file of a different team would not appear). Empty: "No files opened yet."</p>
+<div class="callout warn"><span class="t">Clicking here records YOU</span><p>Opening a file from this list records an access by <b>you</b>, not by the member whose history you are reading.</p></div>
+<h3>Recent Activity</h3>
+<p>"Actions recorded for <i>name</i>": the member's latest 25 logged actions, with a badge "N% avg match" when a score exists. The page has <b>no edit controls</b>: you cannot change a member's role, team, status or files. Those are Admin tasks.</p>
+
+<!-- ===================== 6 ===================== -->
+<h1>6&nbsp; Opening a teammate's file</h1>
+<p>Clicking <b>View</b> (or a "Recently Opened" link, or a notification for a run) opens <code>/candidates?jobId=&hellip;&amp;runId=&hellip;</code>. Because the job belongs to someone else, the page switches to <b>read-only mode</b>. The database already lets you read the data; the application makes sure you cannot change it.</p>
+
+<div class="mock">
+  <div class="bar"><i></i><i></i><i></i><span class="url">/candidates?jobId=...&amp;runId=...</span></div>
+  <div class="body">
+    <div style="font-size:10pt;font-weight:700;margin-bottom:4px">Candidates for Sales Manager</div>
+    <div class="ro"><span class="callnum" style="top:-6px;left:-6px">1</span>&#128065; Viewing Karim Mostafa's sourcing file &middot; read-only</div>
+    <div class="row" style="align-items:center"><span class="field">Name</span><span class="field">Skill</span><span class="field">Location</span><span class="field">Company</span><span class="field">Status</span><span class="field">Sort</span><span class="btn out" style="position:relative">Export Excel<span class="callnum" style="top:-9px;right:-6px;left:auto">2</span></span></div>
+    <table><tr><th>Candidate</th><th>Headline</th><th>Match</th><th style="position:relative">Status<span class="callnum" style="top:-2px;left:38px">3</span></th><th style="position:relative">Actions<span class="callnum" style="top:-2px;left:48px">4</span></th></tr>
+    <tr><td>Mona Adel</td><td>Sales Lead</td><td><span class="badge g">82%</span></td><td><span class="badge b">Shortlisted</span></td><td>&#128065; &nbsp;Profile</td></tr>
+    <tr><td>Omar Said</td><td>Account Mgr</td><td><span class="badge a">58%</span></td><td><span class="badge b">New</span></td><td>&#128065; &nbsp;Profile</td></tr></table>
+    <div class="sm" style="margin-top:4px">Previous &nbsp; Page 1 of 6 (52 total) &nbsp; Next</div>
+  </div>
+</div>
+<ol class="legend">
+  <li><b>Read-only banner</b> (indigo): "Viewing <i>Owner</i>'s sourcing file &middot; read-only". It also shows while the job information is still loading, so edit controls never flash.</li>
+  <li><b>Export Excel</b> still works.</li>
+  <li><b>Status</b> is plain text instead of a dropdown.</li>
+  <li><b>Only the eye icon</b> remains; the delete (trash) icon and the "Score Candidates" button are hidden.</li>
+</ol>
+
+<div class="grid2">
+  <div class="card"><h3 style="color:#d03b3b">Hidden or disabled</h3><ul style="font-size:9.2pt">
+    <li>"Score Candidates" button and score summary</li>
+    <li>Status dropdown (shown as a plain badge)</li>
+    <li>Delete (trash) icon per candidate</li>
+    <li>On a candidate detail page: status becomes "<i>status</i> &middot; only <i>Owner</i> can change this"</li>
+    <li>Recruiter Notes: the note box and "Add Note" are hidden; existing notes stay readable</li>
+  </ul></div>
+  <div class="card"><h3 style="color:#059669">Still works</h3><ul style="font-size:9.2pt">
+    <li>Filters (name, skill, location, company, status, sort) and Previous / Next paging (10 per page)</li>
+    <li>Candidate detail: full Match Score card with sub-scores, AI summary, matched and missing requirements, strengths, concerns</li>
+    <li>Profile "View" external link (LinkedIn)</li>
+    <li>"Export Excel" of the filtered list, including notes. Exports are not written to the activity log.</li>
+  </ul></div>
+</div>
+
+<h2>How the access is recorded</h2>
+<figure>
+<svg viewBox="0 0 720 300" width="720" font-family="Segoe UI, Arial" font-size="11.5">
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#5b6878"/></marker></defs>
+  <rect x="10" y="20" width="120" height="50" rx="8" fill="#d9f1f6" stroke="#0e7490"/><text x="70" y="42" text-anchor="middle" font-weight="700" fill="#0e7490">Manager clicks</text><text x="70" y="58" text-anchor="middle">"View"</text>
+  <rect x="170" y="20" width="150" height="50" rx="8" fill="#fff" stroke="#b9c4d4"/><text x="245" y="42" text-anchor="middle" font-weight="700">Candidates page</text><text x="245" y="58" text-anchor="middle">jobId + runId in URL</text>
+  <line x1="130" y1="45" x2="168" y2="45" stroke="#5b6878" marker-end="url(#a)"/>
+  <rect x="380" y="6" width="160" height="34" rx="8" fill="#fff" stroke="#b9c4d4"/><text x="460" y="27" text-anchor="middle">GET job: owner? can_edit?</text>
+  <rect x="380" y="50" width="160" height="34" rx="8" fill="#fff" stroke="#b9c4d4"/><text x="460" y="71" text-anchor="middle">POST run access</text>
+  <line x1="320" y1="35" x2="378" y2="23" stroke="#5b6878" marker-end="url(#a)"/><line x1="320" y1="55" x2="378" y2="67" stroke="#5b6878" marker-end="url(#a)"/>
+  <rect x="580" y="6" width="130" height="34" rx="8" fill="#e9e8fd" stroke="#4f46e5"/><text x="645" y="27" text-anchor="middle" fill="#4f46e5" font-weight="700">Read-only banner</text>
+  <line x1="540" y1="23" x2="578" y2="23" stroke="#5b6878" marker-end="url(#a)"/>
+  <rect x="150" y="120" width="270" height="56" rx="8" fill="#dcfce9" stroke="#059669"/><text x="285" y="142" text-anchor="middle" font-weight="700" fill="#059669">Always: row in search_run_access</text><text x="285" y="160" text-anchor="middle">(file, user, e-mail) on every open, even the owner's</text>
+  <line x1="460" y1="84" x2="330" y2="118" stroke="#5b6878" marker-end="url(#a)"/>
+  <polygon points="520,148 585,120 650,148 585,176" fill="#fdf1d6" stroke="#b7791f"/><text x="585" y="145" text-anchor="middle" font-size="10">not owner AND no</text><text x="585" y="158" text-anchor="middle" font-size="10">open by you in 30 min?</text>
+  <line x1="420" y1="148" x2="518" y2="148" stroke="#5b6878" marker-end="url(#a)"/>
+  <rect x="440" y="215" width="270" height="62" rx="8" fill="#fff" stroke="#0e7490" stroke-width="2"/><text x="575" y="236" text-anchor="middle" font-weight="700" fill="#0e7490">Activity entry: sourcing_file.accessed</text><text x="575" y="254" text-anchor="middle">"Opened Karim Mostafa's sourcing file</text><text x="575" y="268" text-anchor="middle">"Sales Manager""</text>
+  <line x1="585" y1="176" x2="585" y2="213" stroke="#5b6878" marker-end="url(#a)"/><text x="595" y="198" font-size="10" fill="#059669">yes</text>
+  <text x="660" y="130" font-size="10" fill="#d03b3b">no: no entry</text>
+  <rect x="10" y="215" width="400" height="76" rx="8" fill="#f4f7fb" stroke="#dde3ec"/>
+  <text x="22" y="236" font-weight="700">Visible results</text>
+  <text x="22" y="254">&#8226; "Last Accessed By" = your name + Not owner tag (manager tables)</text>
+  <text x="22" y="270">&#8226; Owner sees you as Last Accessed By on their dashboard</text>
+  <text x="22" y="284">&#8226; Team Activity feed and Activity report column</text>
+  <line x1="285" y1="176" x2="285" y2="213" stroke="#5b6878" stroke-dasharray="4 3" marker-end="url(#a)"/>
+</svg>
+<figcaption>Figure 2. What happens when a manager opens a teammate's sourcing file.</figcaption>
+</figure>
+
+<table class="kv">
+  <tbody>
+    <tr><td>Access row</td><td>Written on every open that carries a run id. A file you are not allowed to see yields "Sourcing run not found." and nothing is recorded.</td></tr>
+    <tr><td>"Not owner" badge</td><td>Shown next to "Last Accessed By" when the latest opener is not the file's owner.</td></tr>
+    <tr><td>Activity entry</td><td>Written only when you are not the owner <b>and</b> you have not opened the same file in the past 30 minutes (de-duplication). Text: <i>Opened &lt;Owner&gt;'s sourcing file "&lt;title&gt;"</i>.</td></tr>
+    <tr><td>Notifications</td><td>Opening a file notifies nobody.</td></tr>
+    <tr><td>Ownership</td><td>Never changes. Data never changes.</td></tr>
+  </tbody>
+</table>
+<div class="callout danger"><span class="t">Access is not recorded when there is no run id</span><p>The "View Candidates" link in /jobs and job-picker links have no run id, and a "job scored" notification opens the job without a run id. Those views are read-only if the job is a teammate's, but leave no access trace. Candidate-level notifications open the candidate without a job, so no Match Score card is shown.</p></div>
+
+<!-- ===================== 7 ===================== -->
+<h1>7&nbsp; Reports</h1>
+<div class="page-head"><span class="chip manager">Manager</span><span class="route">/reports</span><h2>Team reports</h2></div>
+<p>Reports are available to every role; the <b>scope</b> is decided by the server from your role. For a manager it is <b>your team</b> (all members including inactive, shown as "Name (inactive)", and yourself). The hint under the header says "Everyone in <i>team</i>." The scope select ("Report scope") is Admin-only; a manager cannot choose another team. A manager without a team falls back to "My work".</p>
+
+<div class="mock">
+  <div class="bar"><i></i><i></i><i></i><span class="url">/reports</span></div>
+  <div class="body">
+    <div class="hero manager"><span style="font-size:6.5pt;background:rgba(255,255,255,.2);border-radius:8px;padding:0 6px">Sales Recruiting &middot; Last 30 days</span><b>Team Performance Report</b><span style="font-size:7.5pt">Everyone in Sales Recruiting.</span></div>
+    <div class="row f" style="align-items:center;position:relative"><span class="callnum" style="top:-8px;left:-8px">1</span><span class="btn">Team Performance</span><span class="btn out">Activity</span><span class="btn out">Recruitment Pipeline</span><span class="btn out">Sourcing Quality</span></div>
+    <div class="row f" style="align-items:center;position:relative"><span class="callnum" style="top:-8px;left:-8px">2</span><span class="field">Period: Last 30 days</span><span class="field">From</span><span class="field">To</span><span class="btn">Update report</span><span class="btn out" style="position:relative"><span class="callnum" style="top:-10px;left:-9px">3</span>CSV</span><span class="btn out">Excel</span></div>
+    <div class="row"><div class="stat"><span class="callnum" style="top:-6px;left:-6px">4</span><small>Members</small><b>4</b></div><div class="stat"><small>Jobs created</small><b>9</b></div><div class="stat"><small>Sourcing runs</small><b>12</b></div><div class="stat"><small>Average match</small><b>66%</b></div></div>
+    <div class="panel"><b>Performance by member</b><table><tr><th>Member</th><th>Jobs</th><th>Runs</th><th>Candidates</th><th>Shortlisted</th><th>Avg match</th></tr><tr><td>Karim Mostafa</td><td>4</td><td>5</td><td>110</td><td>6</td><td>55%</td></tr><tr><td><b>Total</b></td><td>9</td><td>12</td><td>260</td><td>16</td><td>66%</td></tr></table></div>
+  </div>
+</div>
+<ol class="legend">
+  <li><b>Report type tabs</b>: Team Performance, Activity, Recruitment Pipeline, Sourcing Quality (tabs keep your chosen period).</li>
+  <li><b>Period</b> select, From / To, and <b>Update report</b>.</li>
+  <li><b>CSV</b> and <b>Excel</b> download buttons.</li>
+  <li><b>Summary tiles</b> and section tables with a total row when applicable.</li>
+</ol>
+
+<h2>Date ranges</h2>
+<p>Options: All time, Today, Last 7 days, Last 30 days, Last 90 days, Custom range (From / To). <b>The default is the last 30 days</b>. Counts of jobs, runs and candidates use their <b>creation date</b> inside the period; candidate statuses are <b>current</b>; "last activity" is all-time.</p>
+
+<h2>The four report types</h2>
+<div class="grid2">
+<div class="card manager"><h3>Team Performance</h3><p class="small">Jobs, sourcing runs, and candidate outcomes per member.</p>
+<p style="font-size:9pt"><b>Tiles:</b> Members, Jobs created, Sourcing runs, Candidates sourced, Shortlisted, Average match.<br><b>Performance by member:</b> Member, Jobs, Sourcing runs, Completed runs, Active runs, Failed runs, Candidates, Shortlisted, Contacted, Rejected, Avg match; final row "Total".</p></div>
+<div class="card manager"><h3>Activity</h3><p class="small">Sign-ins and recorded actions per member.</p>
+<p style="font-size:9pt"><b>Tiles:</b> Sign-ins, Failed sign-ins, Sourcing runs, Logged actions, Active members ("x / n").<br><b>Activity by member:</b> Member, Sign-ins, Failed sign-ins, Job actions, Sourcing runs, Teammate files opened, Candidate actions, Team changes, Reports, Logged actions, Last activity; totals row.<br><b>Actions by type:</b> Action, Events, Members (most frequent first).</p></div>
+<div class="card manager"><h3>Recruitment Pipeline</h3><p class="small">Where sourced candidates currently sit in the pipeline.</p>
+<p style="font-size:9pt"><b>Tiles:</b> Total candidates, New, Reviewed, Shortlisted, Contacted, Rejected, Hired.<br><b>Pipeline by member:</b> Member, Total, New, Reviewed, Shortlisted, Contacted, Rejected, Hired, Progressed (%; share now shortlisted, contacted or hired); totals row.</p></div>
+<div class="card manager"><h3>Sourcing Quality</h3><p class="small">Average AI match quality by member, job, and sourcing file.</p>
+<p style="font-size:9pt"><b>Tiles:</b> Average match, Files evaluated ("evaluated / files"), Strong files (70% and above), Weak files (below 40%).<br><b>By member:</b> Member, Evaluated files, Avg match; "Team average" row.<br><b>By job:</b> Job, Owner, Files, Evaluated, Avg match, Best file.<br><b>By sourcing file:</b> Job, Owner, Status, Created, Candidates, Shortlisted, Avg match.</p></div>
+</div>
+
+<h2>Export and logging</h2>
+<ul>
+  <li><b>CSV</b> and <b>Excel</b> export the currently selected report, period and (for you) your team. File name: <code>&lt;title&gt;-report-&lt;scope&gt;-&lt;date&gt;.csv|xlsx</code>. CSV opens cleanly in Excel (UTF-8 marker) and begins with title, scope, period and generated-at lines, then each section with its header and total rows; percentage columns are labelled "(%)". Excel has an "Overview" sheet plus one sheet per section.</li>
+  <li>Cells that start with =, +, - or @ are prefixed with an apostrophe to prevent spreadsheet formula injection.</li>
+  <li>Exports are limited to 20 per minute. If a report cannot be built you see "This report couldn't be generated. Try again in a moment."</li>
+  <li><b>Logging:</b> viewing a report logs "Viewed the &hellip; report (scope, range)" (repeat views with the same description within 10 minutes are logged once). Each CSV/Excel download logs "Exported the &hellip; report &hellip; as CSV". Both appear in the Reports column of the Activity report and in the Team Activity feed.</li>
+</ul>
+<div class="callout warn"><span class="t">Activity history starts September 2026</span><p>The activity log began recording in September 2026, so older periods show few or no logged actions in the Activity report. Sourcing runs are counted from the runs themselves and are complete.</p></div>
+
+<!-- ===================== 8 ===================== -->
+<h1>8&nbsp; Notifications</h1>
+<p>The bell (visible to HR Managers and Admins) tells you when something meaningful happens in your team so you do not have to keep checking the dashboard. There are no e-mail or push notifications: alerts exist only inside the application.</p>
+
+<h2>Bell behaviour</h2>
+<ul>
+  <li>The red badge shows the unread count (capped at 99+). The accessible name is "Notifications, N unread".</li>
+  <li>It refreshes every 60 seconds while the browser tab is visible, again when you return to the tab and each time you open it.</li>
+  <li>The dropdown "Notifications" lists the 20 latest items. Each shows an unread dot, "<i>Actor</i> <i>what happened</i>" and a relative time; unread rows are tinted.</li>
+  <li><b>Click an item</b>: it is marked read and you go to its destination. <b>Mark all as read</b> appears only when something is unread. Esc or a click outside closes the panel.</li>
+  <li>Empty: "You're all caught up. Team sourcing runs, shortlists, hires, strong matches, and access requests will show up here." On error: "Notifications couldn't be loaded. Try again shortly."</li>
+</ul>
+
+<div class="grid2">
+<div class="card"><h3 style="color:#059669">Events that notify you</h3>
+<p style="font-size:9pt">When a <b>teammate</b> (not you) in your team does one of these, every active manager of that team is notified:</p>
+<table class="compact"><thead><tr><th>Event</th><th>Opens</th></tr></thead><tbody>
+<tr><td>A sourcing run starts</td><td>The file (read-only), access recorded</td></tr>
+<tr><td>A sourcing run completes</td><td>The file (read-only), access recorded</td></tr>
+<tr><td>A sourcing run fails</td><td>The file (read-only), access recorded</td></tr>
+<tr><td>A candidate is set to <b>Shortlisted</b> or <b>Hired</b></td><td>The candidate page (no match card)</td></tr>
+<tr><td>Scoring finds strong matches (80% or higher, at least one)</td><td>The job's candidate list (no run id)</td></tr>
+</tbody></table></div>
+<div class="card"><h3 style="color:#d03b3b">Does NOT notify you</h3><ul style="font-size:9.2pt">
+<li>Your own actions, ever</li>
+<li>Someone opening a file (including yours)</li>
+<li>Jobs created, updated or deleted</li>
+<li>Notes added</li>
+<li>Status changes to Reviewed, Contacted or Rejected</li>
+<li>Sign-ins or failed sign-ins</li>
+<li>Report views and exports</li>
+<li>Team or role changes by an Admin</li>
+<li>Access requests (these go to Admins only)</li>
+</ul></div>
+</div>
+<div class="callout"><span class="t">Fallback destination</span><p>If a notification has no specific target it opens the acting member's page (/manager/team/&lt;member&gt;). Notification items are private to you; you can only mark them read, never delete them. An item disappears if the underlying activity is no longer readable by you.</p></div>
+
+<!-- ===================== 9 ===================== -->
+<h1>9&nbsp; Button and control reference</h1>
+<p>Manager-specific controls. Personal-workspace buttons are covered in the HR User guide.</p>
+<table class="buttons">
+  <thead><tr><th style="width:23%">Control</th><th style="width:22%">Where</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><span class="lbl">Team</span></td><td>Top navigation</td><td>Opens the Team Dashboard.</td></tr>
+    <tr><td><span class="lbl">&#128276; bell</span></td><td>Top navigation</td><td>Opens the notification list; badge = unread count.</td></tr>
+    <tr><td><span class="lbl">Mark all as read</span></td><td>Bell dropdown</td><td>Marks every notification read. Shown only when unread items exist.</td></tr>
+    <tr><td><span class="lbl">Notification item</span></td><td>Bell dropdown</td><td>Marks that item read and navigates to its target.</td></tr>
+    <tr><td><span class="lbl">Member card</span></td><td>/manager</td><td>Opens /manager/team/&lt;id&gt; for that member.</td></tr>
+    <tr><td><span class="lbl">Team member</span> (select)</td><td>Files filter</td><td>Limits the files table to one member.</td></tr>
+    <tr><td><span class="lbl">Job title</span></td><td>Files filter</td><td>Partial-match title search.</td></tr>
+    <tr><td><span class="lbl">Status</span></td><td>Files filter</td><td>Pending, Running, Complete or Failed.</td></tr>
+    <tr><td><span class="lbl">Created / From / To</span></td><td>Files filter</td><td>Date window on run creation date.</td></tr>
+    <tr><td><span class="lbl">Min match %</span> / <span class="lbl">Min candidates</span></td><td>Files filter</td><td>Numeric minimums.</td></tr>
+    <tr><td><span class="lbl">Apply</span></td><td>Files filter</td><td>Reloads the page with the selected filters.</td></tr>
+    <tr><td><span class="lbl">Reset</span></td><td>Files filter</td><td>Clears all filters (only shown when a filter is active).</td></tr>
+    <tr><td><span class="lbl">View</span></td><td>Files tables</td><td>Opens the file in read-only mode and records your access.</td></tr>
+    <tr><td><span class="lbl">Owner name link</span></td><td>Files table, Member Comparison</td><td>Opens the owner's member page.</td></tr>
+    <tr><td><span class="lbl">Back to &hellip;</span></td><td>Member page</td><td>Returns to the Team Dashboard.</td></tr>
+    <tr><td><span class="lbl">Recently Opened link</span></td><td>Member page</td><td>Opens that file; records an access by you.</td></tr>
+    <tr><td><span class="lbl">Export Excel</span></td><td>Teammate's candidate list</td><td>Downloads the (filtered) candidates including notes; works read-only.</td></tr>
+    <tr><td><span class="lbl">Report tabs</span></td><td>/reports</td><td>Switch between the four report types.</td></tr>
+    <tr><td><span class="lbl">Period / From / To / Update report</span></td><td>/reports</td><td>Choose the date window (default 30 days) and reload.</td></tr>
+    <tr><td><span class="lbl">CSV</span> / <span class="lbl">Excel</span></td><td>/reports</td><td>Download the current report; logged.</td></tr>
+  </tbody>
+</table>
+<p class="small">Team picker and "Report scope" are Admin-only and never appear for a manager.</p>
+
+<!-- ===================== 10 ===================== -->
+<h1>10&nbsp; Step-by-step tasks</h1>
+
+<h2>10.1 Review team performance weekly</h2>
+<ol class="steps">
+  <li>Click <b>Team</b>. Reload the page first if it was already open, since it never refreshes itself.</li>
+  <li>Check the red banner (data errors), then the stat cards for the overall picture.</li>
+  <li>In <b>Sourcing Runs</b>, look at <b>Failed</b> and <b>Running</b>. Filter the files table by Status "Failed" to find the affected files.</li>
+  <li>In <b>Member Comparison</b>, compare Runs, Candidates, Shortlisted and Avg Match, and check Last Login / Last Activity for quiet members.</li>
+  <li>Open <b>Reports</b> &rarr; Team Performance (Last 7 days) for the week's numbers, and export it to CSV if you need to share them.</li>
+</ol>
+
+<h2>10.2 Investigate a member</h2>
+<ol class="steps">
+  <li>On the Team Dashboard click the member's card (or their name in Member Comparison).</li>
+  <li>Read the hero (status, last login, last activity) and the four stat cards.</li>
+  <li>Study the pipeline and Performance Overview: many Failed runs or low match average point to a search-quality problem.</li>
+  <li>Scan <b>Sourcing Files</b> and <b>Recent Activity</b>. Click <b>View</b> on a file to inspect the candidates read-only.</li>
+  <li>To act on what you find, talk to the member or ask an Admin; you cannot change their data.</li>
+</ol>
+
+<h2>10.3 See who opened or created a file</h2>
+<ol class="steps">
+  <li>Find the file in <b>Team Sourcing Files</b> (use the Team member and Job title filters).</li>
+  <li><b>Created by</b>: read the line under the job title ("Created Sep 3 by ..."). It names the starter when they differ from the owner.</li>
+  <li><b>Owner</b>: the "Owned By" column.</li>
+  <li><b>Last opened by</b>: the "Last Accessed By" column; an indigo "Not owner" tag means someone other than the owner.</li>
+  <li>For a full history of opens, use the <b>Team Activity</b> feed ("Opened ...'s sourcing file") or the Activity report column "Teammate files opened". Repeat opens within 30 minutes by the same person appear once.</li>
+</ol>
+
+<h2>10.4 Find high-quality candidates</h2>
+<ol class="steps">
+  <li>In the files filter set <b>Min match %</b> (for example 70) and optionally Min candidates and a date range, then <b>Apply</b>.</li>
+  <li>Sort your attention by the green Match badges and the Shortlisted count.</li>
+  <li>Click <b>View</b>. In the candidate list use the Status filter and sort to bring the best matches to the top.</li>
+  <li>Open a candidate (eye icon) to read the Match Score breakdown, strengths, concerns and recruiter notes.</li>
+  <li>Use <b>Export Excel</b> to take the filtered list with you. Recommend actions to the owner, who alone can change the status.</li>
+</ol>
+<div class="callout"><span class="t">Also handy</span><p>The Sourcing Quality report ranks jobs and files by average match and lists the best file per job.</p></div>
+
+<h2>10.5 Export a team report</h2>
+<ol class="steps">
+  <li>Open <b>Reports</b> and pick the report tab.</li>
+  <li>Choose the <b>Period</b> (default Last 30 days) or a custom From / To, then <b>Update report</b>.</li>
+  <li>Check the scope line ("Everyone in <i>your team</i>") and the summary tiles.</li>
+  <li>Click <b>CSV</b> or <b>Excel</b>. The file downloads and the export is logged.</li>
+</ol>
+
+<h2>10.6 Follow a notification</h2>
+<ol class="steps">
+  <li>Click the bell. Unread items are tinted with a dot.</li>
+  <li>Click the item, for example "Karim Mostafa completed a sourcing run".</li>
+  <li>You land on the file in read-only mode (run notifications), the candidate page (shortlist/hire) or the job list (strong matches).</li>
+  <li>The item is now read. Use <b>Mark all as read</b> to clear the rest.</li>
+</ol>
+
+<!-- ===================== 11 ===================== -->
+<h1>11&nbsp; What you cannot do, and how it is enforced</h1>
+<p>Restrictions are enforced in three independent layers, so hiding a button is never the only protection.</p>
+<figure>
+<svg viewBox="0 0 720 150" width="720" font-family="Segoe UI, Arial" font-size="11.5">
+  <defs><marker id="b" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#5b6878"/></marker></defs>
+  <rect x="8" y="30" width="200" height="90" rx="10" fill="#d9f1f6" stroke="#0e7490"/><text x="108" y="52" text-anchor="middle" font-weight="700" fill="#0e7490">1. User interface</text><text x="108" y="72" text-anchor="middle">Controls hidden or</text><text x="108" y="88" text-anchor="middle">replaced by text</text><text x="108" y="106" text-anchor="middle" font-size="10" fill="#5b6878">convenience only</text>
+  <rect x="260" y="30" width="200" height="90" rx="10" fill="#fdf1d6" stroke="#b7791f"/><text x="360" y="52" text-anchor="middle" font-weight="700" fill="#b7791f">2. Server API</text><text x="360" y="72" text-anchor="middle">Owner check returns 403</text><text x="360" y="88" text-anchor="middle">"only its owner can</text><text x="360" y="104" text-anchor="middle">change it"</text>
+  <rect x="512" y="30" width="200" height="90" rx="10" fill="#fde4e4" stroke="#d03b3b"/><text x="612" y="52" text-anchor="middle" font-weight="700" fill="#d03b3b">3. Database (RLS)</text><text x="612" y="72" text-anchor="middle">Managers only get SELECT</text><text x="612" y="88" text-anchor="middle">policies on team rows;</text><text x="612" y="104" text-anchor="middle">writes are owner-only</text>
+  <line x1="208" y1="75" x2="258" y2="75" stroke="#5b6878" marker-end="url(#b)"/><line x1="460" y1="75" x2="510" y2="75" stroke="#5b6878" marker-end="url(#b)"/>
+  <text x="360" y="18" text-anchor="middle" fill="#5b6878">a change attempt must pass every layer</text>
+</svg>
+<figcaption>Figure 3. Defence in depth.</figcaption>
+</figure>
+
+<table>
+  <thead><tr><th style="width:26%">You cannot &hellip;</th><th>Enforcement</th></tr></thead>
+  <tbody>
+    <tr><td>Edit, delete or re-run a teammate's job</td><td>UI: not offered. API: 403 "You can view this job, but only its owner can change it." on job update/delete and on starting a search. Database: writes owner-only.</td></tr>
+    <tr><td>Score candidates, change status, delete candidates or add notes on a teammate's file</td><td>UI: buttons hidden / status as text. API: same 403 text for "candidate". Database: owner-only write policies.</td></tr>
+    <tr><td>Change roles, teams, activation; invite users; create or rename teams</td><td>UI: no /admin link, /admin redirects non-admins. API: admin-only endpoints. Database: profile and team updates admin-only.</td></tr>
+    <tr><td>See another team</td><td>Database: managers see only profiles and data of their own team (via active-manager rules). Pages: URL team id ignored; a member outside your team gives "not found".</td></tr>
+    <tr><td>Use org-wide reports or the team picker</td><td>Server chooses scope from your role; the picker and "Report scope" only render for Admins.</td></tr>
+    <tr><td>See what others have opened</td><td>The "seen" tracking is private per viewer, so "Unseen" is always relative to you.</td></tr>
+    <tr><td>Change or delete the activity log</td><td>It is append-only; you can only write entries about yourself.</td></tr>
+    <tr><td>Delete notifications</td><td>You may only set the read time of your own notifications.</td></tr>
+  </tbody>
+</table>
+<div class="callout danger"><span class="t">Deactivation removes manager powers instantly</span><p>If an Admin deactivates a manager, the elevated database access stops and the next request signs them out.</p></div>
+
+<div class="keep"><h2>Permission matrix</h2>
+<table class="matrix">
+  <thead><tr><th>Capability</th><th><span class="chip user">HR User</span></th><th><span class="chip manager">HR Manager</span></th><th><span class="chip admin">Admin</span></th></tr></thead>
+  <tbody>
+    <tr><td>Create jobs, run sourcing, score, manage own candidates</td><td class="y-c">Yes</td><td class="y-c">Yes</td><td class="y-c">Yes</td></tr>
+    <tr><td>Personal dashboard, jobs, candidates</td><td class="y-c">Yes</td><td class="y-c">Yes</td><td class="y-c">Yes</td></tr>
+    <tr><td>Read teammates' jobs, candidates, notes</td><td class="n-c">No</td><td class="r-c">Own team, read-only</td><td class="r-c">All, read-only</td></tr>
+    <tr><td>Edit / score / delete others' data</td><td class="n-c">No</td><td class="n-c">No</td><td class="n-c">No</td></tr>
+    <tr><td>Team Dashboard and member pages</td><td class="n-c">No</td><td class="y-c">Own team</td><td class="y-c">Any team</td></tr>
+    <tr><td>Team picker</td><td class="n-c">No</td><td class="n-c">No</td><td class="y-c">Yes</td></tr>
+    <tr><td>Notification bell</td><td class="n-c">No</td><td class="y-c">Yes</td><td class="y-c">Yes</td></tr>
+    <tr><td>Reports scope</td><td class="r-c">My work</td><td class="r-c">Own team</td><td class="y-c">Org or any team</td></tr>
+    <tr><td>Export reports (CSV/Excel)</td><td class="y-c">Yes</td><td class="y-c">Yes</td><td class="y-c">Yes</td></tr>
+    <tr><td>Receive access-request alerts</td><td class="n-c">No</td><td class="n-c">No</td><td class="y-c">Yes</td></tr>
+    <tr><td>/admin: users, roles, teams, invites</td><td class="n-c">No</td><td class="n-c">No</td><td class="y-c">Yes</td></tr>
+  </tbody>
+</table></div>
+
+<!-- ===================== 12 ===================== -->
+<h1>12&nbsp; Troubleshooting FAQ</h1>
+<table>
+  <thead><tr><th style="width:32%">Symptom</th><th>Explanation and what to do</th></tr></thead>
+  <tbody>
+    <tr><td>"You're not assigned to a team yet"</td><td>Your profile has no team. Ask an Admin to assign you to the team you manage. Until then reports show only your own work.</td></tr>
+    <tr><td>"Team unavailable"</td><td>The team could not be read (removed, or you lack access). Ask an Admin.</td></tr>
+    <tr><td>The Team dashboard is empty or all zeros</td><td>The team has no members yet ("No team members yet"), no runs yet, or the members have not created anything. Also check that filters are not applied (use Reset).</td></tr>
+    <tr><td>I do not see the Team link or the bell</td><td>Role loads a moment after sign-in; refresh once. If still missing, your role may not be HR Manager. Contact an Admin.</td></tr>
+    <tr><td>A member is missing</td><td>They are not assigned to your team, or an Admin moved them. Inactive members still appear (marked Inactive).</td></tr>
+    <tr><td>Nothing new appears</td><td>Pages do not refresh themselves. Reload. Notifications refresh every 60 seconds.</td></tr>
+    <tr><td>"Unseen by you" is high although the owner reviewed everything</td><td>It counts what <b>you</b> have opened, not the owner. Open candidate detail pages to reduce it.</td></tr>
+    <tr><td>Team Jobs differs from my /jobs page</td><td>/jobs lists only your own jobs; Team Jobs counts every member's jobs.</td></tr>
+    <tr><td>Average match shows "No evaluated files yet"</td><td>No file has scored candidates. The owner must run "Score Candidates".</td></tr>
+    <tr><td>A red "data failed to load" banner</td><td>One of the underlying queries failed; figures may be incomplete. Reload; escalate if it persists.</td></tr>
+    <tr><td>I get a "not found" page for a member</td><td>The person is outside your team, or the address is wrong.</td></tr>
+    <tr><td>I see "only its owner can change it"</td><td>Working as designed: ask the owner to make the change.</td></tr>
+    <tr><td>Status dropdown or Score button missing on a file</td><td>The file belongs to a teammate (read-only). Look for the indigo banner.</td></tr>
+    <tr><td>I opened a file but no activity entry appeared</td><td>You may have opened the same file within the last 30 minutes, you own the file, or you arrived without a run id (for example from "View Candidates" in /jobs).</td></tr>
+    <tr><td>Report shows few actions</td><td>Activity logging started September 2026; widen the period or pick a recent one.</td></tr>
+    <tr><td>Export rejected or slow</td><td>Exports are limited to 20 per minute; wait a moment and retry.</td></tr>
+    <tr><td>Team files list seems incomplete</td><td>Only the newest 200 files are shown (see section 13); narrow with filters.</td></tr>
+    <tr><td>I was signed out with "not allowed"</td><td>Your account is not active. Contact an Admin.</td></tr>
+  </tbody>
+</table>
+
+<!-- ===================== 13 ===================== -->
+<h1>13&nbsp; Good-to-know limitations</h1>
+<div class="grid2">
+  <div class="card manager"><h3>Team files table</h3><ul style="font-size:9.2pt">
+    <li>No column sorting, no pagination and <b>no export</b>; newest first, at most 200 files.</li>
+    <li>The member page shows at most 50 files with no filters.</li>
+    <li>Filter values that are invalid are silently ignored.</li>
+    <li>The "Created" filter defaults to All time here, unlike reports (30 days).</li>
+  </ul></div>
+  <div class="card manager"><h3>Numbers</h3><ul style="font-size:9.2pt">
+    <li>Dashboard KPIs (runs, Unseen by you, Contacted/Rejected candidates) cover the <b>newest 200 files</b> (500 when filters are active), not the entire history.</li>
+    <li>Stat cards, Member Comparison and member pages are all-time; reports use a period.</li>
+    <li>"Unseen" is per viewer, never per owner.</li>
+    <li>Shortlisted counts only the current status; Hired candidates are not included.</li>
+    <li>Match figures average per file, so a tiny file weighs as much as a large one.</li>
+  </ul></div>
+  <div class="card manager"><h3>Finding teammates' work</h3><ul style="font-size:9.2pt">
+    <li>The job picker on /candidates and the /jobs list show <b>only your own</b> jobs. Reach team files via /manager, member pages or notifications.</li>
+    <li>Opening via "View Candidates" (job list) or a job-scored notification records <b>no access</b>.</li>
+    <li>The candidate list is per job, not per run: it shows all candidates of the job even when you arrive from one run.</li>
+    <li>Candidate notifications open without the match card.</li>
+  </ul></div>
+  <div class="card manager"><h3>Other</h3><ul style="font-size:9.2pt">
+    <li>Names are derived from e-mail addresses; there is no separate name field.</li>
+    <li>Pages do not auto-refresh; notifications poll every 60 seconds.</li>
+    <li>No e-mail or push notifications.</li>
+    <li>Managers cannot reassign files, change ownership, or edit members.</li>
+    <li>Exporting a teammate's candidates to Excel is allowed but is not logged.</li>
+    <li>Access-log entries collapse repeat opens by the same person within 30 minutes.</li>
+    <li>Activity history starts September 2026.</li>
+  </ul></div>
+</div>
+<div class="callout ok"><span class="t">Rule of thumb</span><p>Use the Team Dashboard to <b>see</b>, the member page to <b>understand</b>, the read-only file view to <b>inspect</b>, reports to <b>share</b>, and the bell to <b>be told</b>. To <b>change</b> anything belonging to someone else, ask the owner or an Admin.</p></div>
+
+</body>
+</html>

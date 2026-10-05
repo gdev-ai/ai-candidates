@@ -4,48 +4,48 @@
 
 @layer base {
   :root {
-    --background: 240 33% 98%;
-    --foreground: 240 10% 12%;
+    --background: 0 0% 98%;
+    --foreground: 0 0% 0%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 12%;
+    --card-foreground: 0 0% 0%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 12%;
-    --primary: 243 75% 59%;
+    --popover-foreground: 0 0% 0%;
+    --primary: 0 0% 0%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 15% 95%;
-    --secondary-foreground: 240 10% 15%;
-    --muted: 240 20% 96%;
-    --muted-foreground: 240 5% 45%;
-    --accent: 243 100% 97%;
-    --accent-foreground: 243 75% 40%;
-    --destructive: 0 72% 51%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 0%;
+    --muted: 0 0% 95%;
+    --muted-foreground: 0 0% 25%;
+    --accent: 0 0% 94%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 3 71% 41%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 15% 91%;
-    --input: 240 15% 88%;
-    --ring: 243 75% 59%;
-    --radius: 0.75rem;
+    --border: 0 0% 87%;
+    --input: 0 0% 75%;
+    --ring: 0 0% 0%;
+    --radius: 0;
   }
 
   .dark {
-    --background: 240 15% 8%;
-    --foreground: 240 10% 92%;
-    --card: 240 14% 11%;
-    --card-foreground: 240 10% 92%;
-    --popover: 240 14% 11%;
-    --popover-foreground: 240 10% 92%;
-    --primary: 243 80% 68%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 240 10% 16%;
-    --secondary-foreground: 240 10% 92%;
-    --muted: 240 10% 16%;
-    --muted-foreground: 240 5% 65%;
-    --accent: 240 10% 18%;
-    --accent-foreground: 243 80% 78%;
-    --destructive: 0 70% 55%;
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 6%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 6%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 75%;
+    --accent: 0 0% 15%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 3 60% 55%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 10% 20%;
-    --input: 240 10% 20%;
-    --ring: 243 80% 68%;
+    --border: 0 0% 25%;
+    --input: 0 0% 25%;
+    --ring: 0 0% 100%;
   }
 }
 
@@ -55,11 +55,65 @@
   }
   body {
     @apply bg-background text-foreground;
-    background-image:
-      radial-gradient(60rem 30rem at 90% -10%, hsl(243 90% 92% / 0.5), transparent),
-      radial-gradient(40rem 24rem at -10% 10%, hsl(38 92% 90% / 0.35), transparent);
-    background-repeat: no-repeat;
-    background-attachment: fixed;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.01em;
+  }
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+  :focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
+  }
+}
+
+/* Page content settles in once on load: opacity and a few pixels of rise,
+   nothing that competes with the data. */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-page-enter {
+  animation: page-enter 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Bars in the dashboard charts grow from zero on first paint. */
+@keyframes bar-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes bar-grow-y {
+  from {
+    transform: scaleY(0);
+  }
+}
+.animate-bar-x {
+  transform-origin: left;
+  animation: bar-grow-x 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animate-bar-y {
+  transform-origin: bottom;
+  animation: bar-grow-y 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-page-enter,
+  .animate-bar-x,
+  .animate-bar-y {
+    animation: none;
   }
 }
 

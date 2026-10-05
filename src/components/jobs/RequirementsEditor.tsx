@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { X, Plus, GraduationCap, Briefcase, Tag, CheckCircle2 } from "lucide-react";
+import { X, Plus, GraduationCap, Briefcase, Tag, MapPin } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -13,30 +12,72 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { JobAnalysis } from "@/types/job-analysis";
 import { cn } from "@/lib/utils";
-import { CITY_OPTIONS, EMPLOYMENT_TYPES, LOCATION_OPTIONS } from "@/lib/jobs/constants";
+import {
+  CITIES,
+  REQUIREMENT_KIND_LABELS,
+  SENIORITIES,
+  SENIORITY_LABELS,
+  type City,
+  type RequirementInput,
+  type RequirementKind,
+  type RequirementsDraft,
+  type Seniority,
+} from "@/types/job";
 
-// Radix Select can't use "" as an item value, so an unset location/employment
-// type is represented by this sentinel in the dropdown and translated back to
-// "" (what the rest of the app — JobAnalysis, resolveCleanLocationText,
-// etc. — expects for "not specified") on change.
+// Radix Select can't use "" as an item value, so "not specified" is this
+// sentinel in the dropdown and "" in the draft.
 const UNSPECIFIED_VALUE = "unspecified";
 
-type ArrayField =
-  | "required_skills"
-  | "preferred_skills"
-  | "education"
-  | "certifications"
-  | "languages"
-  | "industries"
-  | "keywords"
-  | "responsibilities";
-
 interface RequirementsEditorProps {
-  value: JobAnalysis;
-  onChange: (updated: JobAnalysis) => void;
+  value: RequirementsDraft;
+  onChange: (updated: RequirementsDraft) => void;
 }
+
+/** Replaces one kind's rows, keeping the other kinds (and their order). */
+export function replaceKind(
+  requirements: RequirementInput[],
+  kind: RequirementKind,
+  texts: string[],
+): RequirementInput[] {
+  const others = requirements.filter((r) => r.kind !== kind);
+  return [...others, ...texts.map((text) => ({ kind, text }))];
+}
+
+function textsOf(requirements: RequirementInput[], kind: RequirementKind): string[] {
+  return requirements.filter((r) => r.kind === kind).map((r) => r.text);
+}
+
+type TabId = "skills" | "qualifications" | "overview";
+
+const TABS: {
+  id: TabId;
+  label: string;
+  icon: typeof Tag;
+  kinds: { kind: RequirementKind; tone?: "good" | "warning"; placeholder?: string }[];
+}[] = [
+  {
+    id: "skills",
+    label: "Skills & Technologies",
+    icon: Tag,
+    kinds: [
+      { kind: "skill_required", tone: "good", placeholder: "Add required skill (e.g. React)..." },
+      { kind: "skill_preferred", tone: "warning", placeholder: "Add nice-to-have skill..." },
+    ],
+  },
+  {
+    id: "qualifications",
+    label: "Education & Qualifications",
+    icon: GraduationCap,
+    kinds: [{ kind: "education" }, { kind: "certification" }, { kind: "language" }, { kind: "industry" }],
+  },
+  {
+    id: "overview",
+    label: "Responsibilities & Keywords",
+    icon: Briefcase,
+    kinds: [{ kind: "responsibility" }, { kind: "keyword" }],
+  },
+];
 
 function EditableList({
   label,
@@ -72,13 +113,11 @@ function EditableList({
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-slate-900">{label}</span>
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-            {items.length}
-          </span>
-        </div>
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-semibold text-slate-900">{label}</span>
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+          {items.length}
+        </span>
       </div>
 
       <div className="flex flex-wrap gap-2" data-testid={testId}>
@@ -86,21 +125,21 @@ function EditableList({
           <div
             key={index}
             className={cn(
-              "group inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50/80 pl-2.5 pr-1.5 py-1 text-xs transition-all hover:bg-white hover:shadow-xs",
+              "group inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50/80 py-1 pl-2.5 pr-1.5 text-xs transition-all hover:bg-white hover:shadow-xs",
               badgeTone === "good" && "border-emerald-200 bg-emerald-50/60 text-emerald-950",
-              badgeTone === "warning" && "border-amber-200 bg-amber-50/60 text-amber-950"
+              badgeTone === "warning" && "border-amber-200 bg-amber-50/60 text-amber-950",
             )}
           >
             <input
               value={item}
               onChange={(e) => editItem(index, e.target.value)}
               data-testid={`${testId}-item-${index}`}
-              className="bg-transparent text-xs font-medium text-slate-800 focus:outline-none min-w-[60px]"
+              className="min-w-[60px] bg-transparent text-xs font-medium text-slate-800 focus:outline-none"
               aria-label={`${label} item ${index + 1}`}
             />
             <button
               type="button"
-              className="rounded p-0.5 text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 transition-colors"
+              className="rounded p-0.5 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-700"
               aria-label={`Remove ${item}`}
               onClick={() => removeItem(index)}
             >
@@ -110,13 +149,13 @@ function EditableList({
         ))}
       </div>
 
-      <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+      <div className="flex items-center gap-2 border-t border-slate-100 pt-1">
         <Input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder={placeholder || `Add ${label.toLowerCase()}...`}
           data-testid={`${testId}-add-input`}
-          className="h-8 text-xs bg-slate-50/50"
+          className="h-8 bg-slate-50/50 text-xs"
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
@@ -130,7 +169,7 @@ function EditableList({
           size="sm"
           onClick={addItem}
           data-testid={`${testId}-add-button`}
-          className="h-8 px-3 text-xs shrink-0"
+          className="h-8 shrink-0 px-3 text-xs"
         >
           <Plus className="mr-1 h-3 w-3" />
           Add
@@ -140,83 +179,61 @@ function EditableList({
   );
 }
 
-export function RequirementsEditor({ value, onChange }: RequirementsEditorProps) {
-  const [activeTab, setActiveTab] = useState<"skills" | "qualifications" | "overview">("skills");
+function parseYears(raw: string): number | null {
+  if (raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
 
-  function updateField<K extends keyof JobAnalysis>(
-    field: K,
-    fieldValue: JobAnalysis[K],
-  ) {
+/**
+ * Edits the AI-prefilled part of a job: seniority, city, experience range
+ * and the requirement rows ({kind, text}) that become job_requirements.
+ */
+export function RequirementsEditor({ value, onChange }: RequirementsEditorProps) {
+  const [activeTab, setActiveTab] = useState<TabId>("skills");
+
+  function update<K extends keyof RequirementsDraft>(field: K, fieldValue: RequirementsDraft[K]) {
     onChange({ ...value, [field]: fieldValue });
   }
 
-  function updateArrayField(field: ArrayField, items: string[]) {
-    updateField(field, items);
-  }
+  const rangeInvalid =
+    value.min_experience !== null &&
+    value.max_experience !== null &&
+    value.min_experience > value.max_experience;
+  const tab = TABS.find((t) => t.id === activeTab) ?? TABS[0]!;
 
   return (
     <div className="flex flex-col gap-6">
-      
-      {/* Top Role Overview Card */}
-      <div className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50/50 via-white to-slate-50 p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-indigo-100/80">
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-slate-900">Extracted Role Profile</h3>
-          </div>
-          <span className="text-xs text-indigo-600 bg-indigo-50 font-medium px-2.5 py-0.5 rounded-full border border-indigo-200/60">
-            AI-Analyzed
+      <div className="border border-border bg-card p-5">
+        <div className="mb-4 flex items-center justify-between border-b border-indigo-100/80 pb-3">
+          <h3 className="text-sm font-semibold text-slate-900">Role Profile</h3>
+          <span className="flex items-center gap-1 rounded-full border border-indigo-200/60 bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-600">
+            <MapPin className="h-3 w-3" aria-hidden="true" />
+            Egypt
           </span>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-slate-700" htmlFor="ra-job-title">
-              Job Title
-            </label>
-            <Input
-              id="ra-job-title"
-              value={value.job_title}
-              onChange={(e) => updateField("job_title", e.target.value)}
-              className="bg-white text-sm h-9"
-            />
-          </div>
-
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-slate-700" htmlFor="ra-seniority">
-              Seniority Level
-            </label>
-            <Input
-              id="ra-seniority"
-              value={value.seniority}
-              onChange={(e) => updateField("seniority", e.target.value)}
-              placeholder="e.g. Senior, Lead, Mid"
-              className="bg-white text-sm h-9"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-slate-700" htmlFor="ra-location">
-              Location <span className="text-red-600">*</span>
+              Seniority
             </label>
             <Select
-              value={value.location || LOCATION_OPTIONS[0]}
-              onValueChange={(selected) => updateField("location", selected)}
+              value={value.seniority || UNSPECIFIED_VALUE}
+              onValueChange={(v) => update("seniority", v === UNSPECIFIED_VALUE ? "" : (v as Seniority))}
             >
-              <SelectTrigger id="ra-location" className="bg-white text-sm h-9">
-                <SelectValue placeholder="Select a location" />
+              <SelectTrigger id="ra-seniority" className="h-9 bg-white text-sm" data-testid="ra-seniority">
+                <SelectValue placeholder="Select seniority" />
               </SelectTrigger>
               <SelectContent>
-                {LOCATION_OPTIONS.map((location) => (
-                  <SelectItem key={location} value={location}>
-                    {location}
+                <SelectItem value={UNSPECIFIED_VALUE}>Not specified</SelectItem>
+                {SENIORITIES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {SENIORITY_LABELS[s]}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-[11px] text-slate-500 leading-snug">
-              Every role sources nationwide in Egypt. Pick a specific city below to target search
-              results more precisely.
-            </p>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -225,49 +242,23 @@ export function RequirementsEditor({ value, onChange }: RequirementsEditorProps)
             </label>
             <Select
               value={value.city || UNSPECIFIED_VALUE}
-              onValueChange={(selected) =>
-                updateField("city", selected === UNSPECIFIED_VALUE ? "" : selected)
-              }
+              onValueChange={(v) => update("city", v === UNSPECIFIED_VALUE ? "" : (v as City))}
             >
-              <SelectTrigger id="ra-city" className="bg-white text-sm h-9">
+              <SelectTrigger id="ra-city" className="h-9 bg-white text-sm" data-testid="ra-city">
                 <SelectValue placeholder="Select a city" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={UNSPECIFIED_VALUE}>Not specified</SelectItem>
-                {CITY_OPTIONS.map((city) => (
+                <SelectItem value={UNSPECIFIED_VALUE}>Anywhere in Egypt</SelectItem>
+                {CITIES.map((city) => (
                   <SelectItem key={city} value={city}>
                     {city}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-[11px] text-slate-500 leading-snug">
-              Optional. Narrows search results to this specific city instead of nationwide Egypt.
+            <p className="text-[11px] leading-snug text-slate-500">
+              Optional. Narrows the search to this city instead of all of Egypt.
             </p>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-slate-700" htmlFor="ra-employment-type">
-              Employment Type
-            </label>
-            <Select
-              value={value.employment_type || UNSPECIFIED_VALUE}
-              onValueChange={(selected) =>
-                updateField("employment_type", selected === UNSPECIFIED_VALUE ? "" : selected)
-              }
-            >
-              <SelectTrigger id="ra-employment-type" className="bg-white text-sm h-9">
-                <SelectValue placeholder="Select employment type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={UNSPECIFIED_VALUE}>Not specified</SelectItem>
-                {EMPLOYMENT_TYPES.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -277,14 +268,12 @@ export function RequirementsEditor({ value, onChange }: RequirementsEditorProps)
             <Input
               id="ra-min-exp"
               type="number"
-              value={value.years_of_experience.minimum ?? ""}
-              onChange={(e) =>
-                updateField("years_of_experience", {
-                  ...value.years_of_experience,
-                  minimum: e.target.value === "" ? null : Number(e.target.value),
-                })
-              }
-              className="bg-white text-sm h-9"
+              min={0}
+              step={0.5}
+              value={value.min_experience ?? ""}
+              onChange={(e) => update("min_experience", parseYears(e.target.value))}
+              className="h-9 bg-white text-sm"
+              aria-invalid={rangeInvalid}
             />
           </div>
 
@@ -295,141 +284,59 @@ export function RequirementsEditor({ value, onChange }: RequirementsEditorProps)
             <Input
               id="ra-max-exp"
               type="number"
-              value={value.years_of_experience.maximum ?? ""}
-              onChange={(e) =>
-                updateField("years_of_experience", {
-                  ...value.years_of_experience,
-                  maximum: e.target.value === "" ? null : Number(e.target.value),
-                })
-              }
-              className="bg-white text-sm h-9"
+              min={0}
+              step={0.5}
+              value={value.max_experience ?? ""}
+              onChange={(e) => update("max_experience", parseYears(e.target.value))}
+              className="h-9 bg-white text-sm"
+              aria-invalid={rangeInvalid}
             />
           </div>
         </div>
+        {rangeInvalid && (
+          <p role="alert" className="mt-2 text-xs font-medium text-red-600">
+            Minimum experience can&apos;t be more than maximum.
+          </p>
+        )}
       </div>
 
-      {/* Navigation Tabs for Clean Organization */}
-      <div className="flex border-b border-slate-200">
-        <button
-          type="button"
-          onClick={() => setActiveTab("skills")}
-          className={cn(
-            "flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-colors",
-            activeTab === "skills"
-              ? "border-indigo-600 text-indigo-600"
-              : "border-transparent text-slate-500 hover:text-slate-700"
-          )}
-        >
-          <Tag className="h-4 w-4" />
-          Skills & Technologies
-          <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-xs">
-            {value.required_skills.length + value.preferred_skills.length}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("qualifications")}
-          className={cn(
-            "flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-colors",
-            activeTab === "qualifications"
-              ? "border-indigo-600 text-indigo-600"
-              : "border-transparent text-slate-500 hover:text-slate-700"
-          )}
-        >
-          <GraduationCap className="h-4 w-4" />
-          Education & Qualifications
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("overview")}
-          className={cn(
-            "flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-colors",
-            activeTab === "overview"
-              ? "border-indigo-600 text-indigo-600"
-              : "border-transparent text-slate-500 hover:text-slate-700"
-          )}
-        >
-          <Briefcase className="h-4 w-4" />
-          Responsibilities & Keywords
-        </button>
+      <div className="flex flex-wrap border-b border-slate-200">
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          const count = t.kinds.reduce((n, k) => n + textsOf(value.requirements, k.kind).length, 0);
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setActiveTab(t.id)}
+              className={cn(
+                "flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+                activeTab === t.id
+                  ? "border-indigo-600 text-indigo-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700",
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {t.label}
+              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-xs">{count}</span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Tab Contents */}
-      {activeTab === "skills" && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {tab.kinds.map(({ kind, tone, placeholder }) => (
           <EditableList
-            label="Required Skills"
-            items={value.required_skills}
-            onChangeItems={(items) => updateArrayField("required_skills", items)}
-            testId="requirements-required_skills"
-            badgeTone="good"
-            placeholder="Add required skill (e.g. React)..."
+            key={kind}
+            label={REQUIREMENT_KIND_LABELS[kind]}
+            items={textsOf(value.requirements, kind)}
+            onChangeItems={(items) => update("requirements", replaceKind(value.requirements, kind, items))}
+            testId={`requirements-${kind}`}
+            badgeTone={tone}
+            placeholder={placeholder}
           />
-
-          <EditableList
-            label="Preferred Skills"
-            items={value.preferred_skills}
-            onChangeItems={(items) => updateArrayField("preferred_skills", items)}
-            testId="requirements-preferred_skills"
-            badgeTone="warning"
-            placeholder="Add nice-to-have skill..."
-          />
-        </div>
-      )}
-
-      {activeTab === "qualifications" && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <EditableList
-            label="Education"
-            items={value.education}
-            onChangeItems={(items) => updateArrayField("education", items)}
-            testId="requirements-education"
-          />
-
-          <EditableList
-            label="Certifications"
-            items={value.certifications}
-            onChangeItems={(items) => updateArrayField("certifications", items)}
-            testId="requirements-certifications"
-          />
-
-          <EditableList
-            label="Languages"
-            items={value.languages}
-            onChangeItems={(items) => updateArrayField("languages", items)}
-            testId="requirements-languages"
-          />
-
-          <EditableList
-            label="Industries"
-            items={value.industries}
-            onChangeItems={(items) => updateArrayField("industries", items)}
-            testId="requirements-industries"
-          />
-        </div>
-      )}
-
-      {activeTab === "overview" && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <EditableList
-            label="Responsibilities"
-            items={value.responsibilities}
-            onChangeItems={(items) => updateArrayField("responsibilities", items)}
-            testId="requirements-responsibilities"
-          />
-
-          <EditableList
-            label="Keywords"
-            items={value.keywords}
-            onChangeItems={(items) => updateArrayField("keywords", items)}
-            testId="requirements-keywords"
-          />
-        </div>
-      )}
-
+        ))}
+      </div>
     </div>
   );
 }
-

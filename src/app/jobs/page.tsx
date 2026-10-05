@@ -8,20 +8,16 @@ import { DashboardNav } from "@/components/dashboard/nav";
 import { Button } from "@/components/ui/button";
 import { EmptyCell } from "@/components/ui/empty-cell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SENIORITY_LABELS, type JobListItem, type Seniority } from "@/types/job";
 
 const PAGE_SIZE = 10;
 
-interface Job {
-  id: string;
-  title: string;
-  location: string | null;
-  employment_type: string | null;
-  seniority: string | null;
-  created_at: string;
+function seniorityLabel(value: string | null): string | null {
+  return value ? (SENIORITY_LABELS[value as Seniority] ?? value) : null;
 }
 
 export default function JobsPage() {
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobs, setJobs] = useState<JobListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
@@ -58,7 +54,7 @@ export default function JobsPage() {
   return (
     <main className="min-h-screen">
       <DashboardNav />
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+      <div className="animate-page-enter mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
@@ -107,7 +103,8 @@ export default function JobsPage() {
                     <thead>
                       <tr className="border-b border-border bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
                         <th className="p-3 font-medium">Title</th>
-                        <th className="p-3 font-medium">Location</th>
+                        <th className="p-3 font-medium">Company</th>
+                        <th className="p-3 font-medium">City</th>
                         <th className="p-3 font-medium">Employment Type</th>
                         <th className="p-3 font-medium">Seniority</th>
                         <th className="p-3 font-medium">Created</th>
@@ -123,13 +120,16 @@ export default function JobsPage() {
                         >
                           <td className="p-3 font-medium text-foreground">{job.title}</td>
                           <td className="p-3 text-muted-foreground">
-                            {job.location || <EmptyCell />}
+                            {job.company_name || <EmptyCell />}
+                          </td>
+                          <td className="p-3 text-muted-foreground">
+                            {job.city || "Egypt"}
                           </td>
                           <td className="p-3 text-muted-foreground">
                             {job.employment_type || <EmptyCell />}
                           </td>
                           <td className="p-3 text-muted-foreground">
-                            {job.seniority || <EmptyCell />}
+                            {seniorityLabel(job.seniority) || <EmptyCell />}
                           </td>
                           <td className="p-3 text-muted-foreground">
                             {new Date(job.created_at).toLocaleDateString()}
@@ -139,7 +139,7 @@ export default function JobsPage() {
                               href={`/candidates?jobId=${job.id}`}
                               className="font-medium text-primary underline underline-offset-2"
                             >
-                              View Candidates
+                              View {job.candidate_count} candidate{job.candidate_count === 1 ? "" : "s"}
                             </Link>
                           </td>
                         </tr>

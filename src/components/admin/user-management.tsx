@@ -35,7 +35,7 @@ export function UserManagement({
 
   async function updateUser(
     user: UserPerformanceRow,
-    changes: { role?: Role; teamId?: string | null; isActive?: boolean },
+    changes: { role?: Role; teamId?: string | null; status?: "active" | "disabled" },
     successMessage: string,
   ) {
     setPendingUserId(user.id);
@@ -128,7 +128,7 @@ export function UserManagement({
                 </td>
                 <td className="p-3">
                   <Badge tone={user.isActive ? "good" : "neutral"}>
-                    {user.isActive ? "Active" : "Inactive"}
+                    {user.isActive ? "Active" : "Disabled"}
                   </Badge>
                 </td>
                 <td className="p-3">
@@ -140,12 +140,12 @@ export function UserManagement({
                     onClick={() =>
                       updateUser(
                         user,
-                        { isActive: !user.isActive },
-                        user.isActive ? `Deactivated ${user.name}.` : `Reactivated ${user.name}.`,
+                        { status: user.isActive ? "disabled" : "active" },
+                        user.isActive ? `Disabled ${user.name}.` : `Reactivated ${user.name}.`,
                       )
                     }
                   >
-                    {user.isActive ? "Deactivate" : "Reactivate"}
+                    {user.isActive ? "Disable" : "Reactivate"}
                   </Button>
                 </td>
               </tr>

@@ -1,19 +1,25 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getAIProvider } from "@/lib/ai";
 import { analyzeJobDescription } from "@/lib/ai/prompts/job-analysis";
 import { requireUser } from "@/lib/api/requireUser";
 import { withErrorHandling } from "@/lib/errors";
 import { enforceRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 const requestSchema = z.object({
-  jobDescriptionText: z
-    .string({ message: "jobDescriptionText is required." })
+  description: z
+    .string({ message: "description is required." })
     .trim()
-    .min(50, "Job description is too short to analyze."),
+    .min(50, "Job description is too short to analyze.")
+    .max(30_000, "Job description is too long."),
 });
 
+/**
+ * Runs the AI job analysis server-side. The result is logged in
+ * provider_calls (raw Responses object, incl. `output_parsed`) under the
+ * caller's user id; POST /api/jobs copies it into job_analyses by
+ * `analysisCallId`, so the client never supplies analysis JSON itself.
+ */
 export const POST = withErrorHandling(async (request: Request) => {
   const auth = await requireUser();
   if ("error" in auth) return auth.error;
@@ -24,28 +30,15 @@ export const POST = withErrorHandling(async (request: Request) => {
     RATE_LIMITS.aiRequest.windowSeconds,
   );
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
+  const body: unknown = await request.json().catch(() => null);
+  const parsed = requestSchema.safeParse(body);
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: "Request body must be valid JSON." },
+      { error: parsed.error.issues[0]?.message ?? "Invalid request." },
       { status: 400 },
     );
   }
 
-  const parsedRequest = requestSchema.safeParse(body);
-  if (!parsedRequest.success) {
-    return NextResponse.json(
-      { error: parsedRequest.error.issues[0]?.message ?? "Invalid request." },
-      { status: 400 },
-    );
-  }
-
-  const provider = getAIProvider();
-  const analysis = await analyzeJobDescription(
-    parsedRequest.data.jobDescriptionText,
-    provider,
-  );
-  return NextResponse.json(analysis);
+  const result = await analyzeJobDescription(parsed.data.description, { userId: auth.user.id });
+  return NextResponse.json({ analysis: result.data, analysisCallId: result.callId });
 });

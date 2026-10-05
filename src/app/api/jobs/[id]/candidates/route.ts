@@ -1,112 +1,50 @@
 import { NextResponse } from "next/server";
 
+import { loadJobCandidates, loadJobOwner } from "@/app/api/jobs/_lib/candidates";
 import { requireUser } from "@/lib/api/requireUser";
-import {
-  filterCandidates,
-  sortCandidates,
-  type CandidateForFiltering,
-  type CandidateSortField,
-} from "@/lib/candidates/filterAndSort";
+import { filterCandidates, parseCandidateQuery, sortCandidates } from "@/lib/candidates/filterAndSort";
 import { withErrorHandling } from "@/lib/errors";
+import { createLogger } from "@/lib/logger";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
-const SORT_FIELDS: CandidateSortField[] = [
-  "name",
-  "experience_years",
-  "match_score",
-  "created_at",
-];
+const log = createLogger("api-job-candidates");
 
+/**
+ * A job's pipeline: job_candidates + person + skills + latest match.
+ * Filtered, sorted and paged in memory so the three stay consistent; fine
+ * at this app's per-job volumes (tens to a few hundred people).
+ */
 export const GET = withErrorHandling(async (request: Request, { params }: RouteParams) => {
   const auth = await requireUser();
   if ("error" in auth) return auth.error;
-  const { supabase } = auth;
+  const { supabase, user } = auth;
   const { id: jobId } = await params;
 
-  const [job, linkedResult] = await Promise.all([
-    supabase.from("jobs").select("id").eq("id", jobId).maybeSingle(),
-    supabase
-      .from("job_candidates")
-      .select("candidate_id, candidates(*)")
-      .eq("job_id", jobId),
-  ]);
+  const { job, error: jobError } = await loadJobOwner(supabase, jobId);
+  if (jobError) return NextResponse.json({ error: "Failed to load job." }, { status: 500 });
+  if (!job) return NextResponse.json({ error: "Job not found." }, { status: 404 });
 
-  if (job.error) {
-    return NextResponse.json({ error: "Failed to load job." }, { status: 500 });
-  }
-  if (!job.data) {
-    return NextResponse.json({ error: "Job not found." }, { status: 404 });
-  }
-
-  const { data: linked, error: linkError } = linkedResult;
-  if (linkError) {
-    return NextResponse.json(
-      { error: "Failed to load candidates for this job." },
-      { status: 500 },
-    );
+  const { data, error } = await loadJobCandidates(supabase, jobId, user.id);
+  if (error) {
+    log.error("Failed to load job candidates", { error });
+    return NextResponse.json({ error: "Failed to load candidates for this job." }, { status: 500 });
   }
 
   const { searchParams } = new URL(request.url);
-  const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
-  const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? "20")));
+  const page = Math.max(1, Math.floor(Number(searchParams.get("page") ?? "1")) || 1);
+  const limit = Math.min(100, Math.max(1, Math.floor(Number(searchParams.get("limit") ?? "20")) || 20));
+  const { filters, sortBy, sortDir } = parseCandidateQuery(searchParams);
 
-  const sortByParam = searchParams.get("sort_by");
-  const sortBy: CandidateSortField = SORT_FIELDS.includes(
-    sortByParam as CandidateSortField,
-  )
-    ? (sortByParam as CandidateSortField)
-    : "created_at";
-  const sortDir = searchParams.get("sort_dir") === "asc" ? "asc" : "desc";
-
-  const filters = {
-    name: searchParams.get("name") ?? undefined,
-    skill: searchParams.get("skill") ?? undefined,
-    location: searchParams.get("location") ?? undefined,
-    company: searchParams.get("company") ?? undefined,
-    status: searchParams.get("status") ?? undefined,
-  };
-
-  // Fetched in full (not DB-paginated) so filtering/sorting/pagination stay
-  // correct together. Fine at this app's realistic per-job candidate scale;
-  // would need a different approach at very large volumes.
-  const candidateIds = (linked ?? []).map((row) => row.candidate_id);
-
-  const { data: matches, error: matchesError } = candidateIds.length
-    ? await supabase
-        .from("candidate_matches")
-        .select("*")
-        .eq("job_id", jobId)
-        .in("candidate_id", candidateIds)
-    : { data: [], error: null };
-
-  if (matchesError) {
-    return NextResponse.json(
-      { error: "Failed to load match data for this job." },
-      { status: 500 },
-    );
-  }
-
-  const matchByCandidateId = new Map(
-    (matches ?? []).map((match) => [match.candidate_id, match]),
-  );
-
-  const merged: CandidateForFiltering[] = (linked ?? []).map((row) => ({
-    ...(row.candidates as unknown as CandidateForFiltering),
-    match: matchByCandidateId.get(row.candidate_id) ?? null,
-  }));
-
-  const filtered = filterCandidates(merged, filters);
-  const sorted = sortCandidates(filtered, sortBy, sortDir);
-
+  const sorted = sortCandidates(filterCandidates(data, filters), sortBy, sortDir);
   const from = (page - 1) * limit;
-  const paged = sorted.slice(from, from + limit);
 
   return NextResponse.json({
-    candidates: paged,
+    candidates: sorted.slice(from, from + limit),
     total: sorted.length,
+    totalInJob: data.length,
     page,
     limit,
   });

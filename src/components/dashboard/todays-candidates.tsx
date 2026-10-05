@@ -29,10 +29,10 @@ export function TodaysCandidates({ candidates }: { candidates: TodaysCandidateRo
   return (
     <ul className="divide-y divide-slate-100" data-testid="todays-candidates-list">
       {candidates.map((candidate) => (
-        <li key={candidate.id} className="flex items-center justify-between py-3 gap-3">
+        <li key={`${candidate.jobId}:${candidate.personId}`} className="flex items-center justify-between py-3 gap-3">
           <div className="min-w-0 flex-1">
             <Link
-              href={`/candidates/${candidate.id}`}
+              href={`/candidates/${candidate.personId}?jobId=${candidate.jobId}`}
               className="font-medium text-slate-900 hover:text-indigo-600 transition-colors truncate block text-sm"
             >
               {candidate.name ?? "Unnamed candidate"}
@@ -50,7 +50,7 @@ export function TodaysCandidates({ candidates }: { candidates: TodaysCandidateRo
             </p>
           </div>
           <span className="shrink-0 text-xs text-slate-400 tabular-nums">
-            {formatTime(candidate.createdAt)}
+            {formatTime(candidate.foundAt)}
           </span>
         </li>
       ))}

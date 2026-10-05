@@ -23,6 +23,7 @@ export interface CandidateFilterState {
   location: string;
   company: string;
   status: string;
+  openToWork: boolean;
   sortBy: CandidateSortField;
   sortDir: SortDirection;
 }
@@ -33,6 +34,7 @@ export const DEFAULT_CANDIDATE_FILTERS: CandidateFilterState = {
   location: "",
   company: "",
   status: "",
+  openToWork: false,
   sortBy: "match_score",
   sortDir: "desc",
 };
@@ -43,12 +45,26 @@ const SORT_OPTIONS: { value: CandidateSortField; label: string }[] = [
   { value: "match_score", label: "Match Score" },
   { value: "experience_years", label: "Experience" },
   { value: "name", label: "Name" },
-  { value: "created_at", label: "Date Added" },
+  { value: "found_at", label: "Date Found" },
 ];
 
 interface FiltersProps {
   value: CandidateFilterState;
   onChange: (value: CandidateFilterState) => void;
+}
+
+/** URL params understood by GET /api/jobs/[id]/candidates and the export route. */
+export function buildFilterQueryString(filters: CandidateFilterState): string {
+  const params = new URLSearchParams();
+  if (filters.name.trim()) params.set("name", filters.name.trim());
+  if (filters.skill.trim()) params.set("skill", filters.skill.trim());
+  if (filters.location.trim()) params.set("location", filters.location.trim());
+  if (filters.company.trim()) params.set("company", filters.company.trim());
+  if (filters.status) params.set("status", filters.status);
+  if (filters.openToWork) params.set("open_to_work", "true");
+  params.set("sort_by", filters.sortBy);
+  params.set("sort_dir", filters.sortDir);
+  return params.toString();
 }
 
 export function Filters({ value, onChange }: FiltersProps) {
@@ -96,7 +112,7 @@ export function Filters({ value, onChange }: FiltersProps) {
     <div className="flex flex-col gap-4" data-testid="candidate-filters">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Input
-          placeholder="Search by name"
+          placeholder="Name or title"
           value={draft.name}
           onChange={(e) => updateDraft("name", e.target.value)}
           data-testid="filter-name"
@@ -108,7 +124,7 @@ export function Filters({ value, onChange }: FiltersProps) {
           data-testid="filter-skill"
         />
         <Input
-          placeholder="Company"
+          placeholder="Current company"
           value={draft.company}
           onChange={(e) => updateDraft("company", e.target.value)}
           data-testid="filter-company"
@@ -138,6 +154,20 @@ export function Filters({ value, onChange }: FiltersProps) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={draft.openToWork}
+            onChange={(e) => {
+              const updated = { ...draft, openToWork: e.target.checked };
+              setDraft(updated);
+              onChange(updated);
+            }}
+            data-testid="filter-open-to-work"
+            className="h-4 w-4 rounded border-border"
+          />
+          Open to work only
+        </label>
         <Button type="button" onClick={applyFilters} data-testid="filter-apply">
           Apply Filters
         </Button>

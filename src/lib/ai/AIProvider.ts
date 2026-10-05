@@ -1,21 +1,7 @@
-export interface GenerateTextOptions {
-  systemInstruction?: string;
-  temperature?: number;
-  /**
-   * Hints to the provider that the response should be raw JSON (no markdown
-   * fences, no prose). Providers that support a native JSON mode (e.g.
-   * OpenAI's response_format) should use it; others may ignore this hint,
-   * so callers must still validate/parse the returned text defensively.
-   */
-  jsonMode?: boolean;
-}
-
-export interface AIProvider {
-  generateText(
-    prompt: string,
-    options?: GenerateTextOptions,
-  ): Promise<string>;
-}
+/**
+ * Errors raised by the OpenAI layer. `errors.ts` maps AIProviderError and
+ * AIResponseValidationError (and so their subclasses) to safe 502s.
+ */
 
 export class AIProviderError extends Error {
   constructor(provider: string, cause?: unknown) {
@@ -26,14 +12,36 @@ export class AIProviderError extends Error {
 }
 
 /**
- * Thrown when an AI response is not valid JSON, or doesn't match the
- * expected schema. Never let malformed AI output propagate as if it were
- * trustworthy structured data.
+ * The model answered, but not with usable structured output: invalid JSON,
+ * a schema mismatch, a truncated (`incomplete`) response or a refusal.
+ * Never retried unchanged — the same request would fail the same way.
  */
 export class AIResponseValidationError extends Error {
   constructor(context: string, cause?: unknown) {
     super(`AI response for "${context}" was not valid JSON matching the expected schema.`);
     this.name = "AIResponseValidationError";
     this.cause = cause;
+  }
+}
+
+/** `status === "incomplete"`, e.g. max_output_tokens was hit. */
+export class AIIncompleteResponseError extends AIResponseValidationError {
+  constructor(
+    context: string,
+    public readonly reason: string | null,
+  ) {
+    super(context, new Error(`Response incomplete: ${reason ?? "unknown reason"}`));
+    this.name = "AIIncompleteResponseError";
+  }
+}
+
+/** The model refused to answer. */
+export class AIRefusalError extends AIResponseValidationError {
+  constructor(
+    context: string,
+    public readonly refusal: string,
+  ) {
+    super(context, new Error(`Model refused: ${refusal}`));
+    this.name = "AIRefusalError";
   }
 }

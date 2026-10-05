@@ -34,12 +34,17 @@ export default async function TeamMemberPage({
   const memberId = parseUuid(userId);
   if (!memberId) notFound();
 
-  const { supabase, profile, teamOptions } = await resolveManagerScope(null);
+  const { supabase, member: viewer, teamId: managedTeamId, teamOptions } = await resolveManagerScope(null);
   const data = await getTeamMemberData(supabase, memberId);
 
-  // RLS already hides other teams' profiles from an HR Manager; this repeats
-  // the check so an out-of-team id can never render, even if a policy changes.
-  if (!data || (profile.role === "hr_manager" && data.member.teamId !== profile.team_id)) {
+  // RLS already hides other teams' members from an HR Manager; this repeats
+  // the check (against the team they manage) so an out-of-team id can never
+  // render, even if a policy changes.
+  if (
+    !data ||
+    (viewer.role === "hr_manager" &&
+      (managedTeamId === null || data.member.teamId !== managedTeamId))
+  ) {
     notFound();
   }
 
@@ -50,7 +55,7 @@ export default async function TeamMemberPage({
   return (
     <main className="min-h-screen bg-slate-50/70 pb-16">
       <DashboardNav />
-      <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
+      <div className="animate-page-enter mx-auto flex max-w-6xl flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8">
         <Link
           href={backHref}
           className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900"
@@ -59,35 +64,32 @@ export default async function TeamMemberPage({
           Back to {member.teamName ?? "team"}
         </Link>
 
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-8 text-white shadow-xl">
-          <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-            <div className="max-w-2xl">
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-medium text-indigo-300 ring-1 ring-inset ring-indigo-500/30">
-                <Users className="h-3.5 w-3.5" aria-hidden="true" />
-                {ROLE_LABELS[member.role]}
-                {member.teamName && ` · ${member.teamName}`}
-              </div>
-              <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                {member.name}
-              </h1>
-              <p className="mt-2 text-sm text-slate-300">{member.email}</p>
+        <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm md:flex-row md:items-end md:justify-between">
+          <div>
+            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-200">
+              <Users className="h-3.5 w-3.5" aria-hidden="true" />
+              {ROLE_LABELS[member.role]}
+              {member.teamName && ` · ${member.teamName}`}
             </div>
-            <dl className="grid grid-cols-3 gap-6 text-sm">
-              <div>
-                <dt className="text-xs uppercase tracking-wide text-slate-400">Status</dt>
-                <dd className="mt-1 font-medium">{member.isActive ? "Active" : "Inactive"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase tracking-wide text-slate-400">Last login</dt>
-                <dd className="mt-1 font-medium">{formatRelativeTime(member.lastSignInAt)}</dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase tracking-wide text-slate-400">Last activity</dt>
-                <dd className="mt-1 font-medium">{formatRelativeTime(member.lastActivityAt)}</dd>
-              </div>
-            </dl>
+            <h1 className="font-display text-2xl font-semibold tracking-tight text-slate-900">
+              {member.name}
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">{member.email}</p>
           </div>
-          <div className="pointer-events-none absolute -bottom-10 -right-10 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl" />
+          <dl className="grid grid-cols-3 gap-6 text-sm">
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-slate-500">Status</dt>
+              <dd className="mt-1 font-medium text-slate-900">{member.status === "active" ? "Active" : member.status === "disabled" ? "Disabled" : "Pending"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-slate-500">Last login</dt>
+              <dd className="mt-1 font-medium text-slate-900">{formatRelativeTime(member.lastSignInAt)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-slate-500">Last activity</dt>
+              <dd className="mt-1 font-medium text-slate-900">{formatRelativeTime(member.lastActivityAt)}</dd>
+            </div>
+          </dl>
         </div>
 
         {loadError && (
@@ -100,12 +102,12 @@ export default async function TeamMemberPage({
         )}
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="Jobs Created" value={member.jobs} icon={Briefcase} tone="indigo" />
+          <StatCard label="Jobs Created" value={member.jobs} icon={Briefcase} />
           <StatCard
             label="Sourcing Runs"
             value={`${member.completedRuns} / ${member.runs}`}
             icon={FolderSearch}
-            tone="sky"
+           
           />
           <StatCard
             label="Average Match Quality"
@@ -115,9 +117,9 @@ export default async function TeamMemberPage({
                 : "No evaluated files yet"
             }
             icon={Target}
-            tone="emerald"
+           
           />
-          <StatCard label="Shortlisted" value={member.shortlisted} icon={UserCheck} tone="amber" />
+          <StatCard label="Shortlisted" value={member.shortlisted} icon={UserCheck} />
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

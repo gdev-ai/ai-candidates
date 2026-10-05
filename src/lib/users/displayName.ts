@@ -1,9 +1,13 @@
 /**
- * Derives a human-friendly display name from an email address, since this
- * app has no profiles/names table — email is the only identity on record
- * (see src/lib/auth/access.ts). "zeyad.ragab@..." -> "Zeyad Ragab".
+ * A member's display name: their real name when known (copied from HR
+ * Portal's hr_staff on first sign-in), otherwise derived from the email.
+ * "zeyad.ragab@..." -> "Zeyad Ragab".
  */
-export function getDisplayName(email: string | null | undefined): string | null {
+export function getDisplayName(
+  email: string | null | undefined,
+  fullName?: string | null,
+): string | null {
+  if (fullName?.trim()) return fullName.trim();
   if (!email) return null;
   const localPart = email.split("@")[0];
   if (!localPart) return null;

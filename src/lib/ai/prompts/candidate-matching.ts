@@ -1,85 +1,176 @@
-import type { AIProvider } from "@/lib/ai/AIProvider";
-import { parseJsonResponse } from "@/lib/ai/parseJsonResponse";
+import { runStructured, type CallContext } from "@/lib/ai/structured";
+import { countryName } from "@/lib/search/queryBuilder";
 import {
-  matchResultSchema,
-  type MatchResult,
-  type MatchingJobInput,
-  type MatchingCandidateInput,
+  MATCH_WEIGHTS,
+  matchOutputSchema,
+  type MatchItem,
+  type MatchingJob,
+  type MatchingPerson,
+  type MatchOutput,
 } from "@/types/matching";
 
-const SYSTEM_INSTRUCTION = `You are an expert technical recruiter scoring how well a candidate matches a job's requirements.
-Every sub-score must be explicitly justified by comparing the candidate's actual data against the job's stated requirements — never assign a score based on a general impression.
+export const MATCH_PROMPT_VERSION = "match/2026-10-04";
 
-When comparing skills, reason semantically — never require a literal string match:
-- Recognize synonyms and equivalent naming for the same technology (e.g. "JS" = "JavaScript", "Node" = "Node.js", "Postgres" = "PostgreSQL").
-- Recognize umbrella/role terms that imply a set of underlying skills (e.g. a candidate skill list of "HTML, CSS, JavaScript" satisfies a job requirement of "Front-End Development" or is core evidence toward "Full Stack Development"; a headline or summary of "Web Developer" implies working knowledge of HTML/CSS/JS even if those exact words aren't listed as skills). Use your own domain knowledge of what a role or umbrella term typically requires.
-- When a job requirement is itself an umbrella term covering multiple underlying skills (e.g. "Full Stack Development" implies both front-end basics and a back-end/server skill), treat it as partially satisfied when only part of the umbrella is covered: name the covered part in "matched_requirements" and the uncovered part in "missing_requirements" — don't collapse a partial match into one vague low score.
-- Still never invent a specific skill, technology, or qualification the candidate's data gives no basis for — semantic matching means recognizing what evidence in the data reasonably implies, not assuming unstated specifics.
+const INSTRUCTIONS = `You are an expert recruiter scoring how well one candidate fits one job. Compare the candidate's actual data with each requirement.
+Scoring (each 0-100):
+- skills_score: required skills weigh more than preferred. Match semantically: synonyms ("JS" = "JavaScript"), umbrella terms (HTML/CSS/JS imply front-end), and skills evidenced by job titles or role descriptions all count.
+- experience_score: candidate's total years and relevance of roles vs the job's range.
+- seniority_score: level of recent titles and responsibilities vs the job's seniority.
+- education_score: degrees and certifications vs the education requirements; 70 when the job lists none.
+- location_score: 100 when based in the job's city/country, lower when elsewhere or unknown.
+Items: one item per job requirement (use its ref, e.g. "R3", in requirement_ref) with status met / partial / missing, a short text, and evidence quoting the candidate data (empty when missing). Add items of kind experience, seniority and location, plus up to 3 "strength" items (status met) and up to 3 "concern" items (status missing or partial; requirement_ref null).
+When the data gives no evidence either way, score conservatively and say so in a concern. Never invent facts.
+summary: 2-3 sentences.`;
 
-The candidate record often lacks structured education or seniority fields; when the available text (headline, summary, skills) gives genuinely no evidence either way for a dimension, score it conservatively and say so in "concerns" — this conservatism is about absence of evidence, not about requiring exact wording when the evidence clearly implies the skill.
-Respond with raw JSON only. Do not wrap the JSON in markdown code fences.`;
-
-function formatExperienceRange(range: MatchingJobInput["years_of_experience"]): string {
-  if (range.minimum === null && range.maximum === null) return "(not specified)";
-  if (range.maximum === null) return `${range.minimum}+ years`;
-  if (range.minimum === null) return `up to ${range.maximum} years`;
-  return `${range.minimum}-${range.maximum} years`;
+function monthYear(year: number | null, month: number | null): string {
+  if (!year) return "?";
+  return month ? `${String(month).padStart(2, "0")}/${year}` : String(year);
 }
 
-export function buildCandidateMatchingPrompt(
-  job: MatchingJobInput,
-  candidate: MatchingCandidateInput,
-): string {
-  return `Compare this candidate against this job's requirements and produce a structured match assessment as JSON matching exactly this shape:
-
-{
-  "match_score": number (0-100, overall weighted score),
-  "skills_score": number (0-100, based on how well candidate.skills/headline/summary satisfy required_skills and preferred_skills — match semantically: synonyms, equivalent naming, and umbrella/role terms count as evidence, not just identical wording),
-  "experience_score": number (0-100, based on candidate.experience_years vs the job's years_of_experience range),
-  "location_score": number (0-100, based on candidate.location vs the job's location; 100 if they match or the job has no location requirement),
-  "education_score": number (0-100, based on whether the candidate's available text suggests the job's education requirements are met; score conservatively if there isn't enough information),
-  "seniority_score": number (0-100, based on whether the candidate's headline/summary/experience suggests the job's seniority level),
-  "matched_requirements": string[] (specific requirements from the job that this candidate's data clearly satisfies),
-  "missing_requirements": string[] (specific requirements from the job that this candidate's data does not show),
-  "strengths": string[] (specific, evidence-based strengths of this candidate for this role),
-  "concerns": string[] (specific concerns, including any dimension where there wasn't enough data to score confidently),
-  "summary": string (2-3 sentence overall assessment)
+function truncate(text: string | null, max: number): string {
+  if (!text) return "";
+  const clean = text.replace(/\s+/g, " ").trim();
+  return clean.length > max ? `${clean.slice(0, max)}…` : clean;
 }
 
-Job:
-- Title: ${job.job_title}
-- Seniority: ${job.seniority || "(not specified)"}
-- Location: ${job.location || "(not specified)"}
-- Required skills: ${job.required_skills.join(", ") || "(none listed)"}
-- Preferred skills: ${job.preferred_skills.join(", ") || "(none listed)"}
-- Years of experience required: ${formatExperienceRange(job.years_of_experience)}
-- Education requirements: ${job.education.join(", ") || "(none listed)"}
-- Certifications: ${job.certifications.join(", ") || "(none listed)"}
-- Industries: ${job.industries.join(", ") || "(none listed)"}
-- Key responsibilities: ${job.responsibilities.join("; ") || "(none listed)"}
-
-Candidate:
-- Name: ${candidate.name ?? "(unknown)"}
-- Headline: ${candidate.headline ?? "(unknown)"}
-- Current company: ${candidate.company ?? "(unknown)"}
-- Location: ${candidate.location ?? "(unknown)"}
-- Skills: ${candidate.skills.join(", ") || "(none listed)"}
-- Years of experience: ${candidate.experience_years ?? "(unknown)"}
-- Summary: ${candidate.summary ?? "(none available)"}`;
+/** Requirement refs ("R1"…) in prompt order; mapped back to ids afterwards. */
+export function requirementRefs(job: MatchingJob): Map<string, string> {
+  return new Map(job.requirements.map((r, i) => [`R${i + 1}`, r.id]));
 }
 
-export async function matchCandidateToJob(
-  job: MatchingJobInput,
-  candidate: MatchingCandidateInput,
-  provider: AIProvider,
-): Promise<MatchResult> {
-  const prompt = buildCandidateMatchingPrompt(job, candidate);
+export function buildMatchInput(job: MatchingJob, person: MatchingPerson): string {
+  const range =
+    job.min_experience === null && job.max_experience === null
+      ? "not specified"
+      : `${job.min_experience ?? 0}${job.max_experience !== null ? `-${job.max_experience}` : "+"} years`;
+  const where = job.city ? `${job.city}, ${countryName(job.country_code)}` : countryName(job.country_code);
 
-  const rawResponse = await provider.generateText(prompt, {
-    systemInstruction: SYSTEM_INSTRUCTION,
-    temperature: 0.2,
-    jsonMode: true,
+  const jobLines = [
+    `JOB`,
+    `Title: ${job.title}`,
+    `Seniority: ${job.seniority ?? "not specified"}`,
+    `Location: ${where}${job.work_arrangement ? ` (${job.work_arrangement})` : ""}`,
+    `Employment type: ${job.employment_type ?? "not specified"}`,
+    `Experience: ${range}`,
+    `Requirements:`,
+    ...job.requirements.map((r, i) => `R${i + 1} [${r.kind}${r.weight !== 1 ? `, weight ${r.weight}` : ""}] ${r.text}`),
+  ];
+
+  const p = person;
+  const personLines = [
+    ``,
+    `CANDIDATE${p.enriched ? "" : " (search snippet only, profile not enriched)"}`,
+    `Name: ${p.full_name ?? "unknown"}`,
+    `Headline: ${p.headline ?? "unknown"}`,
+    `Current: ${[p.current_title, p.current_company].filter(Boolean).join(" at ") || "unknown"}`,
+    `Location: ${p.location_text ?? "unknown"}${p.location_verified === true ? " (verified in country)" : p.location_verified === false ? " (verified outside country)" : ""}`,
+    `Total experience: ${p.experience_years ?? "unknown"} years`,
+  ];
+  if (p.about || p.search_snippet) personLines.push(`About: ${truncate(p.about ?? p.search_snippet, 600)}`);
+  if (p.experiences.length) {
+    personLines.push(`Experience:`);
+    for (const e of p.experiences.slice(0, 12)) {
+      const end = e.is_current ? "present" : monthYear(e.end_year, e.end_month);
+      const desc = truncate(e.description, 250);
+      personLines.push(
+        `- ${e.title ?? "?"} at ${e.company ?? "?"} (${monthYear(e.start_year, e.start_month)} – ${end})${e.location ? `, ${e.location}` : ""}${desc ? `: ${desc}` : ""}`,
+      );
+    }
+  }
+  if (p.education.length) {
+    personLines.push(`Education:`);
+    for (const e of p.education.slice(0, 5)) {
+      personLines.push(
+        `- ${[e.degree, e.field_of_study].filter(Boolean).join(", ") || "?"} — ${e.school ?? "?"}${e.end_year ? ` (${e.end_year})` : ""}`,
+      );
+    }
+  }
+  if (p.skills.length) {
+    personLines.push(
+      `Skills: ${p.skills
+        .slice(0, 40)
+        .map((s) => (s.endorsements ? `${s.name} (${s.endorsements})` : s.name))
+        .join(", ")}`,
+    );
+  }
+  if (p.certifications.length) {
+    personLines.push(`Certifications: ${p.certifications.slice(0, 10).map((c) => [c.title, c.issuer].filter(Boolean).join(" — ")).join("; ")}`);
+  }
+  if (p.languages.length) {
+    personLines.push(`Languages: ${p.languages.map((l) => (l.proficiency ? `${l.name} (${l.proficiency})` : l.name)).join(", ")}`);
+  }
+  return [...jobLines, ...personLines].join("\n");
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/** Overall score from the sub-scores and MATCH_WEIGHTS (reproducible, not model-chosen). */
+export function computeMatchScore(output: Pick<MatchOutput, "skills_score" | "experience_score" | "seniority_score" | "education_score" | "location_score">): number {
+  return round2(
+    output.skills_score * MATCH_WEIGHTS.skills +
+      output.experience_score * MATCH_WEIGHTS.experience +
+      output.seniority_score * MATCH_WEIGHTS.seniority +
+      output.education_score * MATCH_WEIGHTS.education +
+      output.location_score * MATCH_WEIGHTS.location,
+  );
+}
+
+export function toMatchItems(output: MatchOutput, refs: Map<string, string>): MatchItem[] {
+  return output.items.map((item) => {
+    const requirementId = item.requirement_ref ? refs.get(item.requirement_ref.trim().toUpperCase()) : undefined;
+    return {
+      kind: item.kind,
+      ...(requirementId ? { requirement_id: requirementId } : {}),
+      status: item.status,
+      text: item.text,
+      evidence: item.evidence,
+    };
   });
+}
 
-  return parseJsonResponse(rawResponse, matchResultSchema, "candidate-matching");
+export interface ScoredMatch {
+  match_score: number;
+  skills_score: number;
+  experience_score: number;
+  location_score: number;
+  education_score: number;
+  seniority_score: number;
+  summary: string;
+  items: MatchItem[];
+  callId: string | null;
+  model: string;
+  promptVersion: string;
+}
+
+export async function scoreCandidate(
+  job: MatchingJob,
+  person: MatchingPerson,
+  options: { context?: CallContext; bulk?: boolean } = {},
+): Promise<ScoredMatch> {
+  const result = await runStructured({
+    purpose: "match",
+    schema: matchOutputSchema,
+    schemaName: "candidate_match",
+    instructions: INSTRUCTIONS,
+    input: buildMatchInput(job, person),
+    effort: "low",
+    maxOutputTokens: 3000,
+    promptVersion: MATCH_PROMPT_VERSION,
+    serviceTier: options.bulk ? "flex" : "default",
+    context: options.context,
+  });
+  const out = result.data;
+  return {
+    match_score: computeMatchScore(out),
+    skills_score: round2(out.skills_score),
+    experience_score: round2(out.experience_score),
+    location_score: round2(out.location_score),
+    education_score: round2(out.education_score),
+    seniority_score: round2(out.seniority_score),
+    summary: out.summary,
+    items: toMatchItems(out, requirementRefs(job)),
+    callId: result.callId,
+    model: result.model,
+    promptVersion: result.promptVersion,
+  };
 }

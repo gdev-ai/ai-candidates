@@ -1,53 +1,52 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 import type { Role } from "@/lib/auth/roleDefinitions";
+import type { Row, SourcingClient } from "@/lib/supabase/types";
 
-export interface Profile {
-  id: string;
+export type MemberStatus = "pending" | "active" | "disabled";
+
+export interface Member {
+  user_id: string;
   email: string;
+  full_name: string | null;
   role: Role;
   team_id: string | null;
-  is_active: boolean;
+  status: MemberStatus;
 }
 
-/**
- * Loads the caller's profile. Access to the app is granted by an active
- * profile — there's no separate allowlist — so callers treat a missing or
- * inactive profile as "not allowed in".
- */
-export async function getProfile(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: SupabaseClient<any, any, any>,
-  userId: string,
-): Promise<Profile | null> {
+const MEMBER_COLUMNS = "user_id, email, full_name, role, team_id, status";
+
+function toMember(row: Pick<Row<"members">, "user_id" | "email" | "full_name" | "role" | "team_id" | "status">): Member {
+  return {
+    ...row,
+    role: row.role as Role,
+    status: row.status as MemberStatus,
+  };
+}
+
+/** The caller's sourcing membership, or null if they have never signed in here. */
+export async function getMember(supabase: SourcingClient, userId: string): Promise<Member | null> {
   const { data, error } = await supabase
-    .from("profiles")
-    .select("id, email, role, team_id, is_active")
-    .eq("id", userId)
+    .from("members")
+    .select(MEMBER_COLUMNS)
+    .eq("user_id", userId)
     .maybeSingle();
 
   if (error || !data) return null;
-  return data as Profile;
-}
-
-export async function hasAppAccess(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: SupabaseClient<any, any, any>,
-  userId: string,
-): Promise<boolean> {
-  const profile = await getProfile(supabase, userId);
-  return profile?.is_active === true;
+  return toMember(data);
 }
 
 /**
- * Someone who signed in without being invited: their profile was created
- * inactive, with no team and the default role. Admins see these as access
- * requests rather than as users.
+ * Returns the caller's membership, creating it on first sign-in. The
+ * database function makes invited users active with their invited role and
+ * team, and everyone else a pending access request that notifies admins.
+ * There is deliberately no trigger on auth.users: that table is shared with
+ * HR Portal, whose signups must not become sourcing members.
  */
-export function isAccessRequest(profile: {
-  role: string;
-  team_id: string | null;
-  is_active: boolean;
-}): boolean {
-  return !profile.is_active && profile.team_id === null && profile.role === "hr_user";
+export async function ensureMember(supabase: SourcingClient): Promise<Member | null> {
+  const { data, error } = await supabase.rpc("ensure_member").single();
+  if (error || !data) return null;
+  return toMember(data);
+}
+
+export function isActive(member: Member | null): member is Member & { status: "active" } {
+  return member?.status === "active";
 }

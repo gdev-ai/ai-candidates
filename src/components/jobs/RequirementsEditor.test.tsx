@@ -4,42 +4,31 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { RequirementsEditor } from "./RequirementsEditor";
-import type { JobAnalysis } from "@/types/job-analysis";
+import { RequirementsEditor, replaceKind } from "./RequirementsEditor";
+import type { RequirementsDraft } from "@/types/job";
 
-function makeAnalysis(overrides: Partial<JobAnalysis> = {}): JobAnalysis {
+function makeDraft(overrides: Partial<RequirementsDraft> = {}): RequirementsDraft {
   return {
-    job_title: "Frontend Developer",
-    seniority: "Mid",
-    location: "Egypt",
+    seniority: "mid",
     city: "Cairo",
-    employment_type: "Full-time",
-    required_skills: ["React", "TypeScript"],
-    preferred_skills: [],
-    years_of_experience: { minimum: 3, maximum: null },
-    education: [],
-    certifications: [],
-    languages: [],
-    industries: [],
-    keywords: [],
-    responsibilities: [],
-    search_keywords: [],
-    search_queries: [],
+    min_experience: 3,
+    max_experience: null,
+    requirements: [
+      { kind: "skill_required", text: "React" },
+      { kind: "education", text: "BSc Computer Science" },
+      { kind: "skill_required", text: "TypeScript" },
+    ],
     ...overrides,
   };
 }
 
-/**
- * Mimics how the real /jobs/new page uses RequirementsEditor: it owns the
- * state and feeds updates back in, so the controlled inputs actually reflect
- * user input across renders (a bare unchanging mock value would not).
- */
+/** Owns the state like the New Job page does, so controlled inputs update. */
 function StatefulHarness({
   initial,
   onChangeSpy,
 }: {
-  initial: JobAnalysis;
-  onChangeSpy: (updated: JobAnalysis) => void;
+  initial: RequirementsDraft;
+  onChangeSpy: (updated: RequirementsDraft) => void;
 }) {
   const [value, setValue] = useState(initial);
   return (
@@ -53,91 +42,88 @@ function StatefulHarness({
   );
 }
 
+function lastDraft(spy: ReturnType<typeof vi.fn>): RequirementsDraft {
+  return spy.mock.calls.at(-1)?.[0] as RequirementsDraft;
+}
+
 describe("RequirementsEditor", () => {
-  it("edits an existing skill and reflects it in the payload", async () => {
+  it("edits a requirement row in place, keeping other kinds", async () => {
     const user = userEvent.setup();
-    const onChangeSpy = vi.fn();
+    const spy = vi.fn();
+    render(<StatefulHarness initial={makeDraft()} onChangeSpy={spy} />);
 
-    render(
-      <StatefulHarness initial={makeAnalysis()} onChangeSpy={onChangeSpy} />,
-    );
+    const first = screen.getByTestId("requirements-skill_required-item-0");
+    await user.clear(first);
+    await user.type(first, "Vue");
 
-    const firstSkillInput = screen.getByTestId(
-      "requirements-required_skills-item-0",
-    );
-    await user.clear(firstSkillInput);
-    await user.type(firstSkillInput, "Vue");
-
-    const lastCall = onChangeSpy.mock.calls.at(-1)?.[0] as JobAnalysis;
-    expect(lastCall.required_skills).toEqual(["Vue", "TypeScript"]);
+    const reqs = lastDraft(spy).requirements;
+    expect(reqs.filter((r) => r.kind === "skill_required").map((r) => r.text)).toEqual(["Vue", "TypeScript"]);
+    expect(reqs).toContainEqual({ kind: "education", text: "BSc Computer Science" });
   });
 
-  it("removes a skill and reflects it in the payload", async () => {
+  it("removes and adds rows of a kind", async () => {
     const user = userEvent.setup();
-    const onChangeSpy = vi.fn();
-
-    render(
-      <StatefulHarness initial={makeAnalysis()} onChangeSpy={onChangeSpy} />,
-    );
+    const spy = vi.fn();
+    render(<StatefulHarness initial={makeDraft()} onChangeSpy={spy} />);
 
     await user.click(screen.getByRole("button", { name: "Remove React" }));
+    await user.type(screen.getByTestId("requirements-skill_required-add-input"), "Next.js");
+    await user.click(screen.getByTestId("requirements-skill_required-add-button"));
 
-    expect(onChangeSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ required_skills: ["TypeScript"] }),
-    );
+    expect(
+      lastDraft(spy)
+        .requirements.filter((r) => r.kind === "skill_required")
+        .map((r) => r.text),
+    ).toEqual(["TypeScript", "Next.js"]);
   });
 
-  it("adds a new skill and reflects it in the payload", async () => {
+  it("does not add an empty row", async () => {
     const user = userEvent.setup();
-    const onChangeSpy = vi.fn();
+    const spy = vi.fn();
+    render(<StatefulHarness initial={makeDraft()} onChangeSpy={spy} />);
 
-    render(
-      <StatefulHarness initial={makeAnalysis()} onChangeSpy={onChangeSpy} />,
-    );
-
-    const addInput = screen.getByTestId(
-      "requirements-required_skills-add-input",
-    );
-    await user.type(addInput, "Next.js");
-    await user.click(
-      screen.getByTestId("requirements-required_skills-add-button"),
-    );
-
-    expect(onChangeSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        required_skills: ["React", "TypeScript", "Next.js"],
-      }),
-    );
+    await user.click(screen.getByTestId("requirements-skill_required-add-button"));
+    expect(spy).not.toHaveBeenCalled();
   });
 
-  it("does not add an empty skill", async () => {
+  it("shows other kinds on their tab", async () => {
     const user = userEvent.setup();
-    const onChangeSpy = vi.fn();
+    const spy = vi.fn();
+    render(<StatefulHarness initial={makeDraft()} onChangeSpy={spy} />);
 
-    render(
-      <StatefulHarness initial={makeAnalysis()} onChangeSpy={onChangeSpy} />,
-    );
-
-    await user.click(
-      screen.getByTestId("requirements-required_skills-add-button"),
-    );
-
-    expect(onChangeSpy).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: /Education & Qualifications/ }));
+    expect(screen.getByTestId("requirements-education-item-0")).toHaveProperty("value", "BSc Computer Science");
   });
 
-  it("edits the job title field", async () => {
+  it("edits the experience range and flags min > max", async () => {
     const user = userEvent.setup();
-    const onChangeSpy = vi.fn();
+    const spy = vi.fn();
+    render(<StatefulHarness initial={makeDraft()} onChangeSpy={spy} />);
 
-    render(
-      <StatefulHarness initial={makeAnalysis()} onChangeSpy={onChangeSpy} />,
-    );
+    await user.type(screen.getByLabelText("Max Experience (Years)"), "2");
+    expect(lastDraft(spy).max_experience).toBe(2);
+    expect(screen.getByRole("alert").textContent).toContain("Minimum experience");
 
-    const titleInput = screen.getByLabelText("Job Title");
-    await user.clear(titleInput);
-    await user.type(titleInput, "Backend Developer");
+    await user.clear(screen.getByLabelText("Min Experience (Years)"));
+    expect(lastDraft(spy).min_experience).toBeNull();
+  });
+});
 
-    const lastCall = onChangeSpy.mock.calls.at(-1)?.[0] as JobAnalysis;
-    expect(lastCall.job_title).toBe("Backend Developer");
+describe("replaceKind", () => {
+  it("replaces only the given kind", () => {
+    expect(
+      replaceKind(
+        [
+          { kind: "keyword", text: "a" },
+          { kind: "language", text: "Arabic" },
+        ],
+        "keyword",
+        ["b", "c"],
+      ),
+    ).toEqual([
+      { kind: "language", text: "Arabic" },
+      { kind: "keyword", text: "b" },
+      { kind: "keyword", text: "c" },
+    ]);
   });
 });

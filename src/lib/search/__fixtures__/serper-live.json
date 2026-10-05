@@ -1,0 +1,78 @@
+{
+ "searchParameters": {
+  "q": "site:linkedin.com/in (\"Sales Manager\" OR \"Sales Director\") \"Real Estate\" \"Cairo\"",
+  "gl": "eg",
+  "hl": "en",
+  "type": "search",
+  "num": 10,
+  "page": 1,
+  "engine": "google"
+ },
+ "organic": [
+  {
+   "title": "Mahmoud Jad - HEAD OF SALES",
+   "subtitle": "Cairo, Egypt · Head of Sales · Nozha Beach",
+   "link": "https://www.linkedin.com/in/mahmoudjad",
+   "snippet": "Cairo, Egypt. Sales Manager. Byout investment. Feb 2023 - Jan 2024 1 year. Cairo ... Golden Real Estate Graphic. Senior Property Consultant. Golden Real ...",
+   "position": 1
+  },
+  {
+   "title": "Moahamed Adel - Sales manager",
+   "link": "https://www.linkedin.com/in/moahamed-adel-a04406aa",
+   "snippet": "Sales Manager. RED | Real Estate Domain. Apr 2023 - Jan 2024 10 months. Cairo, Egypt. Sales Manager. ARCHPLAN Developments. Nov 2021 - Jan 2023 1 year 3 months.",
+   "position": 2
+  },
+  {
+   "title": "Mohamed Elbehiri‏ - ‏Sales Manager click for trades",
+   "link": "https://ae.linkedin.com/in/mohamed-elbehiri-626471274",
+   "snippet": "Sales Manager click for trades ... real estate‏ · التعليم: ‏Cairo University ... التعليم. رسم بياني ‏Cairo University‏ · Cairo University. Bachelor's Degree.",
+   "position": 3
+  },
+  {
+   "title": "Ahmed Reyad.‏ - ‏Sales manager.",
+   "link": "https://eg.linkedin.com/in/ahmed-reyad-4591b9116",
+   "snippet": "Sales manager ... رسم بياني ‏ERA Real Estate Egypt‏. Senior Property Consultant. ERA Real Estate Egypt ... New Cairo, Cairo, Egypt. Brokerage accounts ...",
+   "position": 4
+  },
+  {
+   "title": "Eslam Hamdy‏ - ‏sales manager real estate",
+   "link": "https://eg.linkedin.com/in/eslam-hamdy-675802162",
+   "snippet": "sales manager real estate ‏ · ‏I am graduated from faculty of law Seeking for new opportunity in HR field ‏ · الخبرة: ‏Connect Homes‏ · التعليم: ‏Cairo ...",
+   "position": 5
+  },
+  {
+   "title": "Mohamed Osman - Real Estate Sales Manager",
+   "subtitle": "Cairo, Cairo, Egypt · Sales Supervisor · Guira Developments",
+   "link": "https://www.linkedin.com/in/mohamed-osman-b6291a1b2",
+   "snippet": "Real Estate Sales Manager · Experience: Guira Developments · Education: EU Business School · Location: Cairo · 209 connections on LinkedIn.",
+   "position": 6
+  },
+  {
+   "title": "Hossam Shohdy - Senior Real Estate Sales Manager",
+   "link": "https://eg.linkedin.com/in/hossam-shohdy/en",
+   "snippet": "Senior Real Estate Sales Manager | 2B+ EGP Sales ... Sales Director. RSD - RS Developments. May 2026 ... Qesm 2nd New Cairo, Cairo, Egypt. Supervising ...",
+   "position": 7
+  },
+  {
+   "title": "Mohamed Hassan‏ - ‏Sales Director & Team leader at ...",
+   "link": "https://eg.linkedin.com/in/mohamed-hassan-8ba91256",
+   "snippet": "Sales Director & Team leader at BYOTAT Real Estate Company - New Cairo T - 01069991516 mohamed.hassan_company@yahoo.com. dream home construction. مصر. ‏٢٣٧ ...",
+   "position": 8
+  },
+  {
+   "title": "Mohamed Elmogy‏ - ‏Sales Director @ MODAD Properties",
+   "subtitle": "القاهرة القاهرة الجديدة مصر · Sales Director · MODAD Properties",
+   "link": "https://eg.linkedin.com/in/elkhalmogy91",
+   "snippet": "Sales Manager. Capital Link Developments. ‏أغسطس ٢٠٢٢‏ - ‏فبراير ٢٠٢٣‏ ‏7‏ ‏شهر‏. Cairo, Egypt. Sales Manager | Commercial Real Estate | Launching & Scaling ...",
+   "position": 9
+  },
+  {
+   "title": "Samaa Ibrahim‏ - ‏Sales Director Real Estate",
+   "subtitle": "الإمارات العربية المتحدة · Sales Director · Binayah Properties",
+   "link": "https://ae.linkedin.com/in/samaa-ibrahim-aa72882b",
+   "snippet": "Sales Director Real Estate‏ · ‏• Career Summary: Mechanical Engineer graduated from the American University in Cairo ... Sales Manager. Triple Edge ...",
+   "position": 10
+  }
+ ],
+ "credits": 1
+}

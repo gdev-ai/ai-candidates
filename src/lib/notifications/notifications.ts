@@ -1,9 +1,6 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
+import type { SourcingClient } from "@/lib/supabase/types";
 import { getDisplayName } from "@/lib/users/displayName";
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnySupabaseClient = SupabaseClient<any, any, any>;
+import type { Json } from "@/types/database.types";
 
 export interface NotificationItem {
   id: string;
@@ -15,37 +12,39 @@ export interface NotificationItem {
   href: string;
 }
 
-interface NotificationActivity {
+export interface NotificationActivity {
   user_id: string | null;
   action: string;
   entity_type: string;
   entity_id: string | null;
   description: string;
-  metadata: Record<string, unknown> | null;
+  metadata: Json | null;
 }
 
-interface NotificationRow {
-  id: string;
-  read_at: string | null;
-  created_at: string;
-  activity_log: NotificationActivity | null;
+function metadataString(metadata: Json | null, key: string): string | null {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
+  const value = metadata[key];
+  return typeof value === "string" ? value : null;
 }
 
 /** Where clicking a notification should take its recipient. */
 export function notificationHref(activity: NotificationActivity): string {
-  const jobId = typeof activity.metadata?.jobId === "string" ? activity.metadata.jobId : null;
+  const jobId = metadataString(activity.metadata, "jobId");
 
+  if (activity.action === "auth.access_requested") {
+    return "/admin";
+  }
   if (activity.entity_type === "search_run" && activity.entity_id && jobId) {
     return `/candidates?jobId=${jobId}&runId=${activity.entity_id}`;
   }
   if (activity.entity_type === "job" && activity.entity_id) {
     return `/candidates?jobId=${activity.entity_id}`;
   }
+  // Candidates are global people; the pipeline (and its status) is per job.
   if (activity.entity_type === "candidate" && activity.entity_id) {
-    return `/candidates/${activity.entity_id}`;
-  }
-  if (activity.action === "auth.access_requested") {
-    return "/admin";
+    return jobId
+      ? `/candidates/${activity.entity_id}?jobId=${jobId}`
+      : `/candidates/${activity.entity_id}`;
   }
   return activity.user_id ? `/manager/team/${activity.user_id}` : "/manager";
 }
@@ -58,7 +57,7 @@ const LIST_LIMIT = 20;
  * can no longer read (e.g. the actor moved to another team) is dropped.
  */
 export async function loadNotifications(
-  supabase: AnySupabaseClient,
+  supabase: SourcingClient,
 ): Promise<{ unread: number; items: NotificationItem[]; error: boolean }> {
   const [listRes, unreadRes] = await Promise.all([
     supabase
@@ -74,17 +73,19 @@ export async function loadNotifications(
       .is("read_at", null),
   ]);
 
-  const rows = ((listRes.data ?? []) as unknown as NotificationRow[]).filter(
-    (row): row is NotificationRow & { activity_log: NotificationActivity } => row.activity_log !== null,
+  const rows = (listRes.data ?? []).flatMap((row) =>
+    row.activity_log ? [{ ...row, activity: row.activity_log as NotificationActivity }] : [],
   );
 
   const actorIds = Array.from(
-    new Set(rows.map((row) => row.activity_log.user_id).filter((id): id is string => id !== null)),
+    new Set(rows.map((row) => row.activity.user_id).filter((id): id is string => id !== null)),
   );
   const { data: actors } = actorIds.length
-    ? await supabase.from("profiles").select("id, email").in("id", actorIds)
+    ? await supabase.from("members").select("user_id, email, full_name").in("user_id", actorIds)
     : { data: [] };
-  const emails = new Map(((actors ?? []) as { id: string; email: string }[]).map((a) => [a.id, a.email]));
+  const names = new Map(
+    (actors ?? []).map((actor) => [actor.user_id, getDisplayName(actor.email, actor.full_name)]),
+  );
 
   return {
     unread: unreadRes.count ?? 0,
@@ -92,12 +93,10 @@ export async function loadNotifications(
       id: row.id,
       read: row.read_at !== null,
       createdAt: row.created_at,
-      actorName:
-        getDisplayName(row.activity_log.user_id ? emails.get(row.activity_log.user_id) : null) ??
-        "A teammate",
-      action: row.activity_log.action,
-      description: row.activity_log.description,
-      href: notificationHref(row.activity_log),
+      actorName: (row.activity.user_id ? names.get(row.activity.user_id) : null) ?? "A teammate",
+      action: row.activity.action,
+      description: row.activity.description,
+      href: notificationHref(row.activity),
     })),
     error: Boolean(listRes.error || unreadRes.error),
   };

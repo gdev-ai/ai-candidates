@@ -1,68 +1,83 @@
 import { NextResponse } from "next/server";
 
+import { loadJobOwner } from "@/app/api/jobs/_lib/candidates";
 import { logActivity } from "@/lib/activity/log";
 import { requireUser } from "@/lib/api/requireUser";
 import { describeOwnership, forbidUnlessOwner } from "@/lib/auth/ownership";
-import type { createClient } from "@/lib/supabase/server";
 import { withErrorHandling } from "@/lib/errors";
-import { jobUpdateSchema } from "@/types/job";
+import { createLogger } from "@/lib/logger";
+import {
+  JOB_COLUMNS,
+  jobUpdateSchema,
+  type JobDetailResponse,
+  type JobRequirementRecord,
+} from "@/types/job";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
-async function checkJobOwner(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  jobId: string,
-  userId: string,
-): Promise<NextResponse | null> {
-  const { data, error } = await supabase
-    .from("jobs")
-    .select("user_id")
-    .eq("id", jobId)
-    .maybeSingle();
-  if (error) return NextResponse.json({ error: "Failed to load job." }, { status: 500 });
-  if (!data) return NextResponse.json({ error: "Job not found." }, { status: 404 });
-  return forbidUnlessOwner(data.user_id, userId, "job");
-}
+const log = createLogger("api-job");
 
 export const GET = withErrorHandling(async (_request: Request, { params }: RouteParams) => {
   const auth = await requireUser();
   if ("error" in auth) return auth.error;
-  const { supabase } = auth;
+  const { supabase, user } = auth;
   const { id } = await params;
 
-  const { data, error } = await supabase
-    .from("jobs")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-
+  const { data: job, error } = await supabase.from("jobs").select(JOB_COLUMNS).eq("id", id).maybeSingle();
   if (error) {
+    log.error("Failed to load job", { error });
     return NextResponse.json({ error: "Failed to load job." }, { status: 500 });
   }
-  if (!data) {
-    return NextResponse.json({ error: "Job not found." }, { status: 404 });
+  if (!job) return NextResponse.json({ error: "Job not found." }, { status: 404 });
+
+  const [requirements, analysis, company, ownership] = await Promise.all([
+    supabase
+      .from("job_requirements")
+      .select("id, kind, text, sort_order")
+      .eq("job_id", id)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("job_analyses")
+      .select("id, model, prompt_version, output, created_at")
+      .eq("job_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    job.company_id
+      ? supabase.schema("public").from("companies").select("id, name").eq("id", job.company_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    describeOwnership(supabase, job.owner_id, user.id),
+  ]);
+
+  if (requirements.error) {
+    log.error("Failed to load job requirements", { error: requirements.error });
+    return NextResponse.json({ error: "Failed to load job." }, { status: 500 });
   }
 
-  const ownership = await describeOwnership(supabase, data.user_id, auth.user.id);
-  return NextResponse.json({ ...data, ...ownership });
+  const body: JobDetailResponse = {
+    job,
+    company: company.data ?? null,
+    requirements: (requirements.data ?? []) as JobRequirementRecord[],
+    analysis: analysis.data ?? null,
+    ...ownership,
+  };
+  return NextResponse.json(body);
 });
 
-export const PUT = withErrorHandling(async (request: Request, { params }: RouteParams) => {
+/** Owner only. `requirements`, when sent, replaces the job's whole list. */
+export const PATCH = withErrorHandling(async (request: Request, { params }: RouteParams) => {
   const auth = await requireUser();
   if ("error" in auth) return auth.error;
-  const { supabase } = auth;
+  const { supabase, user } = auth;
   const { id } = await params;
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json(
-      { error: "Request body must be valid JSON." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
   }
 
   const parsed = jobUpdateSchema.safeParse(body);
@@ -72,67 +87,104 @@ export const PUT = withErrorHandling(async (request: Request, { params }: RouteP
       { status: 400 },
     );
   }
+  const { requirements, ...fields } = parsed.data;
 
-  const ownerCheck = await checkJobOwner(supabase, id, auth.user.id);
-  if (ownerCheck) return ownerCheck;
+  const existing = await loadJobOwner(supabase, id);
+  if (existing.error) return NextResponse.json({ error: "Failed to load job." }, { status: 500 });
+  if (!existing.job) return NextResponse.json({ error: "Job not found." }, { status: 404 });
+  const forbidden = forbidUnlessOwner(existing.job.owner_id, user.id, "job");
+  if (forbidden) return forbidden;
 
-  const { data, error } = await supabase
-    .from("jobs")
-    .update(parsed.data)
-    .eq("id", id)
-    .select()
-    .maybeSingle();
-
-  if (error) {
-    return NextResponse.json(
-      { error: "Failed to update job." },
-      { status: 500 },
-    );
+  // Only one bound is being changed: check it against the stored other bound.
+  if ((fields.min_experience !== undefined) !== (fields.max_experience !== undefined)) {
+    const { data: current } = await supabase
+      .from("jobs")
+      .select("min_experience, max_experience")
+      .eq("id", id)
+      .single();
+    const min = fields.min_experience !== undefined ? fields.min_experience : current?.min_experience;
+    const max = fields.max_experience !== undefined ? fields.max_experience : current?.max_experience;
+    if (min != null && max != null && min > max) {
+      return NextResponse.json(
+        { error: "Minimum experience can't be more than maximum." },
+        { status: 400 },
+      );
+    }
   }
-  if (!data) {
-    return NextResponse.json({ error: "Job not found." }, { status: 404 });
+
+  let job = null;
+  if (Object.keys(fields).length > 0) {
+    const { data, error } = await supabase
+      .from("jobs")
+      .update(fields)
+      .eq("id", id)
+      .select(JOB_COLUMNS)
+      .maybeSingle();
+    if (error) {
+      log.error("Failed to update job", { error });
+      return NextResponse.json({ error: "Failed to update job." }, { status: 500 });
+    }
+    if (!data) return NextResponse.json({ error: "Job not found." }, { status: 404 });
+    job = data;
+  } else {
+    const { data } = await supabase.from("jobs").select(JOB_COLUMNS).eq("id", id).single();
+    job = data;
   }
 
-  await logActivity(supabase, {
-    userId: auth.user.id,
-    action: "job.updated",
-    entityType: "job",
-    entityId: id,
-    description: `Updated job "${data.title}"`,
-    metadata: { fields: Object.keys(parsed.data) },
-  });
+  if (requirements) {
+    const { error: deleteError } = await supabase.from("job_requirements").delete().eq("job_id", id);
+    if (deleteError) {
+      log.error("Failed to replace job requirements", { error: deleteError });
+      return NextResponse.json({ error: "Failed to update the job requirements." }, { status: 500 });
+    }
+    if (requirements.length > 0) {
+      const { error: insertError } = await supabase
+        .from("job_requirements")
+        .insert(requirements.map((r, i) => ({ job_id: id, kind: r.kind, text: r.text, sort_order: i })));
+      if (insertError) {
+        log.error("Failed to insert job requirements", { error: insertError });
+        return NextResponse.json({ error: "Failed to update the job requirements." }, { status: 500 });
+      }
+    }
+  }
 
-  return NextResponse.json(data);
+  const changed = [...Object.keys(fields), ...(requirements ? ["requirements"] : [])];
+  if (changed.length > 0) {
+    await logActivity(supabase, {
+      userId: user.id,
+      action: "job.updated",
+      entityType: "job",
+      entityId: id,
+      description: `Updated job "${job?.title ?? existing.job.title}"`,
+      metadata: { fields: changed },
+    });
+  }
+
+  return NextResponse.json({ job });
 });
 
+/** Owner only. Requirements, runs, pipeline rows, matches and notes cascade. */
 export const DELETE = withErrorHandling(async (_request: Request, { params }: RouteParams) => {
   const auth = await requireUser();
   if ("error" in auth) return auth.error;
-  const { supabase } = auth;
+  const { supabase, user } = auth;
   const { id } = await params;
 
-  const ownerCheck = await checkJobOwner(supabase, id, auth.user.id);
-  if (ownerCheck) return ownerCheck;
+  const existing = await loadJobOwner(supabase, id);
+  if (existing.error) return NextResponse.json({ error: "Failed to load job." }, { status: 500 });
+  if (!existing.job) return NextResponse.json({ error: "Job not found." }, { status: 404 });
+  const forbidden = forbidUnlessOwner(existing.job.owner_id, user.id, "job");
+  if (forbidden) return forbidden;
 
-  const { data, error } = await supabase
-    .from("jobs")
-    .delete()
-    .eq("id", id)
-    .select()
-    .maybeSingle();
-
+  const { data, error } = await supabase.from("jobs").delete().eq("id", id).select("id, title").maybeSingle();
   if (error) {
-    return NextResponse.json(
-      { error: "Failed to delete job." },
-      { status: 500 },
-    );
+    log.error("Failed to delete job", { error });
+    return NextResponse.json({ error: "Failed to delete job." }, { status: 500 });
   }
-  if (!data) {
-    return NextResponse.json({ error: "Job not found." }, { status: 404 });
-  }
+  if (!data) return NextResponse.json({ error: "Job not found." }, { status: 404 });
 
   await logActivity(supabase, {
-    userId: auth.user.id,
+    userId: user.id,
     action: "job.deleted",
     entityType: "job",
     entityId: id,

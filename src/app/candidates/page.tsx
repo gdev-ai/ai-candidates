@@ -9,6 +9,7 @@ import { DashboardNav } from "@/components/dashboard/nav";
 import {
   Filters,
   DEFAULT_CANDIDATE_FILTERS,
+  buildFilterQueryString,
   type CandidateFilterState,
 } from "@/components/candidates/Filters";
 import { SkillsCell } from "@/components/candidates/SkillsCell";
@@ -27,50 +28,22 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
 import { CANDIDATE_STATUSES } from "@/lib/candidates/statuses";
+import type { JobCandidateListItem } from "@/types/candidate";
+import type { JobDetailResponse, JobListItem } from "@/types/job";
 
 const PAGE_SIZE = 10;
 
-function buildFilterQueryString(filters: CandidateFilterState): string {
-  const params = new URLSearchParams();
-  if (filters.name) params.set("name", filters.name);
-  if (filters.skill) params.set("skill", filters.skill);
-  if (filters.location) params.set("location", filters.location);
-  if (filters.company) params.set("company", filters.company);
-  if (filters.status) params.set("status", filters.status);
-  params.set("sort_by", filters.sortBy);
-  params.set("sort_dir", filters.sortDir);
+function buildRunFilterQueryString(filters: CandidateFilterState, runId: string | null): string {
+  const params = new URLSearchParams(buildFilterQueryString(filters));
+  if (runId) params.set("runId", runId);
   return params.toString();
 }
 
-function buildQueryString(filters: CandidateFilterState, page: number): string {
-  const params = new URLSearchParams(buildFilterQueryString(filters));
+function buildQueryString(filters: CandidateFilterState, page: number, runId: string | null): string {
+  const params = new URLSearchParams(buildRunFilterQueryString(filters, runId));
   params.set("page", String(page));
   params.set("limit", String(PAGE_SIZE));
   return params.toString();
-}
-
-interface Job {
-  id: string;
-  title: string;
-  location: string | null;
-  employment_type: string | null;
-  created_at: string;
-}
-
-interface Candidate {
-  id: string;
-  name: string | null;
-  company: string | null;
-  location: string | null;
-  experience_years: number | null;
-  skills: string[];
-  source: string;
-  profile_url: string | null;
-  profile_image_url: string | null;
-  status: string;
-  created_at: string;
-  match: { match_score: number } | null;
-  location_verified: boolean | null;
 }
 
 function formatDateTime(value: string): string {
@@ -87,7 +60,7 @@ function formatDateTime(value: string): string {
 }
 
 function JobPicker() {
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobs, setJobs] = useState<JobListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -184,12 +157,18 @@ function JobPicker() {
               <p className="truncate font-medium text-foreground">{job.title}</p>
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                 <span>{formatDateTime(job.created_at)}</span>
-                {job.location && (
+                {job.company_name && (
                   <>
                     <span aria-hidden="true">·</span>
-                    <span>{job.location}</span>
+                    <span>{job.company_name}</span>
                   </>
                 )}
+                <span aria-hidden="true">·</span>
+                <span>{job.city ?? "Egypt"}</span>
+                <span aria-hidden="true">·</span>
+                <span>
+                  {job.candidate_count} candidate{job.candidate_count === 1 ? "" : "s"}
+                </span>
                 {job.employment_type && (
                   <>
                     <span aria-hidden="true">·</span>
@@ -252,8 +231,18 @@ function JobPicker() {
 
 // `readOnly`: viewing someone else's file (e.g. as their manager). Edit
 // controls are hidden; the API rejects edits regardless.
-function CandidatesTable({ jobId, readOnly }: { jobId: string; readOnly: boolean }) {
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
+// `runId`: limit the list to the people one search run found (a sourcing
+// file opened from the dashboard). Null shows the job's whole pipeline.
+function CandidatesTable({
+  jobId,
+  runId,
+  readOnly,
+}: {
+  jobId: string;
+  runId: string | null;
+  readOnly: boolean;
+}) {
+  const [candidates, setCandidates] = useState<JobCandidateListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<CandidateFilterState>(
@@ -266,9 +255,9 @@ function CandidatesTable({ jobId, readOnly }: { jobId: string; readOnly: boolean
   const [isScoring, setIsScoring] = useState(false);
   const [scoreError, setScoreError] = useState<string | null>(null);
   const [scoreSummary, setScoreSummary] = useState<{
-    total: number;
-    succeeded: number;
+    scored: number;
     failed: number;
+    strongMatches: number;
   } | null>(null);
 
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
@@ -282,7 +271,7 @@ function CandidatesTable({ jobId, readOnly }: { jobId: string; readOnly: boolean
     const controller = new AbortController();
     setIsLoading(true);
     setError(null);
-    const query = buildQueryString(filters, page);
+    const query = buildQueryString(filters, page, runId);
     fetch(`/api/jobs/${jobId}/candidates?${query}`, { signal: controller.signal })
       .then(async (res) => {
         const data = await res.json();
@@ -302,19 +291,19 @@ function CandidatesTable({ jobId, readOnly }: { jobId: string; readOnly: boolean
       });
 
     return () => controller.abort();
-  }, [jobId, filters, page, refreshToken]);
+  }, [jobId, runId, filters, page, refreshToken]);
 
   function handleFiltersChange(updated: CandidateFilterState) {
     setFilters(updated);
     setPage(1);
   }
 
-  async function handleStatusChange(candidateId: string, status: string) {
+  async function handleStatusChange(personId: string, status: string) {
     setStatusError(null);
-    setUpdatingStatusId(candidateId);
+    setUpdatingStatusId(personId);
     try {
-      const res = await fetch(`/api/candidates/${candidateId}/status`, {
-        method: "PUT",
+      const res = await fetch(`/api/candidates/${personId}/status?jobId=${jobId}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
@@ -327,7 +316,7 @@ function CandidatesTable({ jobId, readOnly }: { jobId: string; readOnly: boolean
       }
       setCandidates((prev) =>
         prev.map((candidate) =>
-          candidate.id === candidateId ? { ...candidate, status } : candidate,
+          candidate.person_id === personId ? { ...candidate, status } : candidate,
         ),
       );
       toast.success(`Candidate status marked as "${status}"`, "Status Updated");
@@ -339,11 +328,11 @@ function CandidatesTable({ jobId, readOnly }: { jobId: string; readOnly: boolean
     }
   }
 
-  async function handleDeleteCandidate(candidateId: string) {
+  async function handleDeleteCandidate(personId: string) {
     setDeleteError(null);
-    setDeletingId(candidateId);
+    setDeletingId(personId);
     try {
-      const res = await fetch(`/api/candidates/${candidateId}`, { method: "DELETE" });
+      const res = await fetch(`/api/candidates/${personId}?jobId=${jobId}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) {
         const msg = data.error ?? "Failed to delete candidate.";
@@ -351,9 +340,9 @@ function CandidatesTable({ jobId, readOnly }: { jobId: string; readOnly: boolean
         toast.error(msg, "Delete Failed");
         return;
       }
-      setCandidates((prev) => prev.filter((candidate) => candidate.id !== candidateId));
+      setCandidates((prev) => prev.filter((candidate) => candidate.person_id !== personId));
       setTotal((prev) => Math.max(0, prev - 1));
-      toast.success("Candidate removed from this job.", "Candidate Deleted");
+      toast.success("Candidate removed from this job.", "Candidate Removed");
     } catch {
       setDeleteError("Failed to delete candidate.");
       toast.error("Failed to delete candidate.");
@@ -382,7 +371,7 @@ function CandidatesTable({ jobId, readOnly }: { jobId: string; readOnly: boolean
 
       setScoreSummary(data);
       setRefreshToken((t) => t + 1);
-      toast.success(`Scored ${data.succeeded} candidates successfully!`, "Match Scoring Completed");
+      toast.success(`Scored ${data.scored} candidates.`, "Match Scoring Completed");
     } catch {
       setScoreError("Failed to score candidates.");
       toast.error("Failed to score candidates.");
@@ -440,7 +429,8 @@ function CandidatesTable({ jobId, readOnly }: { jobId: string; readOnly: boolean
           )}
           {scoreSummary && (
             <p className="text-sm text-muted-foreground" data-testid="score-summary">
-              Scored {scoreSummary.succeeded} of {scoreSummary.total} candidates
+              Scored {scoreSummary.scored} candidates
+              {scoreSummary.strongMatches > 0 ? `, ${scoreSummary.strongMatches} strong matches` : ""}
               {scoreSummary.failed > 0 ? ` (${scoreSummary.failed} failed)` : ""}.
             </p>
           )}
@@ -476,16 +466,16 @@ function CandidatesTable({ jobId, readOnly }: { jobId: string; readOnly: boolean
                 <th className="p-3 font-medium">Location</th>
                 <th className="p-3 font-medium">Skills</th>
                 <th className="p-3 font-medium">Match</th>
-                <th className="p-3 font-medium">Date Added</th>
+                <th className="p-3 font-medium">Found</th>
                 <th className="p-3 font-medium">Status</th>
-                <th className="p-3 font-medium">Profile</th>
+                <th className="p-3 font-medium">LinkedIn</th>
                 <th className="p-3 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {candidates.map((candidate, index) => (
                 <tr
-                  key={candidate.id}
+                  key={candidate.person_id}
                   className="border-b border-border/70 last:border-0 hover:bg-accent/40 even:bg-muted/20"
                   data-testid="candidate-row"
                 >
@@ -494,15 +484,36 @@ function CandidatesTable({ jobId, readOnly }: { jobId: string; readOnly: boolean
                   </td>
                   <td className="p-3">
                     <Link
-                      href={`/candidates/${candidate.id}?jobId=${jobId}`}
-                      className="flex items-center gap-2.5 font-medium text-foreground no-underline transition-colors hover:text-primary focus-visible:text-primary"
+                      href={`/candidates/${candidate.person_id}?jobId=${jobId}`}
+                      className="flex items-center gap-2.5 text-foreground no-underline transition-colors hover:text-primary focus-visible:text-primary"
                     >
                       <Avatar
-                        src={candidate.profile_image_url}
+                        src={candidate.photo_url}
                         alt={candidate.name ?? "Unnamed candidate"}
-                        className="h-8 w-8"
+                        className="h-8 w-8 shrink-0"
                       />
-                      {candidate.name ?? "Unnamed candidate"}
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-1.5 font-medium">
+                          {candidate.name ?? "Unnamed candidate"}
+                          {!candidate.viewed && (
+                            <span
+                              className="h-2 w-2 rounded-full bg-indigo-500"
+                              title="Not opened yet"
+                              data-testid="unseen-dot"
+                            />
+                          )}
+                          {candidate.open_to_work && (
+                            <Badge tone="good" className="font-normal">
+                              Open to work
+                            </Badge>
+                          )}
+                        </span>
+                        {(candidate.current_title || candidate.current_company) && (
+                          <span className="block max-w-[260px] truncate text-xs text-muted-foreground">
+                            {[candidate.current_title, candidate.current_company].filter(Boolean).join(" · ")}
+                          </span>
+                        )}
+                      </span>
                     </Link>
                   </td>
                   <td className="p-3 text-muted-foreground">
@@ -519,16 +530,16 @@ function CandidatesTable({ jobId, readOnly }: { jobId: string; readOnly: boolean
                     <SkillsCell skills={candidate.skills} />
                   </td>
                   <td className="p-3">
-                    {candidate.match ? (
-                      <Badge tone={matchScoreTone(candidate.match.match_score)}>
-                        {candidate.match.match_score}%
+                    {candidate.match_score !== null ? (
+                      <Badge tone={matchScoreTone(candidate.match_score)} title={candidate.match?.summary ?? undefined}>
+                        {Math.round(candidate.match_score)}%
                       </Badge>
                     ) : (
                       <EmptyCell />
                     )}
                   </td>
                   <td className="p-3 whitespace-nowrap text-muted-foreground">
-                    {formatDateTime(candidate.created_at)}
+                    {formatDateTime(candidate.found_at)}
                   </td>
                   <td className="p-3">
                     {readOnly ? (
@@ -538,8 +549,8 @@ function CandidatesTable({ jobId, readOnly }: { jobId: string; readOnly: boolean
                     ) : (
                       <Select
                         value={candidate.status}
-                        onValueChange={(status) => handleStatusChange(candidate.id, status)}
-                        disabled={updatingStatusId === candidate.id}
+                        onValueChange={(status) => handleStatusChange(candidate.person_id, status)}
+                        disabled={updatingStatusId === candidate.person_id}
                       >
                         <SelectTrigger className="h-8 w-[140px] text-xs" data-testid="status-select">
                           <SelectValue />
@@ -559,7 +570,7 @@ function CandidatesTable({ jobId, readOnly }: { jobId: string; readOnly: boolean
                       <Button asChild variant="outline" size="sm" className="gap-1.5">
                         <a href={candidate.profile_url} target="_blank" rel="noreferrer">
                           <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-                          View
+                          Profile
                         </a>
                       </Button>
                     ) : (
@@ -567,24 +578,24 @@ function CandidatesTable({ jobId, readOnly }: { jobId: string; readOnly: boolean
                     )}
                   </td>
                   <td className="p-3 text-right">
-                    {pendingDeleteId === candidate.id ? (
+                    {pendingDeleteId === candidate.person_id ? (
                       <div className="flex items-center justify-end gap-1.5">
-                        <span className="text-xs text-muted-foreground">Delete?</span>
+                        <span className="text-xs text-muted-foreground">Remove?</span>
                         <Button
                           type="button"
                           variant="destructive"
                           size="sm"
-                          disabled={deletingId === candidate.id}
-                          onClick={() => handleDeleteCandidate(candidate.id)}
+                          disabled={deletingId === candidate.person_id}
+                          onClick={() => handleDeleteCandidate(candidate.person_id)}
                           data-testid="confirm-delete-candidate"
                         >
-                          {deletingId === candidate.id ? "Deleting..." : "Confirm"}
+                          {deletingId === candidate.person_id ? "Deleting..." : "Confirm"}
                         </Button>
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          disabled={deletingId === candidate.id}
+                          disabled={deletingId === candidate.person_id}
                           onClick={() => setPendingDeleteId(null)}
                         >
                           Cancel
@@ -601,7 +612,7 @@ function CandidatesTable({ jobId, readOnly }: { jobId: string; readOnly: boolean
                           aria-label={`View ${candidate.name ?? "candidate"}`}
                           data-testid="view-candidate-button"
                         >
-                          <Link href={`/candidates/${candidate.id}?jobId=${jobId}`}>
+                          <Link href={`/candidates/${candidate.person_id}?jobId=${jobId}`}>
                             <Eye className="h-4 w-4" aria-hidden="true" />
                           </Link>
                         </Button>
@@ -611,8 +622,8 @@ function CandidatesTable({ jobId, readOnly }: { jobId: string; readOnly: boolean
                             variant="ghost"
                             size="icon"
                             className="text-muted-foreground hover:text-destructive"
-                            onClick={() => setPendingDeleteId(candidate.id)}
-                            aria-label={`Delete ${candidate.name ?? "candidate"}`}
+                            onClick={() => setPendingDeleteId(candidate.person_id)}
+                            aria-label={`Remove ${candidate.name ?? "candidate"} from this job`}
                             data-testid="delete-candidate-button"
                           >
                             <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -633,7 +644,7 @@ function CandidatesTable({ jobId, readOnly }: { jobId: string; readOnly: boolean
           Page {page} of {totalPages} ({total} total)
         </p>
         <div className="flex gap-2">
-          <ExportButton jobId={jobId} queryString={buildFilterQueryString(filters)} />
+          <ExportButton jobId={jobId} queryString={buildRunFilterQueryString(filters, runId)} />
           <Button
             type="button"
             variant="outline"
@@ -668,6 +679,7 @@ function CandidatesPageContent() {
   const searchParams = useSearchParams();
   const jobId = searchParams.get("jobId");
   const runId = searchParams.get("runId");
+  const [showRunOnly, setShowRunOnly] = useState(true);
   const [job, setJob] = useState<JobMeta | null>(null);
 
   useEffect(() => {
@@ -686,11 +698,11 @@ function CandidatesPageContent() {
     const controller = new AbortController();
     setJob(null);
     fetch(`/api/jobs/${jobId}`, { signal: controller.signal })
-      .then((res) => (res.ok ? res.json() : null))
+      .then((res) => (res.ok ? (res.json() as Promise<JobDetailResponse>) : null))
       .then((data) =>
         setJob(
           data
-            ? { title: data.title ?? null, canEdit: data.can_edit === true, ownerName: data.owner_name ?? null }
+            ? { title: data.job.title, canEdit: data.can_edit === true, ownerName: data.owner_name ?? null }
             : null,
         ),
       )
@@ -703,7 +715,7 @@ function CandidatesPageContent() {
   return (
     <main className="min-h-screen">
       <DashboardNav />
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+      <div className="animate-page-enter mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
             Candidates
@@ -741,7 +753,26 @@ function CandidatesPageContent() {
             </CardHeader>
             <CardContent>
               {/* Read-only until the job loads, so edit controls never flash for a viewer. */}
-              <CandidatesTable jobId={jobId} readOnly={!job?.canEdit} />
+              {runId && showRunOnly && (
+                <p
+                  className="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
+                  data-testid="run-filter-banner"
+                >
+                  Showing candidates found by this search run.
+                  <button
+                    type="button"
+                    onClick={() => setShowRunOnly(false)}
+                    className="font-medium text-primary underline underline-offset-2"
+                  >
+                    Show all candidates for this job
+                  </button>
+                </p>
+              )}
+              <CandidatesTable
+                jobId={jobId}
+                runId={runId && showRunOnly ? runId : null}
+                readOnly={!job?.canEdit}
+              />
             </CardContent>
           </Card>
         )}
@@ -754,7 +785,7 @@ function CandidatesPageSkeleton() {
   return (
     <main className="min-h-screen">
       <DashboardNav />
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+      <div className="animate-page-enter mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
         <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
           Candidates
         </h1>

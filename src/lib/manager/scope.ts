@@ -1,48 +1,36 @@
-import type { User } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 
-import { getProfile, type Profile } from "@/lib/auth/access";
-import { createClient } from "@/lib/supabase/server";
+import { requirePageMember, type PageSession } from "@/lib/dashboard/session";
+import { managedTeamId } from "@/lib/teams/managedTeam";
 
-type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
-
-export interface ManagerScope {
-  supabase: SupabaseClient;
-  user: User;
-  profile: Profile;
-  /** The team this page shows, or null if an HR Manager has no team yet. */
+export interface ManagerScope extends PageSession {
+  /** The team this page shows, or null if an HR Manager leads no team yet. */
   teamId: string | null;
-  /** Admins can switch teams; HR Managers are pinned to their own. */
+  /** Admins can switch teams; HR Managers are pinned to the team they manage. */
   teamOptions: { id: string; name: string }[] | null;
 }
 
 /**
  * Resolves which team a manager-level page may show. An HR Manager always
- * gets their own team — a `teamId` in the URL is ignored for them, so it
- * can't be used to point at another team. Admins may pick any team.
- * Everyone else is sent back to their own dashboard. RLS enforces the same
- * boundaries again on every query the page makes.
+ * gets the team they manage — a `teamId` in the URL is ignored for them, so
+ * it can't be used to point at another team. Admins may pick any team.
+ * Everyone else is sent back to their own dashboard. RLS
+ * (visible_owner_ids) enforces the same boundaries on every query.
  */
 export async function resolveManagerScope(requestedTeamId: string | null): Promise<ManagerScope> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const session = await requirePageMember();
+  const { supabase, user, member } = session;
 
-  const profile = await getProfile(supabase, user.id);
-  if (!profile || !profile.is_active) redirect("/login");
-
-  if (profile.role === "hr_manager") {
-    return { supabase, user, profile, teamId: profile.team_id, teamOptions: null };
+  if (member.role === "hr_manager") {
+    return { ...session, teamId: await managedTeamId(supabase, user.id), teamOptions: null };
   }
 
-  if (profile.role === "admin") {
+  if (member.role === "admin") {
     const { data } = await supabase.from("teams").select("id, name").order("name");
-    const teamOptions = (data ?? []) as { id: string; name: string }[];
+    const teamOptions = data ?? [];
     const teamId =
       teamOptions.find((team) => team.id === requestedTeamId)?.id ?? teamOptions[0]?.id ?? null;
-    return { supabase, user, profile, teamId, teamOptions };
+    return { ...session, teamId, teamOptions };
   }
 
   redirect("/dashboard");

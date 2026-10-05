@@ -46,10 +46,10 @@ export default async function ManagerDashboardPage({ searchParams }: { searchPar
   const requestedTeamId = parseUuid(
     typeof params.teamId === "string" ? params.teamId : null,
   );
-  const { supabase, profile, teamId, teamOptions } = await resolveManagerScope(requestedTeamId);
+  const { supabase, member, teamId, teamOptions } = await resolveManagerScope(requestedTeamId);
 
   if (!teamId) {
-    return profile.role === "admin" ? (
+    return member.role === "admin" ? (
       <EmptyState
         title="No teams yet"
         message="Create a team from the Admin dashboard to see its team dashboard here."
@@ -57,7 +57,7 @@ export default async function ManagerDashboardPage({ searchParams }: { searchPar
     ) : (
       <EmptyState
         title="You're not assigned to a team yet"
-        message="Ask an admin to assign you to the team you manage. Your team's dashboard will appear here."
+        message="Ask an admin to make you the manager of your team. Your team's dashboard will appear here."
       />
     );
   }
@@ -82,29 +82,26 @@ export default async function ManagerDashboardPage({ searchParams }: { searchPar
   return (
     <main className="min-h-screen bg-slate-50/70 pb-16">
       <DashboardNav />
-      <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-8 text-white shadow-xl">
-          <div className="relative z-10 flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
-            <div className="max-w-2xl">
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-medium text-indigo-300 ring-1 ring-inset ring-indigo-500/30">
-                <Users className="h-3.5 w-3.5" aria-hidden="true" />
-                {isAdminView ? "Admin view · Team" : "Team view"}
-              </div>
-              <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                {team.name}
-              </h1>
-              <p className="mt-2 text-base leading-relaxed text-slate-300">
-                {manager ? `Managed by ${manager.name}` : "No manager assigned"} ·{" "}
-                {totals.activeMembers} active{" "}
-                {totals.activeMembers === 1 ? "member" : "members"}. Team members keep ownership of
-                their files — you have management-level visibility.
-              </p>
+      <div className="animate-page-enter mx-auto flex max-w-6xl flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8">
+        <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+          <div>
+            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-200">
+              <Users className="h-3.5 w-3.5" aria-hidden="true" />
+              {isAdminView ? "Admin view · Team" : "Team view"}
             </div>
-            {isAdminView && teamOptions.length > 1 && (
-              <TeamPicker teams={teamOptions} currentTeamId={team.id} />
-            )}
+            <h1 className="font-display text-2xl font-semibold tracking-tight text-slate-900">
+              {team.name}
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              {manager ? `Managed by ${manager.name}` : "No manager assigned"} ·{" "}
+              {totals.activeMembers} active{" "}
+              {totals.activeMembers === 1 ? "member" : "members"}. Team members keep ownership of
+              their files — you have management-level visibility.
+            </p>
           </div>
-          <div className="pointer-events-none absolute -bottom-10 -right-10 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl" />
+          {isAdminView && teamOptions.length > 1 && (
+            <TeamPicker teams={teamOptions} currentTeamId={team.id} />
+          )}
         </div>
 
         {loadError && (
@@ -121,9 +118,9 @@ export default async function ManagerDashboardPage({ searchParams }: { searchPar
             label="Team Members"
             value={`${totals.activeMembers} / ${totals.members}`}
             icon={Users}
-            tone="indigo"
+           
           />
-          <StatCard label="Team Jobs" value={totals.jobs} icon={Briefcase} tone="sky" />
+          <StatCard label="Team Jobs" value={totals.jobs} icon={Briefcase} />
           <StatCard
             label="Average Match Quality"
             value={
@@ -132,13 +129,13 @@ export default async function ManagerDashboardPage({ searchParams }: { searchPar
                 : "No evaluated files yet"
             }
             icon={Target}
-            tone="emerald"
+           
           />
           <StatCard
             label="Shortlisted Talent"
             value={totals.shortlisted}
             icon={UserCheck}
-            tone="amber"
+           
           />
         </div>
 

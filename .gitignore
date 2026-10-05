@@ -12,3 +12,8 @@ npm-debug.log*
 
 .vercel
 .env*
+/.swc
+
+# Vercel Workflows (generated routes + local run data)
+src/app/.well-known/workflow/
+.workflow-data/

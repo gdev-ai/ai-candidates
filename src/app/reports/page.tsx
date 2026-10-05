@@ -1,17 +1,14 @@
 import { FileBarChart } from "lucide-react";
-import { redirect } from "next/navigation";
-
 import { DashboardNav } from "@/components/dashboard/nav";
 import { ReportControls } from "@/components/reports/report-controls";
 import { ReportView } from "@/components/reports/report-view";
 import { logActivityOnce } from "@/lib/activity/log";
-import { getProfile } from "@/lib/auth/access";
+import { requirePageMember } from "@/lib/dashboard/session";
 import { parseDateRange, singleParam, type SearchParams } from "@/lib/dates/dateRange";
 import { parseUuid } from "@/lib/manager/filters";
 import { generateReport, ReportLoadError } from "@/lib/reports/generateReport";
 import { resolveReportScope } from "@/lib/reports/scope";
 import { parseReportType, type Report } from "@/lib/reports/types";
-import { createClient } from "@/lib/supabase/server";
 
 const VIEW_LOG_WINDOW_MS = 10 * 60 * 1000;
 
@@ -21,20 +18,13 @@ export default async function ReportsPage({
   searchParams: Promise<SearchParams>;
 }) {
   const params = await searchParams;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const profile = await getProfile(supabase, user.id);
-  if (!profile || !profile.is_active) redirect("/login");
+  const { supabase, user, member } = await requirePageMember();
 
   const type = parseReportType(singleParam(params, "type")) ?? "performance";
   const selection = parseDateRange(params, "30d");
   const { scope, teamOptions } = await resolveReportScope(
     supabase,
-    profile,
+    member,
     parseUuid(singleParam(params, "teamId")),
   );
 
@@ -55,7 +45,7 @@ export default async function ReportsPage({
         action: "report.viewed",
         entityType: "report",
         description: `Viewed the ${report.title} report (${report.scopeLabel}, ${report.rangeLabel})`,
-        metadata: { type, scope: scope.kind, teamId: scope.teamId, range: selection },
+        metadata: { type, scope: scope.kind, teamId: scope.teamId, range: { range: selection.range, from: selection.from, to: selection.to } },
       },
       VIEW_LOG_WINDOW_MS,
     );
@@ -71,21 +61,18 @@ export default async function ReportsPage({
   return (
     <main className="min-h-screen bg-slate-50/70 pb-16">
       <DashboardNav />
-      <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-8 text-white shadow-xl">
-          <div className="relative z-10 max-w-2xl">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-medium text-indigo-300 ring-1 ring-inset ring-indigo-500/30">
-              <FileBarChart className="h-3.5 w-3.5" aria-hidden="true" />
-              {scope.label} · {report?.rangeLabel ?? ""}
-            </div>
-            <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
-              {report ? `${report.title} Report` : "Reports"}
-            </h1>
-            <p className="mt-2 text-base leading-relaxed text-slate-300">
-              {report?.description} {scopeHint}
-            </p>
+      <div className="animate-page-enter mx-auto flex max-w-6xl flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8">
+        <div>
+          <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-200">
+            <FileBarChart className="h-3.5 w-3.5" aria-hidden="true" />
+            {scope.label}{report?.rangeLabel ? ` · ${report.rangeLabel}` : ""}
           </div>
-          <div className="pointer-events-none absolute -bottom-10 -right-10 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl" />
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-slate-900">
+            {report ? `${report.title} Report` : "Reports"}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {report?.description} {scopeHint}
+          </p>
         </div>
 
         <ReportControls

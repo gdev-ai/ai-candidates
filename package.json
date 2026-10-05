@@ -11,7 +11,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:types": "npx --yes supabase@latest gen types typescript --project-id djsvjflhhgqqqfqpwgjs --schema sourcing --schema public > src/types/database.types.tmp && mv src/types/database.types.tmp src/types/database.types.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.15",
@@ -30,7 +31,9 @@
     "pdf-parse": "^2.4.5",
     "react": "19.1.1",
     "react-dom": "19.1.1",
+    "server-only": "^0.0.1",
     "tailwind-merge": "^3.7.0",
+    "workflow": "4.8.9",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.6.5"
   },

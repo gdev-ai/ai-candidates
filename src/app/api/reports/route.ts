@@ -29,7 +29,7 @@ import { parseReportType } from "@/lib/reports/types";
 export const GET = withErrorHandling(async (request: Request) => {
   const auth = await requireRole(["admin", "hr_manager", "hr_user"]);
   if ("error" in auth) return auth.error;
-  const { user, supabase, profile } = auth;
+  const { user, supabase, member } = auth;
 
   const url = new URL(request.url);
   const params: SearchParams = Object.fromEntries(url.searchParams.entries());
@@ -59,7 +59,7 @@ export const GET = withErrorHandling(async (request: Request) => {
   const selection = parseDateRange(params, "30d");
   const { scope } = await resolveReportScope(
     supabase,
-    profile,
+    member,
     parseUuid(singleParam(params, "teamId")),
   );
 
@@ -82,7 +82,7 @@ export const GET = withErrorHandling(async (request: Request) => {
     action: "report.exported",
     entityType: "report",
     description: `Exported the ${report.title} report (${report.scopeLabel}, ${report.rangeLabel}) as ${format.toUpperCase()}`,
-    metadata: { type, format, scope: scope.kind, teamId: scope.teamId, range: selection },
+    metadata: { type, format, scope: scope.kind, teamId: scope.teamId, range: { range: selection.range, from: selection.from, to: selection.to } },
   });
 
   const fileName = reportFileName(report, format as ExportFormat);

@@ -3,12 +3,13 @@ import type { TeamSourcingFileRow } from "@/lib/manager/getTeamDashboardData";
 import {
   averageOf,
   combinedAverageMatch,
+  memberDisplayName,
+  statusCount,
   sumStats,
-  type ProfileRow,
+  type MemberRow,
   type UserStatsRow,
 } from "@/lib/performance/userStats";
 import { REPORT_META, type Report, type ReportCell, type ReportMeta } from "@/lib/reports/types";
-import { getDisplayName } from "@/lib/users/displayName";
 
 export interface ActivitySummaryRow {
   user_id: string;
@@ -17,18 +18,18 @@ export interface ActivitySummaryRow {
   last_at: string;
 }
 
-function memberName(member: ProfileRow): string {
-  const name = getDisplayName(member.email) ?? member.email;
-  return member.is_active ? name : `${name} (inactive)`;
+function memberName(member: MemberRow): string {
+  const name = memberDisplayName(member);
+  return member.status === "active" ? name : `${name} (inactive)`;
 }
 
-function sortedMembers(members: ProfileRow[]): ProfileRow[] {
+function sortedMembers(members: MemberRow[]): MemberRow[] {
   return [...members].sort((a, b) => memberName(a).localeCompare(memberName(b)));
 }
 
-function statsFor(members: ProfileRow[], stats: Map<string, UserStatsRow>): UserStatsRow[] {
+function statsFor(members: MemberRow[], stats: Map<string, UserStatsRow>): UserStatsRow[] {
   return members
-    .map((member) => stats.get(member.id))
+    .map((member) => stats.get(member.user_id))
     .filter((row): row is UserStatsRow => row !== undefined);
 }
 
@@ -45,16 +46,16 @@ function baseReport(type: Report["type"], meta: ReportMeta) {
 }
 
 export function buildPerformanceReport(
-  members: ProfileRow[],
+  members: MemberRow[],
   stats: Map<string, UserStatsRow>,
   meta: ReportMeta,
 ): Report {
   const scoped = statsFor(members, stats);
-  const n = (row: UserStatsRow | undefined, pick: (r: UserStatsRow) => number | string) =>
+  const n = (row: UserStatsRow | undefined, pick: (r: UserStatsRow) => number) =>
     row ? Number(pick(row)) : 0;
 
   const rows = sortedMembers(members).map((member) => {
-    const row = stats.get(member.id);
+    const row = stats.get(member.user_id);
     return {
       member: memberName(member),
       jobs: n(row, (r) => r.jobs_count),
@@ -63,14 +64,14 @@ export function buildPerformanceReport(
       active: n(row, (r) => r.active_runs),
       failed: n(row, (r) => r.failed_runs),
       candidates: n(row, (r) => r.candidates_count),
-      shortlisted: n(row, (r) => r.shortlisted_count),
-      contacted: n(row, (r) => r.contacted_count),
-      rejected: n(row, (r) => r.rejected_count),
-      averageMatch: row ? averageOf(Number(row.run_avg_sum), Number(row.run_avg_count)) : null,
+      shortlisted: n(row, (r) => statusCount(r, "Shortlisted")),
+      contacted: n(row, (r) => statusCount(r, "Contacted")),
+      rejected: n(row, (r) => statusCount(r, "Rejected")),
+      averageMatch: row ? averageOf(row.run_avg_sum, row.run_avg_count) : null,
     };
   });
 
-  const total = (pick: (r: UserStatsRow) => number | string) => sumStats(scoped, pick);
+  const total = (pick: (r: UserStatsRow) => number) => sumStats(scoped, pick);
   const teamAverage = combinedAverageMatch(scoped);
 
   return {
@@ -80,7 +81,7 @@ export function buildPerformanceReport(
       { label: "Jobs created", value: String(total((r) => r.jobs_count)) },
       { label: "Sourcing runs", value: String(total((r) => r.runs_count)) },
       { label: "Candidates sourced", value: String(total((r) => r.candidates_count)) },
-      { label: "Shortlisted", value: String(total((r) => r.shortlisted_count)) },
+      { label: "Shortlisted", value: String(total((r) => statusCount(r, "Shortlisted"))) },
       { label: "Average match", value: percentText(teamAverage) },
     ],
     sections: [
@@ -111,9 +112,9 @@ export function buildPerformanceReport(
           active: total((r) => r.active_runs),
           failed: total((r) => r.failed_runs),
           candidates: total((r) => r.candidates_count),
-          shortlisted: total((r) => r.shortlisted_count),
-          contacted: total((r) => r.contacted_count),
-          rejected: total((r) => r.rejected_count),
+          shortlisted: total((r) => statusCount(r, "Shortlisted")),
+          contacted: total((r) => statusCount(r, "Contacted")),
+          rejected: total((r) => statusCount(r, "Rejected")),
           averageMatch: teamAverage,
         },
         emptyMessage: "No members in this scope.",
@@ -133,23 +134,23 @@ const ACTIVITY_COLUMNS: { key: string; label: string; matches: (action: string) 
 ];
 
 export function buildActivityReport(
-  members: ProfileRow[],
+  members: MemberRow[],
   stats: Map<string, UserStatsRow>,
   activity: ActivitySummaryRow[],
   meta: ReportMeta,
 ): Report {
-  const memberIds = new Set(members.map((member) => member.id));
+  const memberIds = new Set(members.map((member) => member.user_id));
   const scopedActivity = activity.filter((row) => memberIds.has(row.user_id));
 
   const rows = sortedMembers(members).map((member) => {
-    const mine = scopedActivity.filter((row) => row.user_id === member.id);
+    const mine = scopedActivity.filter((row) => row.user_id === member.user_id);
     const cells: Record<string, ReportCell> = { member: memberName(member) };
     for (const column of ACTIVITY_COLUMNS) {
       cells[column.key] = mine
         .filter((row) => column.matches(row.action))
         .reduce((total, row) => total + Number(row.event_count), 0);
     }
-    cells.runs = Number(stats.get(member.id)?.runs_count ?? 0);
+    cells.runs = stats.get(member.user_id)?.runs_count ?? 0;
     cells.total = mine.reduce((total, row) => total + Number(row.event_count), 0);
     const lastAt = mine.map((row) => row.last_at).sort().at(-1) ?? null;
     cells.lastActivity = lastAt;
@@ -225,31 +226,31 @@ export function buildActivityReport(
 }
 
 export function buildPipelineReport(
-  members: ProfileRow[],
+  members: MemberRow[],
   stats: Map<string, UserStatsRow>,
   meta: ReportMeta,
 ): Report {
   const scoped = statsFor(members, stats);
-  const total = (pick: (r: UserStatsRow) => number | string) => sumStats(scoped, pick);
+  const total = (pick: (r: UserStatsRow) => number) => sumStats(scoped, pick);
   const all = total((r) => r.candidates_count);
   const progressed =
-    total((r) => r.shortlisted_count) + total((r) => r.contacted_count) + total((r) => r.hired_count);
+    total((r) => statusCount(r, "Shortlisted")) + total((r) => statusCount(r, "Contacted")) + total((r) => statusCount(r, "Hired"));
 
   const rows = sortedMembers(members).map((member) => {
-    const row = stats.get(member.id);
-    const count = (pick: (r: UserStatsRow) => number | string) => (row ? Number(pick(row)) : 0);
+    const row = stats.get(member.user_id);
+    const count = (pick: (r: UserStatsRow) => number) => (row ? Number(pick(row)) : 0);
     const candidates = count((r) => r.candidates_count);
     return {
       member: memberName(member),
       total: candidates,
-      new: count((r) => r.new_count),
-      reviewed: count((r) => r.reviewed_count),
-      shortlisted: count((r) => r.shortlisted_count),
-      contacted: count((r) => r.contacted_count),
-      rejected: count((r) => r.rejected_count),
-      hired: count((r) => r.hired_count),
+      new: count((r) => statusCount(r, "New")),
+      reviewed: count((r) => statusCount(r, "Reviewed")),
+      shortlisted: count((r) => statusCount(r, "Shortlisted")),
+      contacted: count((r) => statusCount(r, "Contacted")),
+      rejected: count((r) => statusCount(r, "Rejected")),
+      hired: count((r) => statusCount(r, "Hired")),
       progressed: ratio(
-        count((r) => r.shortlisted_count) + count((r) => r.contacted_count) + count((r) => r.hired_count),
+        count((r) => statusCount(r, "Shortlisted")) + count((r) => statusCount(r, "Contacted")) + count((r) => statusCount(r, "Hired")),
         candidates,
       ),
     };
@@ -259,12 +260,12 @@ export function buildPipelineReport(
     ...baseReport("pipeline", meta),
     summary: [
       { label: "Total candidates", value: String(all) },
-      { label: "New", value: String(total((r) => r.new_count)) },
-      { label: "Reviewed", value: String(total((r) => r.reviewed_count)) },
-      { label: "Shortlisted", value: String(total((r) => r.shortlisted_count)) },
-      { label: "Contacted", value: String(total((r) => r.contacted_count)) },
-      { label: "Rejected", value: String(total((r) => r.rejected_count)) },
-      { label: "Hired", value: String(total((r) => r.hired_count)) },
+      { label: "New", value: String(total((r) => statusCount(r, "New"))) },
+      { label: "Reviewed", value: String(total((r) => statusCount(r, "Reviewed"))) },
+      { label: "Shortlisted", value: String(total((r) => statusCount(r, "Shortlisted"))) },
+      { label: "Contacted", value: String(total((r) => statusCount(r, "Contacted"))) },
+      { label: "Rejected", value: String(total((r) => statusCount(r, "Rejected"))) },
+      { label: "Hired", value: String(total((r) => statusCount(r, "Hired"))) },
     ],
     sections: [
       {
@@ -287,12 +288,12 @@ export function buildPipelineReport(
         totals: {
           member: "Total",
           total: all,
-          new: total((r) => r.new_count),
-          reviewed: total((r) => r.reviewed_count),
-          shortlisted: total((r) => r.shortlisted_count),
-          contacted: total((r) => r.contacted_count),
-          rejected: total((r) => r.rejected_count),
-          hired: total((r) => r.hired_count),
+          new: total((r) => statusCount(r, "New")),
+          reviewed: total((r) => statusCount(r, "Reviewed")),
+          shortlisted: total((r) => statusCount(r, "Shortlisted")),
+          contacted: total((r) => statusCount(r, "Contacted")),
+          rejected: total((r) => statusCount(r, "Rejected")),
+          hired: total((r) => statusCount(r, "Hired")),
           progressed: ratio(progressed, all),
         },
         emptyMessage: "No members in this scope.",
@@ -302,7 +303,7 @@ export function buildPipelineReport(
 }
 
 export function buildQualityReport(
-  members: ProfileRow[],
+  members: MemberRow[],
   stats: Map<string, UserStatsRow>,
   files: TeamSourcingFileRow[],
   meta: ReportMeta,
@@ -346,11 +347,11 @@ export function buildQualityReport(
           { key: "averageMatch", label: "Avg match", kind: "match" },
         ],
         rows: sortedMembers(members).map((member) => {
-          const row = stats.get(member.id);
+          const row = stats.get(member.user_id);
           return {
             member: memberName(member),
-            evaluatedFiles: Number(row?.run_avg_count ?? 0),
-            averageMatch: row ? averageOf(Number(row.run_avg_sum), Number(row.run_avg_count)) : null,
+            evaluatedFiles: row?.run_avg_count ?? 0,
+            averageMatch: row ? averageOf(row.run_avg_sum, row.run_avg_count) : null,
           };
         }),
         totals: {

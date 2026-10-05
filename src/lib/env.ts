@@ -11,16 +11,20 @@ const envSchema = z.object({
     message: "SUPABASE_SERVICE_ROLE_KEY is required",
   }),
   SEARCH_PROVIDER: z
-    .enum(["mock", "serpapi", "serper"], {
-      message: "SEARCH_PROVIDER must be one of: mock, serpapi, serper",
+    .enum(["mock", "serpapi", "serper", "exa"], {
+      message: "SEARCH_PROVIDER must be one of: mock, serpapi, serper, exa",
     })
     .default("mock"),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_MODEL: z.string().optional(),
   SERPAPI_API_KEY: z.string().optional(),
   SERPER_API_KEY: z.string().optional(),
+  EXA_API_KEY: z.string().optional(),
+  // Enrichment: Apify supreme_coder on the free plan's monthly credit, with
+  // HarvestAPI as the pay-as-you-go fallback (docs/db-redesign.md §8.3).
   APIFY_API_TOKEN: z.string().optional(),
-  APIFY_ACTOR_ID: z.string().optional(),
+  APIFY_ACTOR_ID: z.string().default("supreme_coder~linkedin-profile-scraper"),
+  HARVESTAPI_API_KEY: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

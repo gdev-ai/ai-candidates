@@ -7,18 +7,16 @@ const STAGE_ORDER = [
   "Rejected",
 ] as const;
 
-// Ordinal ramp for the four "in progress" stages (lightest→darkest, business
-// order — furthest along the happy path gets the darkest step), per
-// dataviz skill guidance for funnel/tier ordinal encoding. Hired and
-// Rejected are true status colors (success green / critical red), not
-// steps in the ramp, since they're terminal exits rather than progress.
+// Grey ramp for the four in-progress stages, darkening as a candidate moves
+// further along. Hired and Rejected are terminal exits, so they carry the
+// two status accents instead of a ramp step.
 const STAGE_COLOR: Record<(typeof STAGE_ORDER)[number], string> = {
-  New: "#86b6ef",
-  Reviewed: "#5598e7",
-  Shortlisted: "#2a78d6",
-  Contacted: "#1c5cab",
-  Hired: "#059669",
-  Rejected: "#d03b3b",
+  New: "#BFBFBF",
+  Reviewed: "#808080",
+  Shortlisted: "#404040",
+  Contacted: "#000000",
+  Hired: "#1E6B3A",
+  Rejected: "#B3261E",
 };
 
 export function PipelineChart({ counts }: { counts: Record<string, number> }) {
@@ -28,24 +26,28 @@ export function PipelineChart({ counts }: { counts: Record<string, number> }) {
   if (total === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No candidates yet — run a search to start building your pipeline.
+        No candidates yet. Run a search to start building your pipeline.
       </p>
     );
   }
 
   return (
     <div className="flex flex-col gap-3" role="img" aria-label="Candidate pipeline by stage">
-      {STAGE_ORDER.map((stage) => {
+      {STAGE_ORDER.map((stage, index) => {
         const count = counts[stage] ?? 0;
         const widthPct = Math.max(4, (count / max) * 100);
         return (
           <div key={stage} className="flex items-center gap-3">
             <span className="w-24 shrink-0 text-sm text-muted-foreground">{stage}</span>
-            <div className="h-5 flex-1 overflow-hidden rounded-full bg-muted">
+            <div className="h-4 flex-1 overflow-hidden bg-muted">
               {count > 0 && (
                 <div
-                  className="h-full rounded-full transition-[width]"
-                  style={{ width: `${widthPct}%`, backgroundColor: STAGE_COLOR[stage] }}
+                  className="animate-bar-x h-full"
+                  style={{
+                    width: `${widthPct}%`,
+                    backgroundColor: STAGE_COLOR[stage],
+                    animationDelay: `${index * 60}ms`,
+                  }}
                   title={`${stage}: ${count}`}
                 />
               )}

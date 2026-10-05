@@ -1,17 +1,20 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { hasAppAccess } from "@/lib/auth/access";
+import { ensureMember } from "@/lib/auth/access";
+import { DB_SCHEMA } from "@/lib/supabase/types";
+import type { Database } from "@/types/database.types";
 
 const PROTECTED_PREFIXES = ["/dashboard", "/jobs", "/candidates", "/settings", "/admin", "/manager", "/reports"];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
 
-  const supabase = createServerClient(
+  const supabase = createServerClient<Database, typeof DB_SCHEMA>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      db: { schema: DB_SCHEMA },
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -43,14 +46,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Access is an active profile: new sign-ups are inactive unless an admin
-  // invited them, and deactivating someone in Admin takes effect here on
-  // their next page load.
-  if (isProtected && user && !(await hasAppAccess(supabase, user.id))) {
-    await supabase.auth.signOut();
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("error", "not_allowed");
-    return NextResponse.redirect(loginUrl);
+  // Access is an active membership. The first visit creates it (pending
+  // unless an admin invited the email), and disabling someone in Admin
+  // takes effect here on their next page load.
+  if (isProtected && user) {
+    const member = await ensureMember(supabase);
+    if (member?.status !== "active") {
+      await supabase.auth.signOut();
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("error", member?.status === "pending" ? "pending_approval" : "not_allowed");
+      return NextResponse.redirect(loginUrl);
+    }
   }
 
   return response;
@@ -58,6 +64,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    // .well-known/workflow/ is Vercel Workflows' internal step endpoint.
+    "/((?!_next/static|_next/image|favicon.ico|.well-known/workflow/).*)",
   ],
 };

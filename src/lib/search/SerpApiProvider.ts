@@ -1,189 +1,109 @@
+import { serpApiLocation } from "@/lib/candidates/location";
+import { fetchJson, ProviderHttpError } from "@/lib/providers/http";
+import { SERPAPI_USD_PER_SEARCH } from "@/lib/providers/pricing";
 import { SearchProviderError, type SearchProvider } from "@/lib/search/SearchProvider";
-import { isRetryableStatus, withRetry } from "@/lib/retry";
-import type { CandidateSearchParams, CandidateSearchResult } from "@/types/search";
+import type { SearchHit, SearchPageRequest, SearchPageResult } from "@/types/search";
 
-const SERPAPI_ENDPOINT = "https://serpapi.com/search.json";
+const ENDPOINT = "https://serpapi.com/search.json";
+const PAGE_SIZE = 10;
+// A real search took 37 s and was billed after a 15 s client timeout (§8.2).
+const TIMEOUT_MS = 75_000;
+const NO_RESULTS = /hasn't returned any results/i;
 
-// Real SerpApi responses land well under 2s even for long boolean queries;
-// this is a generous ceiling, not a target. Without it, a stalled connection
-// (no response, no error — fetch just never settles) hangs the fetch promise
-// forever, which hangs the whole search run in "running" with no way to
-// recover — observed in production use before this was added.
-const REQUEST_TIMEOUT_MS = 15000;
-
-const RETRY_OPTIONS = {
-  maxAttempts: 3,
-  baseDelayMs: 500,
-  maxDelayMs: 4000,
-};
-
-const NO_RESULTS_ERROR_PATTERN = /hasn't returned any results/i;
-
-/** Marks the error with the HTTP status so withRetry's isRetryable can see it
- * without re-fetching or re-parsing the response. */
-class SerpApiHttpError extends Error {
-  constructor(
-    public readonly status: number,
-    body?: string,
-  ) {
-    super(
-      `SerpApi request failed with status ${status}${body ? `: ${body}` : ""}`,
-    );
-  }
-}
-
-interface SerpApiOrganicResult {
+interface SerpApiOrganic {
+  position?: number;
   title?: string;
   link?: string;
   snippet?: string;
   snippet_highlighted_words?: string[];
+  rich_snippet?: Record<string, unknown>;
 }
 
 interface SerpApiResponse {
-  organic_results?: SerpApiOrganicResult[];
+  search_metadata?: { id?: string };
+  search_information?: { total_results?: number };
+  organic_results?: SerpApiOrganic[];
+  serpapi_pagination?: { next?: string };
   error?: string;
 }
 
-/**
- * Parses a search result title into name/title/company using the common
- * "Name - Job Title - Company | Site" pattern seen in public profile
- * listings. This is a best-effort heuristic over noisy search-engine
- * output, not a guarantee — sparse/inconsistent results are expected for
- * ordinary corporate roles. Never fabricates a field the title doesn't
- * actually contain.
- */
-function parseTitleSegments(title: string | undefined): {
-  name?: string;
-  jobTitle?: string;
-  company?: string;
-} {
-  if (!title) return {};
-
-  const withoutSiteSuffix = title.split("|")[0]?.trim() ?? title;
-  const segments = withoutSiteSuffix
-    .split(" - ")
-    .map((segment) => segment.trim())
-    .filter(Boolean);
-
-  return {
-    name: segments[0],
-    jobTitle: segments[1],
-    company: segments[2],
-  };
-}
-
-/**
- * URL patterns that identify a result as something other than an individual's
- * profile page — a company/org page, a job posting or job board, a
- * recruitment agency, or an article. Matched against the result link before
- * it is ever turned into a candidate, so these never reach normalization,
- * dedupe, or matching.
- */
-const NON_INDIVIDUAL_URL_PATTERNS: RegExp[] = [
-  // LinkedIn pages that aren't a person's /in/ profile.
-  /linkedin\.com\/(company|school|jobs|pulse|showcase|groups)\//i,
-  // GitHub pages that aren't a user profile.
-  /github\.com\/(orgs|about|sponsors|marketplace|topics|collections)\//i,
-  // Generic job/career/vacancy paths on any domain.
-  /\/(jobs?|careers?|vacanc(?:y|ies))(\/|$|\?)/i,
-  // Known job boards and aggregators.
-  /\b(indeed|glassdoor|bayt|wuzzuf|naukri|monster|ziprecruiter|simplyhired|careerjet|talent|dice|ycombinator)\.[a-z.]+\//i,
-  // Known recruitment/staffing agencies.
-  /\b(robertwalters|michaelpage|hays|randstad|adecco|kellyservices|roberthalf|manpower)\.[a-z.]+\//i,
-];
-
-function isIndividualProfileUrl(url: string): boolean {
-  return !NON_INDIVIDUAL_URL_PATTERNS.some((pattern) => pattern.test(url));
-}
-
-function mapOrganicResult(result: SerpApiOrganicResult): CandidateSearchResult | null {
+export function mapSerpApiOrganic(result: SerpApiOrganic, index: number): SearchHit | null {
   if (!result.link) return null;
-  if (!isIndividualProfileUrl(result.link)) return null;
-
-  const { name, jobTitle, company } = parseTitleSegments(result.title);
-
   return {
-    source: "serpapi",
-    source_url: result.link,
-    name,
-    title: jobTitle,
-    company,
-    profile_url: result.link,
-    snippet: result.snippet,
-    skills: result.snippet_highlighted_words,
+    position: result.position ?? index + 1,
+    link: result.link,
+    title: result.title ?? null,
+    snippet: result.snippet ?? null,
+    subtitle: null,
+    // Highlighted search terms — kept as matched terms, never as skills.
+    matchedTerms: result.snippet_highlighted_words ?? [],
+    richSnippet: result.rich_snippet ?? null,
   };
 }
 
+/** Fallback search provider (free plan, 250 searches/month). */
 export class SerpApiProvider implements SearchProvider {
+  readonly name = "serpapi" as const;
+  readonly maxPages = 3;
+
   constructor(private readonly apiKey: string) {
-    if (!apiKey) {
-      throw new Error(
-        "SERPAPI_API_KEY is required to use SerpApiProvider. Set it in your environment.",
-      );
-    }
+    if (!apiKey) throw new Error("SERPAPI_API_KEY is required for the SerpApi search provider.");
   }
 
-  async searchCandidates(
-    params: CandidateSearchParams,
-  ): Promise<CandidateSearchResult[]> {
-    const url = new URL(SERPAPI_ENDPOINT);
-    url.searchParams.set("engine", "google");
-    url.searchParams.set("q", params.query);
+  async searchPage({ query, page, location }: SearchPageRequest): Promise<SearchPageResult> {
+    const request: Record<string, string> = {
+      engine: "google",
+      q: query,
+      gl: location.countryCode.toLowerCase(),
+      hl: "en",
+    };
+    const canonical = serpApiLocation(location.city, location.countryCode);
+    if (canonical) request.location = canonical;
+    if (location.countryCode.toUpperCase() === "EG") request.google_domain = "google.com.eg";
+    if (page > 1) request.start = String((page - 1) * PAGE_SIZE);
+
+    const url = new URL(ENDPOINT);
+    for (const [key, value] of Object.entries(request)) url.searchParams.set(key, value);
     url.searchParams.set("api_key", this.apiKey);
-    if (params.location) {
-      url.searchParams.set("location", params.location);
-    }
-    if (params.countryCode) {
-      url.searchParams.set("gl", params.countryCode);
-    }
-    if (params.googleDomain) {
-      url.searchParams.set("google_domain", params.googleDomain);
-    }
-    if (params.limit) {
-      url.searchParams.set("num", String(params.limit));
-    }
-    if (params.page && params.page > 1 && params.limit) {
-      url.searchParams.set("start", String((params.page - 1) * params.limit));
-    }
 
-    let data: SerpApiResponse;
+    let status: number;
+    let body: SerpApiResponse;
     try {
-      data = await withRetry(
-        async () => {
-          const response = await fetch(url.toString(), {
-            signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-          });
-          if (!response.ok) {
-            throw new SerpApiHttpError(response.status, await response.text());
-          }
-          return (await response.json()) as SerpApiResponse;
-        },
-        {
-          ...RETRY_OPTIONS,
-          // A network-level failure (fetch itself throwing, e.g. DNS/timeout)
-          // is just as transient as a 429/5xx, so it's retried too.
-          isRetryable: (error) =>
-            !(error instanceof SerpApiHttpError) || isRetryableStatus(error.status),
-        },
-      );
+      ({ status, body } = await fetchJson<SerpApiResponse>("serpapi", url.toString(), {
+        method: "GET",
+        timeoutMs: TIMEOUT_MS,
+      }));
     } catch (error) {
-      throw new SearchProviderError("serpapi", error);
+      throw new SearchProviderError("serpapi", error, {
+        httpStatus: error instanceof ProviderHttpError ? error.status : null,
+        request,
+        raw: error instanceof ProviderHttpError ? error.body : null,
+      });
     }
 
-    // SerpApi reports "Google found nothing" through the same `error` field
-    // as real failures (confirmed live: HTTP 200 with
-    // `{"error": "Google hasn't returned any results for this query."}`).
-    // A narrow query legitimately matching no one isn't a provider failure,
-    // so it's an empty result, not an error surfaced on the search run.
-    if (data.error && NO_RESULTS_ERROR_PATTERN.test(data.error)) {
-      return [];
+    const base = {
+      totalResults: body.search_information?.total_results ?? null,
+      credits: 1,
+      costUsd: SERPAPI_USD_PER_SEARCH,
+      providerRequestId: body.search_metadata?.id ?? null,
+      httpStatus: status,
+      request,
+      raw: body,
+    };
+    // "Google found nothing" arrives as HTTP 200 + error; it's an empty page.
+    if (body.error && NO_RESULTS.test(body.error)) {
+      return { ...base, hits: [], hasNextPage: false };
     }
-    if (data.error) {
-      throw new SearchProviderError("serpapi", new Error(data.error));
+    if (body.error) {
+      throw new SearchProviderError("serpapi", new Error(body.error), {
+        httpStatus: status,
+        request,
+        raw: body,
+      });
     }
-
-    return (data.organic_results ?? [])
-      .map(mapOrganicResult)
-      .filter((result): result is CandidateSearchResult => result !== null);
+    const hits = (body.organic_results ?? [])
+      .map(mapSerpApiOrganic)
+      .filter((hit): hit is SearchHit => hit !== null);
+    return { ...base, hits, hasNextPage: Boolean(body.serpapi_pagination?.next) };
   }
 }

@@ -3,23 +3,22 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Briefcase,
+  ArrowRight,
   Building2,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
   FileText,
   Loader2,
-  Plus,
   Search,
+  Sparkles,
   UploadCloud,
-  Users,
   X,
-  ArrowRight,
 } from "lucide-react";
 
 import { DashboardNav } from "@/components/dashboard/nav";
 import { RequirementsEditor } from "@/components/jobs/RequirementsEditor";
+import { SearchQueries } from "@/components/jobs/SearchQueries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -39,11 +38,40 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/toast";
-import type { JobAnalysis } from "@/types/job-analysis";
 import { cn } from "@/lib/utils";
-import { EMPLOYMENT_TYPES, WORK_ARRANGEMENTS } from "@/lib/jobs/constants";
+import {
+  EMPLOYMENT_TYPE_VALUES as EMPLOYMENT_TYPES,
+  WORK_ARRANGEMENT_VALUES as WORK_ARRANGEMENTS,
+  analysisToDraft,
+  type AnalysisLike,
+  type RequirementsDraft,
+} from "@/types/job";
 
 type InputMode = "paste" | "upload";
+
+/** GET /api/search/[runId]/status (see docs/api-contract.md #5). */
+interface RunStatus {
+  status: string;
+  error: string | null;
+  candidates_found: number | null;
+  candidates_new: number | null;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+const TERMINAL_RUN_STATUSES = new Set(["complete", "error", "cancelled"]);
+
+async function readJson(res: Response): Promise<Record<string, unknown>> {
+  try {
+    return (await res.json()) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+function errorOf(data: Record<string, unknown>, fallback: string): string {
+  return typeof data.error === "string" && data.error ? data.error : fallback;
+}
 
 export default function NewJobPage() {
   const router = useRouter();
@@ -53,7 +81,7 @@ export default function NewJobPage() {
   const [isJobDetailsOpen, setIsJobDetailsOpen] = useState(true);
   const [isJdOpen, setIsJdOpen] = useState(true);
 
-  // Form state
+  // Job details
   const [title, setTitle] = useState("");
   const [companyId, setCompanyId] = useState("");
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
@@ -69,12 +97,12 @@ export default function NewJobPage() {
     setCompaniesError(null);
     fetch("/api/companies", { signal: controller.signal })
       .then(async (res) => {
-        const data = await res.json();
+        const data = await readJson(res);
         if (!res.ok) {
-          setCompaniesError(data.error ?? "Failed to load companies.");
+          setCompaniesError(errorOf(data, "Failed to load companies."));
           return;
         }
-        setCompanies(data.companies ?? []);
+        setCompanies((data.companies as { id: string; name: string }[] | undefined) ?? []);
       })
       .catch((err) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
@@ -88,7 +116,7 @@ export default function NewJobPage() {
 
   const selectedCompanyName = companies.find((c) => c.id === companyId)?.name ?? null;
 
-  // Job description & file upload state
+  // Job description & file upload
   const [mode, setMode] = useState<InputMode>("upload");
   const [description, setDescription] = useState("");
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
@@ -97,47 +125,41 @@ export default function NewJobPage() {
   const [extractError, setExtractError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  // AI Analysis state
+  // AI analysis -> editable requirements. The analysis itself is never
+  // posted back: the server copies it from the logged call (analysisCallId).
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
-  const [analysis, setAnalysis] = useState<JobAnalysis | null>(null);
+  const [draft, setDraft] = useState<RequirementsDraft | null>(null);
+  const [analysisCallId, setAnalysisCallId] = useState<string | null>(null);
 
-  // Automatic Sourcing state
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchStep, setSearchStep] = useState<"idle" | "generating" | "sourcing" | "scoring">("idle");
-  const [searchError, setSearchError] = useState<string | null>(null);
+  // Save -> queries -> search
   const [savedJobId, setSavedJobId] = useState<string | null>(null);
-  const [searchRun, setSearchRun] = useState<{
-    id: string;
-    status: string;
-    total_results: number | null;
-    candidates_found: number | null;
-    candidates_new: number | null;
-    credits_used: number | null;
-  } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [queries, setQueries] = useState<string[] | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [runId, setRunId] = useState<string | null>(null);
+  const [runStatus, setRunStatus] = useState<RunStatus | null>(null);
 
-  // Success Modal state
+  // Success modal
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
-  const [candidatesFoundCount, setCandidatesFoundCount] = useState(0);
 
   const jobDetailsErrors: Record<string, string> = {};
   if (!title.trim()) jobDetailsErrors.title = "Job title is required.";
   if (!companyId) jobDetailsErrors.company = "Company is required.";
   if (!employmentType) jobDetailsErrors.employmentType = "Employment type is required.";
   if (!workArrangement) jobDetailsErrors.workArrangement = "Work arrangement is required.";
-  if (analysis && !analysis.location) jobDetailsErrors.location = "Location is required.";
   const isJobDetailsValid = Object.keys(jobDetailsErrors).length === 0;
+  const isRangeValid =
+    !draft ||
+    draft.min_experience === null ||
+    draft.max_experience === null ||
+    draft.min_experience <= draft.max_experience;
 
   function markAllFieldsTouched() {
-    setTouchedFields({
-      title: true,
-      company: true,
-      employmentType: true,
-      workArrangement: true,
-    });
+    setTouchedFields({ title: true, company: true, employmentType: true, workArrangement: true });
   }
 
-  // File formatting helper
   function formatFileSize(bytes: number): string {
     if (bytes < 1024) return bytes + " B";
     if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
@@ -154,21 +176,17 @@ export default function NewJobPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-
-      const response = await fetch("/api/files/extract", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await response.json();
+      const response = await fetch("/api/files/extract", { method: "POST", body: formData });
+      const data = await readJson(response);
 
       if (!response.ok) {
-        const msg = data.error ?? "Failed to extract text from file.";
+        const msg = errorOf(data, "Failed to extract text from file.");
         setExtractError(msg);
         toast.error(msg);
         return;
       }
 
-      setDescription(data.text);
+      setDescription(typeof data.text === "string" ? data.text : "");
       toast.success(`Extracted content from ${file.name}`, "Upload Successful");
     } catch {
       setExtractError("Failed to upload or process the file.");
@@ -188,24 +206,25 @@ export default function NewJobPage() {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) {
-      processFile(file);
-    }
+    if (file) processFile(file);
   }
 
   function handleRemoveFile() {
     setUploadedFileName(null);
     setUploadedFileSize(null);
     setDescription("");
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  /** Anything edited after queries were generated makes them stale. */
+  function handleDraftChange(updated: RequirementsDraft) {
+    setDraft(updated);
+    if (queries && !runId) setQueries(null);
   }
 
   async function handleAnalyze() {
     if (description.trim().length < 50) return;
 
-    // Requirement: Close accordions and show load screen
     setIsJobDetailsOpen(false);
     setIsJdOpen(false);
     setAnalyzeError(null);
@@ -216,23 +235,30 @@ export default function NewJobPage() {
       const response = await fetch("/api/jobs/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobDescriptionText: description }),
+        body: JSON.stringify({ description }),
       });
-      const data = await response.json();
+      const data = await readJson(response);
 
-      if (!response.ok) {
-        const msg = data.error ?? "Failed to analyze the job description.";
+      if (!response.ok || !data.analysis || typeof data.analysis !== "object") {
+        const msg = errorOf(data, "Failed to analyze the job description.");
         setAnalyzeError(msg);
         toast.error(msg);
         return;
       }
 
-      // Every job sources nationwide in Egypt now — location isn't a real
-      // choice, only the "Country" (city) field the recruiter picks below is.
-      setAnalysis({ ...data, location: "Egypt" });
-      if (!title && data.job_title) setTitle(data.job_title);
-      if (!employmentType && data.employment_type) setEmploymentType(data.employment_type);
-      toast.success("Requirements successfully extracted from job spec!", "Analysis Complete");
+      const analysis = data.analysis as AnalysisLike;
+      setDraft(analysisToDraft(analysis));
+      setAnalysisCallId(typeof data.analysisCallId === "string" ? data.analysisCallId : null);
+      setQueries(null);
+      if (!title && analysis.job_title) setTitle(analysis.job_title);
+      if (
+        !employmentType &&
+        analysis.employment_type &&
+        (EMPLOYMENT_TYPES as readonly string[]).includes(analysis.employment_type)
+      ) {
+        setEmploymentType(analysis.employment_type);
+      }
+      toast.success("Requirements extracted from the job description.", "Analysis Complete");
     } catch {
       setAnalyzeError("Failed to analyze the job description.");
       toast.error("Failed to analyze the job description.");
@@ -241,45 +267,124 @@ export default function NewJobPage() {
     }
   }
 
-  async function pollSearchRunStatus(runId: string, currentJobId: string) {
-    // LinkedIn enrichment via Apify can take several minutes, so keep
-    // polling well past that instead of giving up after a minute.
-    const POLL_INTERVAL_MS = 2000;
-    const MAX_WAIT_MS = 10 * 60 * 1000;
+  /** Creates the job (or updates it if already saved), then generates queries. */
+  async function handleSaveAndGenerate() {
+    if (!draft || isSaving) return;
+    if (!isJobDetailsValid || !isRangeValid) {
+      markAllFieldsTouched();
+      if (!isJobDetailsValid) setIsJobDetailsOpen(true);
+      const msg = !isJobDetailsValid
+        ? "Please complete all required job details before continuing."
+        : "Minimum experience can't be more than maximum.";
+      setSearchError(msg);
+      toast.error(msg, "Missing Required Fields");
+      return;
+    }
+
+    setSearchError(null);
+    setIsSaving(true);
+
+    const fields = {
+      title: title.trim(),
+      description,
+      company_id: companyId,
+      employment_type: employmentType,
+      work_arrangement: workArrangement,
+      seniority: draft.seniority,
+      city: draft.city,
+      min_experience: draft.min_experience,
+      max_experience: draft.max_experience,
+      requirements: draft.requirements,
+    };
+
+    try {
+      let jobId = savedJobId;
+      const jobResponse = jobId
+        ? await fetch(`/api/jobs/${jobId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(fields),
+          })
+        : await fetch("/api/jobs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...fields, ...(analysisCallId ? { analysisCallId } : {}) }),
+          });
+      const jobData = await readJson(jobResponse);
+      if (!jobResponse.ok) {
+        const msg = errorOf(jobData, "Failed to save the job.");
+        setSearchError(msg);
+        toast.error(msg);
+        return;
+      }
+      if (!jobId) {
+        jobId = (jobData.job as { id: string } | undefined)?.id ?? null;
+        if (!jobId) {
+          setSearchError("Failed to save the job.");
+          return;
+        }
+        setSavedJobId(jobId);
+      }
+
+      toast.info("Generating search queries...", "Job Saved");
+      const queryResponse = await fetch("/api/jobs/generate-queries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId }),
+      });
+      const queryData = await readJson(queryResponse);
+      if (!queryResponse.ok || !Array.isArray(queryData.queries)) {
+        const msg = errorOf(queryData, "Failed to generate search queries.");
+        setSearchError(msg);
+        toast.error(msg);
+        return;
+      }
+      setQueries((queryData.queries as unknown[]).filter((q): q is string => typeof q === "string"));
+      toast.success("Review the search queries, then start the search.", "Queries Ready");
+    } catch {
+      setSearchError("Failed to save the job or generate queries.");
+      toast.error("Failed to save the job or generate queries.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function pollRun(currentRunId: string) {
+    // Enrichment can take several minutes; keep polling well past that.
+    const POLL_INTERVAL_MS = 2500;
+    const MAX_WAIT_MS = 15 * 60 * 1000;
     const deadline = Date.now() + MAX_WAIT_MS;
 
     while (Date.now() < deadline) {
       let res: Response;
-      let run;
+      let data: Record<string, unknown>;
       try {
-        res = await fetch(`/api/search/${runId}/status`);
-        run = await res.json();
+        res = await fetch(`/api/search/${currentRunId}/status`);
+        data = await readJson(res);
       } catch {
-        // A single dropped poll (dev server recompiling, network blip)
-        // shouldn't abort a search that's still running server-side.
+        // A dropped poll shouldn't abort a run that's still going server-side.
         await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
         continue;
       }
 
       if (!res.ok) {
-        const msg = run.error ?? "Failed to check search status.";
+        const msg = errorOf(data, "Failed to check search status.");
         setSearchError(msg);
         toast.error(msg, "Search Error");
         return;
       }
 
-      setSearchRun(run);
+      const run = data as unknown as RunStatus;
+      setRunStatus(run);
 
-      if (run.status === "complete" || run.status === "error") {
-        if (run.status === "error" && run.error) {
-          setSearchError(run.error);
-          toast.error(run.error, "Sourcing Failed");
-        } else if (run.status === "complete") {
-          const found = run.candidates_found ?? 0;
-          setCandidatesFoundCount(found);
-          setSavedJobId(currentJobId);
+      if (TERMINAL_RUN_STATUSES.has(run.status)) {
+        if (run.status === "complete") {
           setIsSuccessModalOpen(true);
-          toast.success(`Found ${found} candidates! Sourcing complete.`, "Sourcing Succeeded");
+          toast.success(`Found ${run.candidates_found ?? 0} candidates.`, "Sourcing Complete");
+        } else {
+          const msg = run.error || (run.status === "cancelled" ? "The search was cancelled." : "The search failed.");
+          setSearchError(msg);
+          toast.error(msg, "Sourcing Failed");
         }
         return;
       }
@@ -287,133 +392,65 @@ export default function NewJobPage() {
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     }
 
-    setSearchError("Search is taking longer than expected. Check back shortly.");
-    toast.warning("Search is taking longer than expected. Check back shortly.");
+    setSearchError("The search is taking longer than expected. Check the job's candidates shortly.");
+    toast.warning("The search is taking longer than expected. Check back shortly.");
   }
 
-  // Unified automatic flow: generates queries, saves job, searches candidates, and scores
-  async function handleGenerateAndFindCandidates() {
-    if (!analysis) return;
-    if (isSearching) return; // guard against duplicate submissions
-
-    if (!isJobDetailsValid) {
-      markAllFieldsTouched();
-      setIsJobDetailsOpen(true);
-      const msg = "Please complete all required job details before continuing.";
-      setSearchError(msg);
-      toast.error(msg, "Missing Required Fields");
+  async function handleStartSearch() {
+    if (!savedJobId || !queries || isSearching) return;
+    const cleaned = queries.map((q) => q.trim()).filter(Boolean);
+    if (cleaned.length === 0) {
+      setSearchError("Add at least one search query.");
       return;
     }
 
     setSearchError(null);
     setIsSearching(true);
-    setSearchStep("generating");
-    setSearchRun(null);
-    toast.info("Generating optimized search queries...", "Automated Sourcing");
+    setRunStatus(null);
+    toast.info("Searching for candidates...", "Sourcing Started");
 
     try {
-      // 1. Generate optimized queries automatically
-      const queryResponse = await fetch("/api/jobs/generate-queries", {
+      const res = await fetch(`/api/jobs/${savedJobId}/search`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(analysis),
+        body: JSON.stringify({ queries: cleaned }),
       });
-      const queryData = await queryResponse.json();
-
-      if (!queryResponse.ok) {
-        const msg = queryData.error ?? "Failed to generate search queries.";
+      const data = await readJson(res);
+      const run = data.run as { id: string; status: string } | undefined;
+      if (!res.ok || !run?.id) {
+        const msg = errorOf(data, "Failed to start the candidate search.");
         setSearchError(msg);
         toast.error(msg);
-        setIsSearching(false);
         return;
       }
-
-      const generatedQueries = queryData.search_queries;
-
-      // 2. Save job to Supabase
-      setSearchStep("sourcing");
-      toast.info("Saving role and scanning talent databases...", "Autonomous Search");
-
-      const jobResponse = await fetch("/api/jobs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: title || analysis.job_title,
-          description,
-          company_id: companyId,
-          location: analysis.location,
-          city: analysis.city,
-          employment_type: employmentType || analysis.employment_type,
-          work_arrangement: workArrangement,
-          seniority: analysis.seniority,
-          required_skills: analysis.required_skills,
-          preferred_skills: analysis.preferred_skills,
-          minimum_experience: analysis.years_of_experience.minimum,
-          maximum_experience: analysis.years_of_experience.maximum,
-          education: analysis.education,
-          certifications: analysis.certifications,
-          languages: analysis.languages,
-          keywords: analysis.keywords,
-          ai_analysis: analysis,
-        }),
-      });
-      const job = await jobResponse.json();
-
-      if (!jobResponse.ok) {
-        const msg = job.error ?? "Failed to save the job.";
-        setSearchError(msg);
-        toast.error(msg);
-        setIsSearching(false);
-        return;
-      }
-
-      setSavedJobId(job.id);
-
-      // 3. Trigger candidate search run
-      const searchResponse = await fetch(`/api/jobs/${job.id}/search`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ queries: generatedQueries }),
-      });
-      const run = await searchResponse.json();
-
-      if (!searchResponse.ok) {
-        const msg = run.error ?? "Failed to run candidate search.";
-        setSearchError(msg);
-        toast.error(msg);
-        setIsSearching(false);
-        return;
-      }
-
-      setSearchRun(run);
-      setSearchStep("scoring");
-
-      // 4. Poll status until complete
-      await pollSearchRunStatus(run.id, job.id);
+      setRunId(run.id);
+      await pollRun(run.id);
     } catch {
       setSearchError("An unexpected error occurred during candidate sourcing.");
       toast.error("An unexpected error occurred during candidate sourcing.");
     } finally {
       setIsSearching(false);
-      setSearchStep("idle");
     }
   }
+
+  const candidatesHref = savedJobId
+    ? `/candidates?jobId=${savedJobId}${runId ? `&runId=${runId}` : ""}`
+    : "/candidates";
 
   return (
     <main className="min-h-screen bg-slate-50/70 pb-24">
       <DashboardNav />
       <div className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-8 sm:px-6">
-        
-        {/* Header */}
         <div className="flex flex-col gap-1">
-          <div className="inline-flex items-center gap-2 text-xs font-semibold text-indigo-600 uppercase tracking-wider">
+          <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-indigo-600">
             AI Talent Pipeline
           </div>
           <h1 className="font-display text-3xl font-bold tracking-tight text-slate-900">
             Create New Job Opening
           </h1>
           <p className="text-sm text-slate-500">
-            Provide the role parameters and job description. Our AI will extract requirements, synthesize search queries, and source qualified candidates.
+            Provide the role details and job description. The AI extracts the requirements, you
+            review them and the search queries, then candidates are sourced and scored.
           </p>
         </div>
 
@@ -804,7 +841,7 @@ export default function NewJobPage() {
 
         {/* 3. Loading Screen when Analyzing */}
         {isAnalyzing && (
-          <Card className="border-indigo-200 bg-gradient-to-br from-indigo-50/60 via-white to-indigo-50/30 p-8 text-center shadow-lg animate-in fade-in duration-300">
+          <Card className="p-8 text-center animate-in fade-in duration-300">
             <div className="flex flex-col items-center justify-center max-w-md mx-auto">
               <div className="relative mb-5">
                 <div className="h-16 w-16 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 animate-pulse">
@@ -824,150 +861,182 @@ export default function NewJobPage() {
             </div>
           </Card>
         )}
-
-        {/* 4. Extracted Requirements Section (Redesigned & Pleasant) */}
-        {analysis && (
-          <Card className="shadow-sm border-slate-200 animate-in fade-in duration-300">
-            <CardHeader className="pb-4 border-b border-slate-100">
+        {/* 4. Extracted requirements */}
+        {draft && (
+          <Card className="animate-in fade-in border-slate-200 shadow-sm duration-300">
+            <CardHeader className="border-b border-slate-100 pb-4">
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="font-display text-xl font-bold text-slate-900">
                     Extracted Requirements
                   </CardTitle>
                   <CardDescription className="text-xs text-slate-500">
-                    Review and fine-tune extracted parameters before autonomous candidate discovery
+                    Review and fine-tune what the AI extracted before saving the job
                   </CardDescription>
                 </div>
-                <Badge tone="good" className="text-xs font-medium">
-                  Analysis Verified
+                <Badge tone={savedJobId ? "good" : "neutral"} className="text-xs font-medium">
+                  {savedJobId ? "Job saved" : "Not saved yet"}
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="pt-6">
-              <RequirementsEditor value={analysis} onChange={setAnalysis} />
+              <RequirementsEditor value={draft} onChange={handleDraftChange} />
 
-              {/* 5. Automated Sourcing Trigger (No Search Query Form shown!) */}
-              <div className="mt-8 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 text-white shadow-md">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="mt-8 bg-black p-6 text-white">
+                <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
                   <div>
-                    <h4 className="text-base font-bold text-white flex items-center gap-2">
-                      <Search className="h-4 w-4 text-indigo-400" />
-                      Ready to Find Candidates?
+                    <h4 className="flex items-center gap-2 text-base font-bold text-white">
+                      <Sparkles className="h-4 w-4 text-indigo-400" />
+                      {queries ? "Search Queries" : "Save & Build Search Queries"}
                     </h4>
-                    <p className="text-xs text-slate-300 mt-1 max-w-xl leading-relaxed">
-                      Click below to automatically synthesize targeted queries, search authorized web sources, deduplicate records, and score candidate profiles against your criteria.
+                    <p className="mt-1 max-w-xl text-xs leading-relaxed text-slate-300">
+                      {queries
+                        ? "Edit, remove or add queries, then start the search. Location targeting is added automatically."
+                        : "Saves the job with these requirements and generates targeted search queries for you to review."}
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    size="lg"
-                    onClick={handleGenerateAndFindCandidates}
-                    disabled={isSearching || !isJobDetailsValid}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-lg shadow-indigo-600/30 shrink-0 disabled:opacity-60"
-                    data-testid="find-candidates-button"
-                  >
-                    {isSearching ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Finding Candidates...
-                      </>
-                    ) : (
-                      <>
-                        <Search className="mr-2 h-4 w-4" />
-                        Generate Queries & Find Candidates
-                      </>
-                    )}
-                  </Button>
+                  {!queries && (
+                    <Button
+                      type="button"
+                      size="lg"
+                      onClick={handleSaveAndGenerate}
+                      disabled={isSaving || isSearching || !isJobDetailsValid || !isRangeValid}
+                      className="shrink-0 bg-indigo-600 font-semibold text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 disabled:opacity-60"
+                      data-testid="save-generate-button"
+                    >
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="mr-2 h-4 w-4" />
+                          {savedJobId ? "Update Job & Regenerate Queries" : "Save Job & Generate Queries"}
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
 
                 {!isJobDetailsValid && (
                   <p className="mt-3 text-xs text-amber-300">
-                    Complete all required job details (title, company, employment type, work
-                    arrangement, location) above to continue.
+                    Complete all required job details above (title, company, employment type, work
+                    arrangement) to continue.
                   </p>
                 )}
 
-                {/* Sourcing in progress live banner */}
+                {queries && (
+                  <div className="mt-5 rounded-xl bg-white p-4 text-slate-900" data-testid="queries-review">
+                    <SearchQueries queries={queries} onChange={setQueries} />
+                    <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleSaveAndGenerate}
+                        disabled={isSaving || isSearching}
+                      >
+                        {isSaving ? "Regenerating..." : "Regenerate"}
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleStartSearch}
+                        disabled={isSearching || isSaving || queries.every((q) => !q.trim())}
+                        className="bg-indigo-600 font-semibold text-white hover:bg-indigo-500"
+                        data-testid="find-candidates-button"
+                      >
+                        {isSearching ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Finding Candidates...
+                          </>
+                        ) : (
+                          <>
+                            <Search className="mr-2 h-4 w-4" />
+                            Start Search
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 {isSearching && (
-                  <div className="mt-4 pt-4 border-t border-white/10 flex items-center gap-3 text-xs text-indigo-200">
+                  <div className="mt-4 flex items-center gap-3 border-t border-white/10 pt-4 text-xs text-indigo-200" data-testid="search-progress">
                     <Loader2 className="h-4 w-4 animate-spin text-indigo-400" />
                     <span>
-                      {searchStep === "generating" && "Synthesizing multi-variable search queries..."}
-                      {searchStep === "sourcing" && "Querying authorized talent pools across public sources..."}
-                      {searchStep === "scoring" && "Deduplicating candidates and computing AI match scores..."}
+                      {!runStatus || runStatus.status === "pending"
+                        ? "Starting the search..."
+                        : `Searching and scoring candidates · ${runStatus.candidates_found ?? 0} found so far`}
                     </span>
                   </div>
                 )}
 
                 {searchError && (
-                  <div className="mt-3 rounded-lg bg-red-500/20 p-3 border border-red-500/30 text-xs text-red-200">
+                  <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/20 p-3 text-xs text-red-200" role="alert">
                     {searchError}
+                    {savedJobId && (
+                      <button
+                        type="button"
+                        onClick={() => router.push(candidatesHref)}
+                        className="ml-2 underline underline-offset-2"
+                      >
+                        Open the job&apos;s candidates
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
             </CardContent>
           </Card>
         )}
-
       </div>
 
-      {/* 6. Success Alert in Middle of Screen Modal */}
+      {/* 5. Success modal */}
       {isSuccessModalOpen && (
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
+          className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm duration-200"
         >
-          <div className="relative w-full max-w-md rounded-2xl bg-white p-6 sm:p-8 text-center shadow-2xl ring-1 ring-slate-900/10 animate-in zoom-in-95 duration-200">
-            
-            {/* Success Icon */}
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 mb-5 ring-8 ring-emerald-50">
+          <div className="animate-in zoom-in-95 relative w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-2xl ring-1 ring-slate-900/10 duration-200 sm:p-8">
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 ring-8 ring-emerald-50">
               <CheckCircle2 className="h-8 w-8" />
             </div>
 
-            <h2 className="font-display text-2xl font-bold text-slate-900">
-              Candidate Sourcing Complete!
-            </h2>
+            <h2 className="font-display text-2xl font-bold text-slate-900">Candidate Sourcing Complete!</h2>
 
-            <p className="text-sm text-slate-600 mt-2 leading-relaxed">
-              Successfully identified and evaluated{" "}
-              <span className="font-bold text-slate-900 text-base">
-                {candidatesFoundCount} candidates
-              </span>{" "}
-              matching your requirements for{" "}
-              <span className="font-medium text-slate-900">
-                {title || analysis?.job_title || "this role"}
-              </span>.
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              Found{" "}
+              <span className="text-base font-bold text-slate-900">
+                {runStatus?.candidates_found ?? 0} candidates
+              </span>
+              {runStatus?.candidates_new ? ` (${runStatus.candidates_new} new to the database)` : ""} for{" "}
+              <span className="font-medium text-slate-900">{title || "this role"}</span>.
             </p>
 
             {selectedCompanyName && (
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="mt-1 text-xs text-slate-400">
                 Company: <span className="font-medium text-slate-600">{selectedCompanyName}</span>
               </p>
             )}
 
-            {/* Two Action Buttons */}
-            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setIsSuccessModalOpen(false)}
-                className="w-full sm:w-1/2 text-slate-700 hover:bg-slate-50"
+                className="w-full text-slate-700 hover:bg-slate-50 sm:w-1/2"
               >
                 Close
               </Button>
-
               <Button
                 type="button"
                 onClick={() => {
                   setIsSuccessModalOpen(false);
-                  if (savedJobId) {
-                    router.push(`/candidates?jobId=${savedJobId}`);
-                  } else {
-                    router.push("/candidates");
-                  }
+                  router.push(candidatesHref);
                 }}
-                className="w-full sm:w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-md shadow-indigo-600/20"
+                className="w-full bg-indigo-600 font-medium text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700 sm:w-1/2"
               >
                 Show Candidates
                 <ArrowRight className="ml-1.5 h-4 w-4" />
@@ -976,7 +1045,6 @@ export default function NewJobPage() {
           </div>
         </div>
       )}
-
     </main>
   );
 }

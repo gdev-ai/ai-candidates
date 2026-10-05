@@ -7,7 +7,13 @@ export async function signInWithPassword(email: string, password: string) {
 
 export async function signUpWithPassword(email: string, password: string) {
   const supabase = createClient();
-  return supabase.auth.signUp({ email, password });
+  // The auth project is shared with HR Portal, whose Site URL is the default
+  // confirmation target — send this app's confirmations back here instead.
+  return supabase.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+  });
 }
 
 export async function signOut() {
@@ -32,14 +38,4 @@ export async function reportAuthEvent(event: AuthEvent): Promise<void> {
   } catch {
     // Logging must never get in the way of signing in or out.
   }
-}
-
-export async function signInWithGoogle() {
-  const supabase = createClient();
-  return supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: `${window.location.origin}/auth/callback`,
-    },
-  });
 }

@@ -19,15 +19,23 @@ export interface ActivityFeedItem {
   createdAt: string;
 }
 
+export interface ActorInfo {
+  email: string;
+  full_name: string | null;
+}
+
 export function toActivityFeedItems(
   rows: ActivityLogRow[],
-  emailsById: Map<string, string>,
+  actorsById: Map<string, ActorInfo>,
 ): ActivityFeedItem[] {
-  return rows.map((row) => ({
-    id: row.id,
-    actorName: getDisplayName(row.user_id ? emailsById.get(row.user_id) : null) ?? "Unknown user",
-    action: row.action,
-    description: row.description,
-    createdAt: row.created_at,
-  }));
+  return rows.map((row) => {
+    const actor = row.user_id ? actorsById.get(row.user_id) : undefined;
+    return {
+      id: row.id,
+      actorName: getDisplayName(actor?.email, actor?.full_name) ?? "Unknown user",
+      action: row.action,
+      description: row.description,
+      createdAt: row.created_at,
+    };
+  });
 }

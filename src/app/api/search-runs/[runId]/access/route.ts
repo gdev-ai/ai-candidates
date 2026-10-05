@@ -1,29 +1,28 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
-import { logActivity } from "@/lib/activity/log";
+import { logActivityOnce } from "@/lib/activity/log";
 import { requireUser } from "@/lib/api/requireUser";
 import { withErrorHandling } from "@/lib/errors";
+import { createLogger } from "@/lib/logger";
 import { getDisplayName } from "@/lib/users/displayName";
 
 interface RouteParams {
   params: Promise<{ runId: string }>;
 }
 
-interface RunRow {
-  id: string;
-  jobs: { user_id: string; title: string } | null;
-}
-
-// Re-opening the same file within this window still records an access row,
+// Re-opening the same file within this window refreshes last_accessed_at
 // but doesn't add another activity-log entry.
 const ACTIVITY_DEDUPE_MS = 30 * 60 * 1000;
 
+const log = createLogger("api-search-run-access");
+
 /**
- * Records that the current user opened this sourcing run's candidate list.
- * Used to compute the dashboard's "Last Accessed By" / "Last Activity Time"
- * columns — every open is logged, so "last" is just the most recent row.
- * When the opener isn't the file's owner (e.g. their manager), the access is
- * also written to the activity log so it shows up in team views.
+ * Records that the caller opened this sourcing run's candidate list (one
+ * row per run and user, upserted with the latest time) — feeds the
+ * dashboard's "Last Accessed By" / "Last Activity". When the opener isn't
+ * the file's owner (e.g. their manager), it's also logged as
+ * sourcing_file.accessed so it shows up in team views.
  */
 export const POST = withErrorHandling(async (_request: Request, { params }: RouteParams) => {
   const auth = await requireUser();
@@ -31,68 +30,58 @@ export const POST = withErrorHandling(async (_request: Request, { params }: Rout
   const { user, supabase } = auth;
   const { runId } = await params;
 
+  if (!z.uuid().safeParse(runId).success) {
+    return NextResponse.json({ error: "Sourcing run not found." }, { status: 404 });
+  }
+
   // RLS decides visibility: a run the caller can't read is a 404, so access
   // can't be recorded against (or probe the existence of) someone else's file.
   const { data: run, error: runError } = await supabase
     .from("search_runs")
-    .select("id, jobs(user_id, title)")
+    .select("id, job:jobs!search_runs_job_id_fkey ( id, owner_id, title )")
     .eq("id", runId)
     .maybeSingle();
 
   if (runError) {
+    log.error("Failed to load search run", { error: runError });
     return NextResponse.json({ error: "Failed to load sourcing run." }, { status: 500 });
   }
-  if (!run) {
+  if (!run || !run.job) {
     return NextResponse.json({ error: "Sourcing run not found." }, { status: 404 });
   }
 
-  const owner = (run as unknown as RunRow).jobs;
-  const isOwner = owner?.user_id === user.id;
-
-  let recentlyAccessed = false;
-  if (!isOwner) {
-    const { data: previous } = await supabase
-      .from("search_run_access")
-      .select("accessed_at")
-      .eq("search_run_id", runId)
-      .eq("user_id", user.id)
-      .order("accessed_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    recentlyAccessed =
-      previous !== null &&
-      Date.now() - new Date(previous.accessed_at).getTime() < ACTIVITY_DEDUPE_MS;
-  }
-
-  const { error } = await supabase.from("search_run_access").insert({
-    search_run_id: runId,
-    user_id: user.id,
-    user_email: user.email,
-  });
-
-  if (error) {
-    return NextResponse.json(
-      { error: "Failed to record run access." },
-      { status: 500 },
+  const { error } = await supabase
+    .from("search_run_access")
+    .upsert(
+      { search_run_id: runId, user_id: user.id, last_accessed_at: new Date().toISOString() },
+      { onConflict: "search_run_id,user_id" },
     );
+  if (error) {
+    log.error("Failed to record run access", { error });
+    return NextResponse.json({ error: "Failed to record run access." }, { status: 500 });
   }
 
-  if (!isOwner && owner && !recentlyAccessed) {
-    const { data: ownerProfile } = await supabase
-      .from("profiles")
-      .select("email")
-      .eq("id", owner.user_id)
+  const owner = run.job;
+  if (owner.owner_id !== user.id) {
+    const { data: ownerMember } = await supabase
+      .from("members")
+      .select("email, full_name")
+      .eq("user_id", owner.owner_id)
       .maybeSingle();
-    const ownerName = getDisplayName(ownerProfile?.email) ?? "a teammate";
+    const ownerName = getDisplayName(ownerMember?.email, ownerMember?.full_name) ?? "a teammate";
 
-    await logActivity(supabase, {
-      userId: user.id,
-      action: "sourcing_file.accessed",
-      entityType: "search_run",
-      entityId: runId,
-      description: `Opened ${ownerName}'s sourcing file "${owner.title}"`,
-      metadata: { ownerId: owner.user_id },
-    });
+    await logActivityOnce(
+      supabase,
+      {
+        userId: user.id,
+        action: "sourcing_file.accessed",
+        entityType: "search_run",
+        entityId: runId,
+        description: `Opened ${ownerName}'s sourcing file "${owner.title}"`,
+        metadata: { ownerId: owner.owner_id, jobId: owner.id },
+      },
+      ACTIVITY_DEDUPE_MS,
+    );
   }
 
   return NextResponse.json({ success: true });

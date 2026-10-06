@@ -1,18 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { isAccessRequest } from "@/lib/auth/access";
+import { isActive, type Member } from "@/lib/auth/access";
 
-describe("isAccessRequest", () => {
-  it("is an uninvited sign-in: inactive, no team, default role", () => {
-    expect(isAccessRequest({ is_active: false, team_id: null, role: "hr_user" })).toBe(true);
-  });
+function member(status: Member["status"]): Member {
+  return { user_id: "u1", email: "a@b.c", full_name: null, role: "hr_user", team_id: null, status };
+}
 
-  it("excludes active users", () => {
-    expect(isAccessRequest({ is_active: true, team_id: null, role: "hr_user" })).toBe(false);
-  });
-
-  it("excludes deactivated users an admin had placed in a team or given a role", () => {
-    expect(isAccessRequest({ is_active: false, team_id: "t1", role: "hr_user" })).toBe(false);
-    expect(isAccessRequest({ is_active: false, team_id: null, role: "hr_manager" })).toBe(false);
+describe("isActive", () => {
+  it("only lets active members in", () => {
+    expect(isActive(member("active"))).toBe(true);
+    expect(isActive(member("pending"))).toBe(false);
+    expect(isActive(member("disabled"))).toBe(false);
+    expect(isActive(null)).toBe(false);
   });
 });

@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+import { Brandmark } from "@/components/brand/brandmark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,7 +16,7 @@ import {
 } from "@/components/ui/card";
 import {
   reportAuthEvent,
-  signInWithGoogle,
+  signInWithMicrosoft,
   signInWithPassword,
   signUpWithPassword,
 } from "@/lib/supabase/auth";
@@ -23,7 +24,9 @@ import {
 type Mode = "login" | "signup";
 
 const NOT_ALLOWED_MESSAGE =
-  "Your account doesn't have access yet. Ask an admin to invite you or approve your access request.";
+  "Your account doesn't have access. Ask an admin to invite you.";
+const PENDING_MESSAGE =
+  "Your access request has been sent. An admin needs to approve it before you can sign in.";
 
 export default function LoginPage() {
   return (
@@ -40,16 +43,33 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
 
   useEffect(() => {
     const errorParam = searchParams.get("error");
     if (errorParam === "not_allowed") {
       setError(NOT_ALLOWED_MESSAGE);
-    } else if (errorParam === "oauth_failed") {
-      setError("Google sign-in failed. Please try again.");
+    } else if (errorParam === "pending_approval") {
+      setMessage(PENDING_MESSAGE);
+    } else if (errorParam === "link_failed") {
+      setError(
+        "That sign-in link is invalid or has expired. Please log in again.",
+      );
     }
   }, [searchParams]);
+
+  async function handleMicrosoft() {
+    setError(null);
+    setMessage(null);
+    setIsSubmitting(true);
+    const { error: authError } = await signInWithMicrosoft(
+      searchParams.get("redirectTo"),
+    );
+    // On success the browser is already navigating to Microsoft.
+    if (authError) {
+      setIsSubmitting(false);
+      setError(authError.message);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -86,27 +106,14 @@ function LoginForm() {
     router.refresh();
   }
 
-  async function handleGoogleSignIn() {
-    setError(null);
-    setMessage(null);
-    setIsGoogleSubmitting(true);
-
-    const { error: authError } = await signInWithGoogle();
-
-    if (authError) {
-      setIsGoogleSubmitting(false);
-      setError(authError.message);
-    }
-  }
-
   return (
-    <main className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-sm">
+    <main className="relative flex min-h-screen items-center justify-center bg-black p-4 text-white">
+      <Card className="animate-page-enter w-full max-w-sm border-white/20">
         <CardHeader>
           <CardTitle>{mode === "login" ? "Log in" : "Sign up"}</CardTitle>
           <CardDescription>
             {mode === "login"
-              ? "Enter your email and password to continue."
+              ? "Use your HR Portal email and password."
               : "Create an account to get started."}
           </CardDescription>
         </CardHeader>
@@ -125,7 +132,9 @@ function LoginForm() {
               placeholder="Password"
               required
               minLength={6}
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              autoComplete={
+                mode === "login" ? "current-password" : "new-password"
+              }
             />
             {error && (
               <p role="alert" className="text-sm text-destructive">
@@ -139,26 +148,21 @@ function LoginForm() {
             )}
           </CardContent>
           <CardFooter className="flex flex-col gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              disabled={isSubmitting}
+              onClick={handleMicrosoft}
+            >
+              Sign in with Microsoft
+            </Button>
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting
                 ? "Please wait..."
                 : mode === "login"
                   ? "Log in"
                   : "Sign up"}
-            </Button>
-            <div className="flex w-full items-center gap-2">
-              <div className="h-px flex-1 bg-border" />
-              <span className="text-xs text-muted-foreground">or</span>
-              <div className="h-px flex-1 bg-border" />
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              disabled={isGoogleSubmitting}
-              onClick={handleGoogleSignIn}
-            >
-              {isGoogleSubmitting ? "Redirecting..." : "Continue with Google"}
             </Button>
             <Button
               type="button"
@@ -177,6 +181,10 @@ function LoginForm() {
           </CardFooter>
         </form>
       </Card>
+      <div className="absolute bottom-8 left-8 hidden sm:block">
+        <Brandmark className="h-6 text-white" />
+        <p className="mt-3 text-xs text-[#BFBFBF]">Candidate sourcing</p>
+      </div>
     </main>
   );
 }

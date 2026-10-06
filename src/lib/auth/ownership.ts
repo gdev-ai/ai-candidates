@@ -1,6 +1,6 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
+import type { SourcingClient } from "@/lib/supabase/types";
 import { getDisplayName } from "@/lib/users/displayName";
 
 /**
@@ -10,14 +10,17 @@ import { getDisplayName } from "@/lib/users/displayName";
  * routes enforce ownership themselves.
  */
 export async function describeOwnership(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: SupabaseClient<any, any, any>,
+  supabase: SourcingClient,
   ownerId: string,
   userId: string,
 ): Promise<{ can_edit: boolean; owner_name: string | null }> {
   if (ownerId === userId) return { can_edit: true, owner_name: null };
-  const { data } = await supabase.from("profiles").select("email").eq("id", ownerId).maybeSingle();
-  return { can_edit: false, owner_name: getDisplayName(data?.email as string | undefined) };
+  const { data } = await supabase
+    .from("members")
+    .select("email, full_name")
+    .eq("user_id", ownerId)
+    .maybeSingle();
+  return { can_edit: false, owner_name: getDisplayName(data?.email, data?.full_name) };
 }
 
 /**

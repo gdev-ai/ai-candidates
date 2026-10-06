@@ -1,14 +1,14 @@
 "use client";
 
-import { Eye } from "lucide-react";
-import { Suspense, useEffect, useState } from "react";
+import { ArrowLeft, ExternalLink, Eye, MapPin, UserRound } from "lucide-react";
+import Link from "next/link";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 
 import { DashboardNav } from "@/components/dashboard/nav";
 import { Avatar } from "@/components/ui/avatar";
+import { Badge, matchScoreTone } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { matchScoreTone } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyCell } from "@/components/ui/empty-cell";
 import {
@@ -18,57 +18,159 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { CANDIDATE_STATUSES } from "@/lib/candidates/statuses";
 import { cn } from "@/lib/utils";
+import type {
+  CandidateDetailResponse,
+  CandidateNoteRecord,
+  MatchItem,
+  MatchResultRecord,
+  PersonExperience,
+} from "@/types/candidate";
 
-interface Match {
-  match_score: number;
-  skills_score: number | null;
-  experience_score: number | null;
-  location_score: number | null;
-  education_score: number | null;
-  seniority_score: number | null;
-  matched_requirements: string[];
-  missing_requirements: string[];
-  strengths: string[];
-  concerns: string[];
-  ai_summary: string | null;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function formatYearMonth(year: number | null, month: number | null): string | null {
+  if (!year) return null;
+  return month ? `${MONTHS[month - 1]} ${year}` : String(year);
 }
 
-interface Candidate {
-  id: string;
-  name: string | null;
-  headline: string | null;
-  company: string | null;
-  location: string | null;
-  profile_url: string | null;
-  profile_image_url: string | null;
-  source: string;
-  summary: string | null;
-  skills: string[];
-  experience_years: number | null;
-  status: string;
-  match: Match | null;
-  /** False when viewing someone else's candidate (e.g. as their manager). */
-  can_edit: boolean;
-  owner_name: string | null;
+function experiencePeriod(e: PersonExperience): string {
+  const start = formatYearMonth(e.start_year, e.start_month);
+  const end = e.is_current ? "Present" : formatYearMonth(e.end_year, e.end_month);
+  const range = [start, end].filter(Boolean).join(" – ");
+  return [range, e.duration_text].filter(Boolean).join(" · ");
 }
 
-interface Note {
-  id: string;
-  note: string;
-  created_at: string;
+function formatScore(score: number | null | undefined): string | null {
+  return score === null || score === undefined ? null : `${Math.round(score)}%`;
+}
+
+const ITEM_GROUPS: { status: string; label: string; tone: "good" | "warning" | "critical" }[] = [
+  { status: "met", label: "Met", tone: "good" },
+  { status: "partial", label: "Partially met", tone: "warning" },
+  { status: "missing", label: "Missing", tone: "critical" },
+];
+
+function MatchItems({ items }: { items: MatchItem[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {ITEM_GROUPS.map((group) => {
+        const groupItems = items.filter((i) => i.status === group.status);
+        return (
+          <div key={group.status}>
+            <p className="mb-1 flex items-center gap-2 font-medium">
+              {group.label}
+              <Badge tone={group.tone}>{groupItems.length}</Badge>
+            </p>
+            {groupItems.length === 0 ? (
+              <p className="text-muted-foreground">None.</p>
+            ) : (
+              <ul className="flex flex-col gap-1.5 text-muted-foreground">
+                {groupItems.map((item, i) => (
+                  <li key={i}>
+                    <span className="text-foreground">{item.text}</span>
+                    {item.evidence && <span className="block text-xs">{item.evidence}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function MatchCard({ matches }: { matches: MatchResultRecord[] }) {
+  const [latest, ...history] = matches;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="font-display text-xl">Match for this job</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-5 text-sm" data-testid="match-breakdown">
+        {!latest ? (
+          <p className="text-muted-foreground">Not scored for this job yet.</p>
+        ) : (
+          <>
+            <div className="flex items-center gap-4">
+              <span
+                className={cn(
+                  "flex h-16 w-16 shrink-0 items-center justify-center rounded-full font-display text-xl font-semibold",
+                  matchScoreTone(latest.match_score) === "good" && "bg-emerald-100 text-emerald-700",
+                  matchScoreTone(latest.match_score) === "warning" && "bg-amber-100 text-amber-700",
+                  matchScoreTone(latest.match_score) === "critical" && "bg-red-100 text-red-700",
+                )}
+              >
+                {formatScore(latest.match_score)}
+              </span>
+              <div>
+                <p className="font-medium text-foreground">Overall match</p>
+                <p className="text-muted-foreground">
+                  Scored {new Date(latest.created_at).toLocaleString()} · {latest.model}
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+              {(
+                [
+                  ["Skills", latest.skills_score],
+                  ["Experience", latest.experience_score],
+                  ["Location", latest.location_score],
+                  ["Education", latest.education_score],
+                  ["Seniority", latest.seniority_score],
+                ] as const
+              ).map(([label, score]) => (
+                <div key={label} className="rounded-lg border border-border p-2">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+                  <p className="font-medium text-foreground">{formatScore(score) ?? <EmptyCell />}</p>
+                </div>
+              ))}
+            </div>
+            {latest.summary && <p className="leading-relaxed">{latest.summary}</p>}
+            <MatchItems items={latest.items} />
+            {history.length > 0 && (
+              <div>
+                <p className="mb-1 font-medium">Earlier scores</p>
+                <ul className="flex flex-col gap-1 text-muted-foreground" data-testid="match-history">
+                  {history.map((m) => (
+                    <li key={m.id} className="flex items-center gap-2">
+                      <Badge tone={matchScoreTone(m.match_score)}>{formatScore(m.match_score)}</Badge>
+                      {new Date(m.created_at).toLocaleString()} · {m.model}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="font-display text-xl">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="text-sm">{children}</CardContent>
+    </Card>
+  );
 }
 
 function CandidateProfileContent() {
   const params = useParams<{ id: string }>();
-  const candidateId = params.id;
+  const personId = params.id;
   const searchParams = useSearchParams();
   const jobId = searchParams.get("jobId");
 
-  const [candidate, setCandidate] = useState<Candidate | null>(null);
-  const [notes, setNotes] = useState<Note[]>([]);
+  const [data, setData] = useState<CandidateDetailResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,56 +181,52 @@ function CandidateProfileContent() {
   const [isSavingNote, setIsSavingNote] = useState(false);
   const [noteError, setNoteError] = useState<string | null>(null);
 
-  async function loadAll() {
+  const load = useCallback(async () => {
+    if (!jobId) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setError(null);
     try {
-      const candidateUrl = jobId
-        ? `/api/candidates/${candidateId}?jobId=${jobId}`
-        : `/api/candidates/${candidateId}`;
-      const [candidateRes, notesRes] = await Promise.all([
-        fetch(candidateUrl),
-        fetch(`/api/candidates/${candidateId}/notes`),
-      ]);
-      const candidateData = await candidateRes.json();
-      const notesData = await notesRes.json();
-
-      if (!candidateRes.ok) {
-        setError(candidateData.error ?? "Failed to load candidate.");
+      const res = await fetch(`/api/candidates/${personId}?jobId=${jobId}`);
+      const body = await res.json();
+      if (!res.ok) {
+        setError(body.error ?? "Failed to load candidate.");
         return;
       }
-      setCandidate(candidateData);
-      setNotes(notesData.notes ?? []);
+      setData(body as CandidateDetailResponse);
     } catch {
       setError("Failed to load candidate.");
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [personId, jobId]);
 
   useEffect(() => {
-    loadAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candidateId, jobId]);
+    load();
+  }, [load]);
 
   async function handleStatusChange(status: string) {
-    if (!candidate) return;
+    if (!data || !jobId) return;
     setStatusError(null);
     setIsUpdatingStatus(true);
     try {
-      const res = await fetch(`/api/candidates/${candidateId}/status`, {
-        method: "PUT",
+      const res = await fetch(`/api/candidates/${personId}/status?jobId=${jobId}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
-      const data = await res.json();
+      const body = await res.json();
       if (!res.ok) {
-        const msg = data.error ?? "Failed to update status.";
+        const msg = body.error ?? "Failed to update status.";
         setStatusError(msg);
         toast.error(msg, "Status Update Failed");
         return;
       }
-      setCandidate(data);
+      setData((prev) =>
+        prev ? { ...prev, pipeline: { ...prev.pipeline, ...body.pipeline } } : prev,
+      );
       toast.success(`Candidate status updated to "${status}"`, "Status Updated");
     } catch {
       setStatusError("Failed to update status.");
@@ -139,31 +237,46 @@ function CandidateProfileContent() {
   }
 
   async function handleAddNote() {
-    if (!noteDraft.trim()) return;
+    if (!noteDraft.trim() || !jobId) return;
     setNoteError(null);
     setIsSavingNote(true);
     try {
-      const res = await fetch(`/api/candidates/${candidateId}/notes`, {
+      const res = await fetch(`/api/candidates/${personId}/notes?jobId=${jobId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ note: noteDraft }),
       });
-      const data = await res.json();
+      const body = await res.json();
       if (!res.ok) {
-        const msg = data.error ?? "Failed to save note.";
+        const msg = body.error ?? "Failed to save note.";
         setNoteError(msg);
         toast.error(msg, "Save Note Failed");
         return;
       }
-      setNotes((prev) => [data, ...prev]);
+      const note = body.note as CandidateNoteRecord;
+      setData((prev) => (prev ? { ...prev, notes: [note, ...prev.notes] } : prev));
       setNoteDraft("");
-      toast.success("Recruiter note saved to candidate record", "Note Added");
+      toast.success("Note saved.", "Note Added");
     } catch {
       setNoteError("Failed to save note.");
       toast.error("Failed to save note.");
     } finally {
       setIsSavingNote(false);
     }
+  }
+
+  if (!jobId) {
+    return (
+      <main className="min-h-screen">
+        <DashboardNav />
+        <p role="alert" className="p-4 text-sm text-destructive">
+          Open candidates from a job&apos;s candidate list.{" "}
+          <Link href="/candidates" className="underline">
+            Go to jobs
+          </Link>
+        </p>
+      </main>
+    );
   }
 
   if (isLoading) {
@@ -175,7 +288,7 @@ function CandidateProfileContent() {
     );
   }
 
-  if (error || !candidate) {
+  if (error || !data) {
     return (
       <main className="min-h-screen">
         <DashboardNav />
@@ -186,198 +299,112 @@ function CandidateProfileContent() {
     );
   }
 
+  const { person, pipeline } = data;
+  const name = person.full_name ?? "Unnamed candidate";
+  const location = person.location_text ?? person.city;
+  const roleLine = [person.current_title, person.current_company].filter(Boolean).join(" at ");
+
   return (
     <main className="min-h-screen">
       <DashboardNav />
-      <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6 sm:py-8">
-        {!candidate.can_edit && (
+      <div className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-6 sm:py-8">
+        <Link
+          href={`/candidates?jobId=${pipeline.job_id}`}
+          className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-primary"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Candidates for {pipeline.job_title}
+        </Link>
+
+        {!data.can_edit && (
           <p
             className="flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-800"
             data-testid="readonly-banner"
           >
             <Eye className="h-4 w-4 shrink-0" aria-hidden="true" />
-            Viewing {candidate.owner_name ? `${candidate.owner_name}'s` : "a teammate's"} candidate
-            · read-only
+            Viewing {data.owner_name ? `${data.owner_name}'s` : "a teammate's"} candidate · read-only
           </p>
         )}
+
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-4">
-              <Avatar
-                src={candidate.profile_image_url}
-                alt={candidate.name ?? "Unnamed candidate"}
-                className="h-16 w-16"
-              />
-              <CardTitle className="font-display text-2xl">
-                {candidate.name ?? "Unnamed candidate"}
-              </CardTitle>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-center gap-4">
+                <Avatar src={person.photo_url} alt={name} className="h-16 w-16" />
+                <div className="min-w-0">
+                  <CardTitle className="font-display text-2xl">{name}</CardTitle>
+                  {roleLine && <p className="text-base text-foreground">{roleLine}</p>}
+                  {location && (
+                    <p className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+                      {location}
+                      {person.location_verified === true && (
+                        <Badge tone="good" title={person.location_evidence ?? "Confirmed based in Egypt"}>
+                          Egypt verified
+                        </Badge>
+                      )}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {person.profile_url ? (
+                <Button asChild size="lg" className="gap-2" data-testid="linkedin-button">
+                  <a href={person.profile_url} target="_blank" rel="noreferrer">
+                    <UserRound className="h-4 w-4" aria-hidden="true" />
+                    Open LinkedIn profile
+                    <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                  </a>
+                </Button>
+              ) : (
+                <p className="text-sm text-muted-foreground">No profile link</p>
+              )}
             </div>
           </CardHeader>
-          <CardContent className="flex flex-col gap-2 text-sm">
-            {candidate.headline && (
-              <p className="text-base text-foreground">{candidate.headline}</p>
+          <CardContent className="flex flex-col gap-3 text-sm">
+            {person.headline && person.headline !== roleLine && (
+              <p className="text-foreground">{person.headline}</p>
             )}
-            {(candidate.company || candidate.location) && (
-              <p className="text-muted-foreground">
-                {[candidate.company, candidate.location].filter(Boolean).join(" · ")}
-              </p>
-            )}
-            <p>
-              Experience:{" "}
-              {candidate.experience_years !== null ? (
-                `${candidate.experience_years} yrs`
-              ) : (
-                <EmptyCell />
+            <div className="flex flex-wrap gap-2">
+              <Badge tone="neutral">
+                {person.experience_years !== null
+                  ? `${person.experience_years} yrs experience`
+                  : "Experience unknown"}
+              </Badge>
+              {person.open_to_work && <Badge tone="good">Open to work</Badge>}
+              {person.connections_count !== null && (
+                <Badge tone="neutral">{person.connections_count.toLocaleString()} connections</Badge>
               )}
-            </p>
-            <p>
-              Skills:{" "}
-              {candidate.skills.length > 0 ? candidate.skills.join(", ") : <EmptyCell />}
-            </p>
-            <p>Source: {candidate.source}</p>
-            {candidate.profile_url && (
-              <a
-                href={candidate.profile_url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-primary underline"
-              >
-                View profile
-              </a>
+              {person.enrichment_status !== "enriched" && (
+                <Badge tone="warning" title="Only the search result is known so far">
+                  Profile not enriched
+                </Badge>
+              )}
+            </div>
+            {person.about ? (
+              <p className="whitespace-pre-line leading-relaxed text-muted-foreground">{person.about}</p>
+            ) : (
+              person.search_snippet && (
+                <p className="leading-relaxed text-muted-foreground">{person.search_snippet}</p>
+              )
             )}
-            {candidate.summary && <p>{candidate.summary}</p>}
           </CardContent>
         </Card>
 
-        {jobId && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-display text-xl">Match Score</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4 text-sm" data-testid="match-breakdown">
-              {candidate.match ? (
-                <>
-                  <div className="flex items-center gap-4">
-                    <span
-                      className={cn(
-                        "flex h-16 w-16 shrink-0 items-center justify-center rounded-full font-display text-xl font-semibold",
-                        matchScoreTone(candidate.match.match_score) === "good" &&
-                          "bg-emerald-100 text-emerald-700",
-                        matchScoreTone(candidate.match.match_score) === "warning" &&
-                          "bg-amber-100 text-amber-700",
-                        matchScoreTone(candidate.match.match_score) === "critical" &&
-                          "bg-red-100 text-red-700",
-                      )}
-                    >
-                      {candidate.match.match_score}%
-                    </span>
-                    <div>
-                      <p className="font-medium text-foreground">Overall Match</p>
-                      <p className="text-muted-foreground">
-                        How well this candidate fits the job&apos;s requirements.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    {[
-                      ["Skills", candidate.match.skills_score],
-                      ["Experience", candidate.match.experience_score],
-                      ["Location", candidate.match.location_score],
-                      ["Education", candidate.match.education_score],
-                      ["Seniority", candidate.match.seniority_score],
-                    ].map(([label, score]) => (
-                      <div key={label as string} className="rounded-lg border border-border p-2">
-                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                          {label}
-                        </p>
-                        <p className="font-medium text-foreground">
-                          {score !== null && score !== undefined ? `${score}%` : <EmptyCell />}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                  {candidate.match.ai_summary && <p>{candidate.match.ai_summary}</p>}
-
-                  <div>
-                    <p className="font-medium">Matched Requirements</p>
-                    {candidate.match.matched_requirements.length > 0 ? (
-                      <ul className="list-inside list-disc text-muted-foreground">
-                        {candidate.match.matched_requirements.map((req, i) => (
-                          <li key={i}>{req}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-muted-foreground">None listed.</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <p className="font-medium">Missing Requirements</p>
-                    {candidate.match.missing_requirements.length > 0 ? (
-                      <ul className="list-inside list-disc text-muted-foreground">
-                        {candidate.match.missing_requirements.map((req, i) => (
-                          <li key={i}>{req}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-muted-foreground">None listed.</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <p className="font-medium">Strengths</p>
-                    {candidate.match.strengths.length > 0 ? (
-                      <ul className="list-inside list-disc text-muted-foreground">
-                        {candidate.match.strengths.map((s, i) => (
-                          <li key={i}>{s}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-muted-foreground">None listed.</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <p className="font-medium">Concerns</p>
-                    {candidate.match.concerns.length > 0 ? (
-                      <ul className="list-inside list-disc text-muted-foreground">
-                        {candidate.match.concerns.map((c, i) => (
-                          <li key={i}>{c}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-muted-foreground">None listed.</p>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <p className="text-muted-foreground">
-                  Not scored for this job yet.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
         <Card>
           <CardHeader>
-            <CardTitle className="font-display text-xl">Status</CardTitle>
+            <CardTitle className="font-display text-xl">Pipeline status</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col gap-2">
-            {!candidate.can_edit ? (
-              <p className="text-sm" data-testid="status-readonly">
-                <span className="font-medium">{candidate.status}</span>
+          <CardContent className="flex flex-col gap-2 text-sm">
+            {!data.can_edit ? (
+              <p data-testid="status-readonly">
+                <span className="font-medium">{pipeline.status}</span>
                 <span className="text-muted-foreground">
                   {" "}
-                  · only {candidate.owner_name ?? "the owner"} can change this
+                  · only {data.owner_name ?? "the owner"} can change this
                 </span>
               </p>
             ) : (
-              <Select
-                value={candidate.status}
-                onValueChange={handleStatusChange}
-                disabled={isUpdatingStatus}
-              >
+              <Select value={pipeline.status} onValueChange={handleStatusChange} disabled={isUpdatingStatus}>
                 <SelectTrigger className="w-[200px]" data-testid="status-select">
                   <SelectValue />
                 </SelectTrigger>
@@ -390,25 +417,130 @@ function CandidateProfileContent() {
                 </SelectContent>
               </Select>
             )}
+            <p className="text-xs text-muted-foreground">
+              Found {new Date(pipeline.found_at).toLocaleDateString()}
+              {pipeline.status_changed_at &&
+                ` · status changed ${new Date(pipeline.status_changed_at).toLocaleString()}`}
+            </p>
             {statusError && (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className="text-destructive">
                 {statusError}
               </p>
             )}
           </CardContent>
         </Card>
 
+        <MatchCard matches={data.matches} />
+
+        {data.experiences.length > 0 && (
+          <Section title="Experience">
+            <ol className="flex flex-col gap-4" data-testid="experience-list">
+              {data.experiences.map((e) => (
+                <li key={e.id} className="border-l-2 border-border pl-3">
+                  <p className="font-medium text-foreground">
+                    {e.title ?? "Role"}
+                    {e.company && <span className="font-normal text-muted-foreground"> · {e.company}</span>}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {[experiencePeriod(e), e.location, e.employment_type].filter(Boolean).join(" · ")}
+                  </p>
+                  {e.description && (
+                    <p className="mt-1 whitespace-pre-line leading-relaxed text-muted-foreground">
+                      {e.description}
+                    </p>
+                  )}
+                  {e.skills.length > 0 && (
+                    <p className="mt-1 text-xs text-muted-foreground">Skills: {e.skills.join(", ")}</p>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </Section>
+        )}
+
+        {data.skills.length > 0 && (
+          <Section title="Skills">
+            <div className="flex flex-wrap gap-1.5" data-testid="skills-list">
+              {data.skills.map((s) => (
+                <Badge
+                  key={s.name}
+                  tone={s.is_top ? "good" : "neutral"}
+                  className="font-normal"
+                  title={s.is_top ? "Top skill" : undefined}
+                >
+                  {s.name}
+                  {s.endorsements ? ` · ${s.endorsements}` : ""}
+                </Badge>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {data.education.length > 0 && (
+          <Section title="Education">
+            <ul className="flex flex-col gap-3">
+              {data.education.map((ed) => (
+                <li key={ed.id}>
+                  <p className="font-medium text-foreground">{ed.school ?? "School"}</p>
+                  <p className="text-muted-foreground">
+                    {[ed.degree, ed.field_of_study].filter(Boolean).join(", ")}
+                    {(ed.start_year || ed.end_year) &&
+                      ` · ${[ed.start_year, ed.end_year].filter(Boolean).join(" – ")}`}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
+
+        {(data.certifications.length > 0 || data.languages.length > 0) && (
+          <Section title="Certifications & Languages">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <ul className="flex flex-col gap-2">
+                {data.certifications.map((c) => (
+                  <li key={c.id}>
+                    <p className="font-medium text-foreground">
+                      {c.credential_url ? (
+                        <a href={c.credential_url} target="_blank" rel="noreferrer" className="underline">
+                          {c.title}
+                        </a>
+                      ) : (
+                        c.title
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {[c.issuer, c.issued_on && `Issued ${c.issued_on}`, c.expires_on && `Expires ${c.expires_on}`]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              <ul className="flex flex-col gap-1">
+                {data.languages.map((l) => (
+                  <li key={l.id}>
+                    {l.name}
+                    {l.proficiency && (
+                      <span className="text-muted-foreground"> · {l.proficiency.replace(/_/g, " ")}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </Section>
+        )}
+
         <Card>
           <CardHeader>
-            <CardTitle className="font-display text-xl">Recruiter Notes</CardTitle>
+            <CardTitle className="font-display text-xl">Recruiter notes</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            {candidate.can_edit && (
+            {data.can_edit && (
               <div className="flex flex-col gap-2">
                 <Textarea
                   value={noteDraft}
                   onChange={(e) => setNoteDraft(e.target.value)}
-                  placeholder="Add a note about this candidate..."
+                  placeholder="Add a note about this candidate for this job..."
                   data-testid="note-input"
                 />
                 <Button
@@ -429,13 +561,14 @@ function CandidateProfileContent() {
             )}
 
             <div className="flex flex-col gap-3" data-testid="notes-list">
-              {notes.length === 0 ? (
+              {data.notes.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No notes yet.</p>
               ) : (
-                notes.map((note) => (
+                data.notes.map((note) => (
                   <div key={note.id} className="rounded-md border p-3 text-sm" data-testid="note-item">
-                    <p>{note.note}</p>
+                    <p className="whitespace-pre-line">{note.note}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
+                      {note.author_name ? `${note.author_name} · ` : ""}
                       {new Date(note.created_at).toLocaleString()}
                     </p>
                   </div>

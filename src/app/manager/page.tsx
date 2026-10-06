@@ -12,14 +12,23 @@ import {
 import { UserPerformanceTable } from "@/components/admin/user-performance-table";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { DashboardNav } from "@/components/dashboard/nav";
-import { PipelineChart } from "@/components/dashboard/pipeline-chart";
+import {
+  PipelineChart,
+  STAGE_COLOR,
+} from "@/components/dashboard/pipeline-chart";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { SourcingFilesFilters } from "@/components/manager/sourcing-files-filters";
 import { TeamMemberCards } from "@/components/manager/team-member-cards";
 import { TeamPicker } from "@/components/manager/team-picker";
 import { TeamSourcingTable } from "@/components/manager/team-sourcing-table";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { parseSourcingFileFilters, parseUuid } from "@/lib/manager/filters";
 import { getTeamDashboardData } from "@/lib/manager/getTeamDashboardData";
 import { resolveManagerScope } from "@/lib/manager/scope";
@@ -34,22 +43,29 @@ function EmptyState({ title, message }: { title: string; message: string }) {
         <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400">
           <Users className="h-7 w-7" />
         </div>
-        <h1 className="font-display text-2xl font-semibold text-slate-900">{title}</h1>
+        <h1 className="font-display text-2xl font-semibold text-slate-900">
+          {title}
+        </h1>
         <p className="mt-2 max-w-md text-sm text-slate-500">{message}</p>
       </div>
     </main>
   );
 }
 
-export default async function ManagerDashboardPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function ManagerDashboardPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   const params = await searchParams;
   const requestedTeamId = parseUuid(
     typeof params.teamId === "string" ? params.teamId : null,
   );
-  const { supabase, profile, teamId, teamOptions } = await resolveManagerScope(requestedTeamId);
+  const { supabase, member, teamId, teamOptions } =
+    await resolveManagerScope(requestedTeamId);
 
   if (!teamId) {
-    return profile.role === "admin" ? (
+    return member.role === "admin" ? (
       <EmptyState
         title="No teams yet"
         message="Create a team from the Admin dashboard to see its team dashboard here."
@@ -57,7 +73,7 @@ export default async function ManagerDashboardPage({ searchParams }: { searchPar
     ) : (
       <EmptyState
         title="You're not assigned to a team yet"
-        message="Ask an admin to assign you to the team you manage. Your team's dashboard will appear here."
+        message="Ask an admin to make you the manager of your team. Your team's dashboard will appear here."
       />
     );
   }
@@ -74,37 +90,43 @@ export default async function ManagerDashboardPage({ searchParams }: { searchPar
     );
   }
 
-  const { team, totals, pipelineCounts, members, sourcingFiles, filtersActive, recentActivity, loadError } =
-    data;
+  const {
+    team,
+    totals,
+    pipelineCounts,
+    members,
+    sourcingFiles,
+    filtersActive,
+    recentActivity,
+    loadError,
+  } = data;
   const manager = members.find((member) => member.id === team.managerId);
   const isAdminView = teamOptions !== null;
 
   return (
     <main className="min-h-screen bg-slate-50/70 pb-16">
       <DashboardNav />
-      <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-8 text-white shadow-xl">
-          <div className="relative z-10 flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
-            <div className="max-w-2xl">
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-medium text-indigo-300 ring-1 ring-inset ring-indigo-500/30">
-                <Users className="h-3.5 w-3.5" aria-hidden="true" />
-                {isAdminView ? "Admin view · Team" : "Team view"}
-              </div>
-              <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                {team.name}
-              </h1>
-              <p className="mt-2 text-base leading-relaxed text-slate-300">
-                {manager ? `Managed by ${manager.name}` : "No manager assigned"} ·{" "}
-                {totals.activeMembers} active{" "}
-                {totals.activeMembers === 1 ? "member" : "members"}. Team members keep ownership of
-                their files — you have management-level visibility.
-              </p>
+      <div className="animate-page-enter mx-auto flex max-w-6xl flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8">
+        <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+          <div>
+            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-200">
+              <Users className="h-3.5 w-3.5" aria-hidden="true" />
+              {isAdminView ? "Admin view · Team" : "Team view"}
             </div>
-            {isAdminView && teamOptions.length > 1 && (
-              <TeamPicker teams={teamOptions} currentTeamId={team.id} />
-            )}
+            <h1 className="font-display text-2xl font-semibold tracking-tight text-slate-900">
+              {team.name}
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              {manager ? `Managed by ${manager.name}` : "No manager assigned"} ·{" "}
+              {totals.activeMembers} active{" "}
+              {totals.activeMembers === 1 ? "member" : "members"}. Team members
+              keep ownership of their files — you have management-level
+              visibility.
+            </p>
           </div>
-          <div className="pointer-events-none absolute -bottom-10 -right-10 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl" />
+          {isAdminView && teamOptions.length > 1 && (
+            <TeamPicker teams={teamOptions} currentTeamId={team.id} />
+          )}
         </div>
 
         {loadError && (
@@ -121,9 +143,8 @@ export default async function ManagerDashboardPage({ searchParams }: { searchPar
             label="Team Members"
             value={`${totals.activeMembers} / ${totals.members}`}
             icon={Users}
-            tone="indigo"
           />
-          <StatCard label="Team Jobs" value={totals.jobs} icon={Briefcase} tone="sky" />
+          <StatCard label="Team Jobs" value={totals.jobs} icon={Briefcase} />
           <StatCard
             label="Average Match Quality"
             value={
@@ -132,13 +153,11 @@ export default async function ManagerDashboardPage({ searchParams }: { searchPar
                 : "No evaluated files yet"
             }
             icon={Target}
-            tone="emerald"
           />
           <StatCard
             label="Shortlisted Talent"
             value={totals.shortlisted}
             icon={UserCheck}
-            tone="amber"
           />
         </div>
 
@@ -192,7 +211,9 @@ export default async function ManagerDashboardPage({ searchParams }: { searchPar
                 <div className="flex items-center justify-between py-2.5">
                   <dt className="text-slate-600">Failed</dt>
                   <dd>
-                    <Badge tone={totals.failedRuns > 0 ? "critical" : "neutral"}>
+                    <Badge
+                      tone={totals.failedRuns > 0 ? "critical" : "neutral"}
+                    >
                       {totals.failedRuns}
                     </Badge>
                   </dd>
@@ -202,15 +223,35 @@ export default async function ManagerDashboardPage({ searchParams }: { searchPar
                     <EyeOff className="h-3.5 w-3.5" aria-hidden="true" />
                     Unseen by you
                   </dt>
-                  <dd className="font-medium tabular-nums text-slate-900">{totals.unseen}</dd>
+                  <dd className="font-medium tabular-nums text-slate-900">
+                    {totals.unseen}
+                  </dd>
                 </div>
                 <div className="flex items-center justify-between py-2.5">
-                  <dt className="text-slate-600">Contacted candidates</dt>
-                  <dd className="font-medium tabular-nums text-slate-900">{totals.contacted}</dd>
+                  <dt className="flex items-center gap-2 text-slate-600">
+                    <span
+                      aria-hidden
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: STAGE_COLOR.Contacted }}
+                    />
+                    Contacted candidates
+                  </dt>
+                  <dd className="font-medium tabular-nums text-slate-900">
+                    {totals.contacted}
+                  </dd>
                 </div>
                 <div className="flex items-center justify-between py-2.5">
-                  <dt className="text-slate-600">Rejected candidates</dt>
-                  <dd className="font-medium tabular-nums text-slate-900">{totals.rejected}</dd>
+                  <dt className="flex items-center gap-2 text-slate-600">
+                    <span
+                      aria-hidden
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: STAGE_COLOR.Rejected }}
+                    />
+                    Rejected candidates
+                  </dt>
+                  <dd className="font-medium tabular-nums text-slate-900">
+                    {totals.rejected}
+                  </dd>
                 </div>
               </dl>
             </CardContent>
@@ -240,22 +281,29 @@ export default async function ManagerDashboardPage({ searchParams }: { searchPar
                 Team Sourcing Files
               </CardTitle>
               <CardDescription className="text-xs text-slate-500">
-                Every sourcing file owned by your team. Opening one is recorded as an access
-                by you, not a change of owner.
+                Every sourcing file owned by your team. Opening one is recorded
+                as an access by you, not a change of owner.
               </CardDescription>
             </div>
             <Badge tone="neutral">
-              {sourcingFiles.length} {sourcingFiles.length === 1 ? "file" : "files"}
+              {sourcingFiles.length}{" "}
+              {sourcingFiles.length === 1 ? "file" : "files"}
             </Badge>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 pt-4">
             <SourcingFilesFilters
               filters={filters}
-              members={members.map((member) => ({ id: member.id, name: member.name }))}
+              members={members.map((member) => ({
+                id: member.id,
+                name: member.name,
+              }))}
               teamId={isAdminView ? team.id : null}
               filtersActive={filtersActive}
             />
-            <TeamSourcingTable rows={sourcingFiles} filtersActive={filtersActive} />
+            <TeamSourcingTable
+              rows={sourcingFiles}
+              filtersActive={filtersActive}
+            />
           </CardContent>
         </Card>
 
@@ -271,7 +319,11 @@ export default async function ManagerDashboardPage({ searchParams }: { searchPar
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-4">
-              <UserPerformanceTable users={members} showTeam={false} linkToMember />
+              <UserPerformanceTable
+                users={members}
+                showTeam={false}
+                linkToMember
+              />
             </CardContent>
           </Card>
 

@@ -1,34 +1,55 @@
-export interface CandidateSearchParams {
-  query: string;
-  location?: string;
-  /** Google's `gl` two-letter country-restriction code (e.g. "eg"). Does
-   * most of the actual work of biasing organic results to a country as a
-   * whole — `location` alone is only a ranking hint. */
-  countryCode?: string;
-  /** Country-localized Google domain (e.g. "google.com.eg"). */
-  googleDomain?: string;
-  page?: number;
-  limit?: number;
+/** Search provider names; mirrors search_runs.provider. */
+export type SearchProviderName = "mock" | "serper" | "serpapi" | "exa";
+
+/** Where to aim a search: a city (when the job has one) or the whole country. */
+export interface SearchLocation {
+  countryCode: string;
+  city: string | null;
 }
 
-export interface CandidateSearchResult {
-  source: string;
-  source_url: string;
-  name?: string;
-  title?: string;
-  company?: string;
-  location?: string;
-  profile_url?: string;
-  profile_image_url?: string;
-  snippet?: string;
-  skills?: string[];
-  /** Only ever set from a structured source (e.g. an Apify LinkedIn profile
-   * scrape's total tenure) — never guessed from free text. */
-  experience_years?: number;
-  /** Set by the Egypt location verification step (see
-   * verifyEgyptLocation.ts): true = confirmed in Egypt, false = confirmed
-   * elsewhere (filtered out before this ever reaches normalization), null =
-   * couldn't be determined either way, undefined = the check never ran
-   * (job location wasn't Egypt-scoped). */
-  location_verified?: boolean | null;
+export interface SearchPageRequest {
+  query: string;
+  /** 1-based. */
+  page: number;
+  location: SearchLocation;
+}
+
+/**
+ * One organic result, as stored in search_hits. Never carries "skills":
+ * highlighted words are kept as matched_terms only.
+ */
+export interface SearchHit {
+  position: number;
+  link: string;
+  title: string | null;
+  snippet: string | null;
+  /** Serper `subtitle`, e.g. "Cairo, Egypt · Head of Sales · Nozha Beach". */
+  subtitle: string | null;
+  matchedTerms: string[];
+  richSnippet: Record<string, unknown> | null;
+}
+
+export interface SearchPageResult {
+  hits: SearchHit[];
+  /** Whether the provider says another page exists. */
+  hasNextPage: boolean;
+  /** Provider-reported total, when it gives one. */
+  totalResults: number | null;
+  credits: number | null;
+  costUsd: number | null;
+  providerRequestId: string | null;
+  httpStatus: number | null;
+  /** Request as sent, minus secrets. */
+  request: Record<string, unknown>;
+  /** Raw response body. */
+  raw: unknown;
+}
+
+/** What the title/subtitle parser can tell from a search result. */
+export interface ParsedSearchTitle {
+  name: string | null;
+  /** Free-text headline; never treated as a verified current title. */
+  headline: string | null;
+  company: string | null;
+  location: string | null;
 }

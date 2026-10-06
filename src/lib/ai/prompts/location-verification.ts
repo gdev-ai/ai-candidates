@@ -1,57 +1,71 @@
 import { z } from "zod";
 
-import type { AIProvider } from "@/lib/ai/AIProvider";
-import { parseJsonResponse } from "@/lib/ai/parseJsonResponse";
+import { runStructured, type CallContext } from "@/lib/ai/structured";
+import { countryName } from "@/lib/search/queryBuilder";
+
+export const LOCATION_PROMPT_VERSION = "location-check/2026-10-04";
 
 export const locationVerificationSchema = z.object({
-  in_egypt: z.boolean().nullable(),
+  in_country: z.boolean().nullable(),
   evidence: z.string(),
 });
-
-export type LocationVerificationResult = z.infer<typeof locationVerificationSchema>;
-
-const SYSTEM_INSTRUCTION = `You are verifying whether a sourced candidate is genuinely based in Egypt, using ONLY the text provided. Never infer a country from a name, ethnicity, language, or the recruiting company's location. Respond only from an explicit or clearly implied location in the given text. If the text gives no such signal, respond null — never guess. Respond with raw JSON only. Do not wrap the JSON in markdown code fences.`;
+export type LocationVerificationResult = z.infer<
+  typeof locationVerificationSchema
+>;
 
 export interface LocationVerificationInput {
+  name: string | null;
   headline: string | null;
-  summary: string | null;
+  locationLine: string | null;
+  snippet: string | null;
   currentCompany: string | null;
 }
 
-export function buildLocationVerificationPrompt(input: LocationVerificationInput): string {
-  return `Candidate headline: ${input.headline ?? "(unknown)"}
-Candidate summary: ${input.summary ?? "(unknown)"}
-Candidate current company: ${input.currentCompany ?? "(unknown)"}
+function instructions(country: string): string {
+  return `Decide whether a LinkedIn profile owner is currently based in ${country}, using only the text given.
+Never infer a country from a name, language or the recruiting company. Past jobs' cities in a snippet are weak evidence of where someone lives now.
+in_country: true when the current location is explicitly or unambiguously in ${country}; false when it is explicitly elsewhere; null when the text doesn't say. evidence: the words you relied on (empty when null).`;
+}
 
-Determine whether this candidate is currently based in Egypt, using only the text above. Respond as JSON matching exactly this shape:
-{ "in_egypt": true | false | null, "evidence": string }
-- true: an Egyptian city, governorate, or 'Egypt' is explicitly stated or unambiguous from the text.
-- false: a city or country outside Egypt is explicitly stated.
-- null: there is not enough information — do not guess.`;
+export function buildLocationInput(input: LocationVerificationInput): string {
+  return [
+    `Name: ${input.name ?? "(unknown)"}`,
+    `Headline: ${input.headline ?? "(unknown)"}`,
+    `Location line: ${input.locationLine ?? "(none)"}`,
+    `Current company: ${input.currentCompany ?? "(unknown)"}`,
+    `Search snippet: ${input.snippet ?? "(none)"}`,
+  ].join("\n");
 }
 
 /**
- * AI fallback tier for Egypt location verification, only meant to be called
- * when a candidate's location field is missing entirely (see
- * verifyEgyptLocation.ts's deterministic first tier, which handles the case
- * where a location string is present). Skips the AI call entirely when
- * there's no text at all to read — that's guaranteed to come back null, so
- * spending a request on it would be pure waste.
+ * The ambiguous-case tier of the location check (the deterministic tier in
+ * lib/candidates/location.ts runs first). Effort none + temperature 0.
+ * Skips the call when there is no text at all.
  */
-export async function verifyEgyptLocationWithAI(
+export async function verifyLocationWithAI(
   input: LocationVerificationInput,
-  provider: AIProvider,
-): Promise<LocationVerificationResult> {
-  if (!input.headline && !input.summary && !input.currentCompany) {
-    return { in_egypt: null, evidence: "" };
+  countryCode: string,
+  context: CallContext = {},
+): Promise<LocationVerificationResult & { callId: string | null }> {
+  if (
+    !input.headline &&
+    !input.snippet &&
+    !input.locationLine &&
+    !input.currentCompany
+  ) {
+    return { in_country: null, evidence: "", callId: null };
   }
-
-  const prompt = buildLocationVerificationPrompt(input);
-  const rawResponse = await provider.generateText(prompt, {
-    systemInstruction: SYSTEM_INSTRUCTION,
+  const result = await runStructured({
+    purpose: "location_check",
+    schema: locationVerificationSchema,
+    schemaName: "location_check",
+    instructions: instructions(countryName(countryCode)),
+    input: buildLocationInput(input),
+    effort: "none",
     temperature: 0,
-    jsonMode: true,
+    maxOutputTokens: 300,
+    promptVersion: LOCATION_PROMPT_VERSION,
+    context,
   });
-
-  return parseJsonResponse(rawResponse, locationVerificationSchema, "location-verification");
+  return { ...result.data, callId: result.callId };
 }

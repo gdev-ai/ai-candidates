@@ -1,11 +1,14 @@
 "use client";
 
+import { UserCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { LogoutButton } from "@/components/auth/logout-button";
+import { Brandmark } from "@/components/brand/brandmark";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
+import { CreditsMeter } from "@/components/usage/CreditsMeter";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -14,8 +17,13 @@ const LINKS = [
   { href: "/jobs", label: "Jobs" },
   { href: "/candidates", label: "Candidates" },
   { href: "/reports", label: "Reports" },
-  { href: "/settings", label: "Settings" },
 ];
+
+// Optional: the link is hidden when unset (local dev). Trailing slash tolerated.
+const HR_PORTAL_URL = process.env.NEXT_PUBLIC_HR_PORTAL_URL?.trim().replace(
+  /\/+$/,
+  "",
+);
 
 const TEAM_LINK = { href: "/manager", label: "Team" };
 const ADMIN_LINK = { href: "/admin", label: "Admin" };
@@ -38,7 +46,7 @@ async function fetchRole(): Promise<string | null> {
 
   let pending = roleCache.get(userId);
   if (!pending) {
-    pending = Promise.resolve(supabase.rpc("current_profile_role")).then(
+    pending = Promise.resolve(supabase.rpc("my_role")).then(
       ({ data, error }) => (!error && typeof data === "string" ? data : null),
       () => null,
     );
@@ -84,15 +92,20 @@ export function DashboardNav() {
         : LINKS;
 
   return (
-    <header className="sticky top-0 z-10 border-b border-border/80 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-6">
-        <div className="flex flex-wrap items-center gap-6">
-          <Link href="/dashboard" className="flex items-center">
-            <span className="font-display text-base font-semibold tracking-tight text-foreground">
-              AI Candidate
+    <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-8 gap-y-2 px-4 sm:px-6">
+        <div className="flex flex-wrap items-center gap-x-8">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-3 py-4 text-foreground"
+            aria-label="G Developments candidate sourcing, home"
+          >
+            <Brandmark className="h-4" />
+            <span className="border-l border-border pl-3 text-xs font-medium text-muted-foreground">
+              Sourcing
             </span>
           </Link>
-          <nav className="flex flex-wrap items-center gap-1">
+          <nav className="flex flex-wrap items-center gap-x-5">
             {links.map((link) => {
               const isActive =
                 link.href === "/dashboard"
@@ -102,11 +115,12 @@ export function DashboardNav() {
                 <Link
                   key={link.href}
                   href={link.href}
+                  aria-current={isActive ? "page" : undefined}
                   className={cn(
-                    "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+                    "relative py-4 text-[13px] transition-colors after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:origin-left after:bg-foreground after:transition-transform after:duration-200",
                     isActive
-                      ? "bg-accent text-accent-foreground"
-                      : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+                      ? "font-medium text-foreground after:scale-x-100"
+                      : "text-muted-foreground after:scale-x-0 hover:text-foreground hover:after:scale-x-100",
                   )}
                 >
                   {link.label}
@@ -116,7 +130,29 @@ export function DashboardNav() {
           </nav>
         </div>
         <div className="flex items-center gap-2">
+          {role && <CreditsMeter />}
           {(role === "hr_manager" || role === "admin") && <NotificationBell />}
+          <Link
+            href="/settings"
+            aria-label="Account"
+            title="Account"
+            className={cn(
+              "flex h-9 w-9 items-center justify-center transition-colors",
+              pathname?.startsWith("/settings")
+                ? "bg-foreground text-background"
+                : "text-muted-foreground hover:bg-accent hover:text-foreground",
+            )}
+          >
+            <UserCircle className="h-5 w-5" aria-hidden="true" />
+          </Link>
+          {HR_PORTAL_URL && (
+            <a
+              href={`${HR_PORTAL_URL}/admin`}
+              className="px-2 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Back to HR Portal
+            </a>
+          )}
           <LogoutButton />
         </div>
       </div>

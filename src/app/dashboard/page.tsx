@@ -1,6 +1,5 @@
-import { Briefcase, Plus, UserCheck, Target, Users, Activity, Clock } from "lucide-react";
+import { ArrowRight, Briefcase, Plus, UserCheck, Target, Users, Activity, Clock } from "lucide-react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import { DashboardNav } from "@/components/dashboard/nav";
 import { PipelineChart } from "@/components/dashboard/pipeline-chart";
@@ -18,17 +17,19 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getDashboardData } from "@/lib/dashboard/getDashboardData";
-import { createClient } from "@/lib/supabase/server";
+import { requirePageMember } from "@/lib/dashboard/session";
+
+const RECENT_FILES_LIMIT = 5;
+
+const GETTING_STARTED_STEPS = [
+  { title: "Upload Job Spec", description: "Paste text or upload PDF/DOCX to extract key skills." },
+  { title: "Review Criteria", description: "Review, customize and refine extracted requirements." },
+  { title: "Run Sourcing", description: "Automated queries search authorized providers." },
+  { title: "Score & Export", description: "Multi-factor match breakdown and Excel export." },
+];
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
+  const { supabase, user } = await requirePageMember();
 
   const {
     totalJobs,
@@ -37,7 +38,7 @@ export default async function DashboardPage() {
     averageMatchQuality,
     pipelineCounts,
     unifiedRows,
-    matchScores,
+    scoreBuckets,
     todaysCandidatesCount,
     todaysCandidates,
     loadError,
@@ -46,83 +47,68 @@ export default async function DashboardPage() {
   return (
     <main className="min-h-screen bg-slate-50/70 pb-16">
       <DashboardNav />
-      <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
+      <div className="animate-page-enter mx-auto flex max-w-6xl flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8">
         
-        {/* Welcome & Action Header */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-8 text-white shadow-xl">
-          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div className="max-w-2xl">
-              <div className="inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-medium text-indigo-300 ring-1 ring-inset ring-indigo-500/30 mb-3">
-                AI-Powered Recruitment Pipeline
-              </div>
-              <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-white">
-                Candidate Sourcing Hub
-              </h1>
-              <p className="mt-2 text-base text-slate-300 leading-relaxed">
-                Transform job descriptions into structured requirements, discover passive talent legally across authorized sources, and evaluate match quality instantly with AI.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <Button asChild size="lg" className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 font-medium">
+        {/* Page Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="font-display text-2xl font-semibold tracking-tight text-slate-900">
+              Dashboard
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Your sourcing activity and candidate pipeline at a glance.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild variant="outline">
+              <Link href="/candidates">
+                <Users className="mr-2 h-4 w-4" aria-hidden="true" />
+                Browse Candidates
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href="/jobs/new">
+                <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                New Job Opening
+              </Link>
+            </Button>
+          </div>
+        </div>
+
+        {/* First-run guide: only shown until the first job exists */}
+        {totalJobs === 0 && !loadError && (
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold text-slate-900">
+                Get started with your first sourcing file
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-500">
+                Four steps from a job description to a scored, exportable shortlist.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ol className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                {GETTING_STARTED_STEPS.map((step, index) => (
+                  <li key={step.title} className="flex items-start gap-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-sm font-semibold text-indigo-600">
+                      {index + 1}
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{step.title}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">{step.description}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              <Button asChild className="mt-5">
                 <Link href="/jobs/new">
-                  <Plus className="mr-2 h-5 w-5" aria-hidden="true" />
-                  New Job Opening
+                  <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                  Create your first job
                 </Link>
               </Button>
-              <Button asChild variant="outline" size="lg" className="bg-white/10 hover:bg-white/20 text-white border-white/20">
-                <Link href="/candidates">
-                  <Users className="mr-2 h-4 w-4" />
-                  Browse Candidates
-                </Link>
-              </Button>
-            </div>
-          </div>
-          {/* Subtle background glow */}
-          <div className="absolute -right-10 -bottom-10 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
-        </div>
-
-        {/* Quick Sourcing Workflow Guide */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 rounded-xl bg-white border border-slate-200/80 shadow-sm">
-          <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 font-semibold text-sm">
-              1
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-slate-900">Upload Job Spec</p>
-              <p className="text-xs text-slate-500 mt-0.5">Paste text or upload PDF/DOCX to extract key skills.</p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-50 text-sky-600 font-semibold text-sm">
-              2
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-slate-900">AI Criteria Extraction</p>
-              <p className="text-xs text-slate-500 mt-0.5">Review, customize and refine extracted requirements.</p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600 font-semibold text-sm">
-              3
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-slate-900">Autonomous Sourcing</p>
-              <p className="text-xs text-slate-500 mt-0.5">Automated queries search authorized providers.</p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 font-semibold text-sm">
-              4
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-slate-900">AI Scoring & Excel</p>
-              <p className="text-xs text-slate-500 mt-0.5">Multi-factor match breakdown and instant export.</p>
-            </div>
-          </div>
-        </div>
+            </CardContent>
+          </Card>
+        )}
 
         {loadError && (
           <div className="rounded-xl bg-red-50 p-4 border border-red-200 shadow-sm flex items-center gap-3">
@@ -135,70 +121,56 @@ export default async function DashboardPage() {
 
         {/* Core Metrics */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="Active Jobs" value={totalJobs} icon={Briefcase} tone="indigo" />
-          <StatCard label="Total Candidates" value={totalCandidates} icon={Users} tone="sky" />
-                    <StatCard
+          <StatCard label="Active Jobs" value={totalJobs} icon={Briefcase} href="/jobs" />
+          <StatCard
+            label="Total Candidates"
+            value={totalCandidates}
+            icon={Users}
+           
+            href="/candidates"
+          />
+          <StatCard
             label="Average Match Quality"
-            value={averageMatchQuality !== null ? `${averageMatchQuality}%` : "No evaluated files yet"}
+            value={averageMatchQuality !== null ? `${averageMatchQuality}%` : "—"}
+            hint={averageMatchQuality === null ? "No evaluated candidates yet" : undefined}
             icon={Target}
-            tone="emerald"
+           
           />
           <StatCard
             label="Shortlisted Talent"
             value={shortlistedCandidates}
             icon={UserCheck}
-            tone="amber"
+           
+            href="/candidates"
           />
 
         </div>
 
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <Card className="col-span-1 lg:col-span-2 shadow-sm border-slate-200">
-            <CardHeader className="pb-3 border-b border-slate-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
-                    <Activity className="h-4 w-4 text-indigo-600" />
-                    Candidate Pipeline Stages
-                  </CardTitle>
-                  <CardDescription className="text-xs text-slate-500">
-                    Real-time status breakdown across your sourcing jobs
-                  </CardDescription>
-                </div>
-                <Badge tone="neutral">
-                  {totalCandidates} total
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <PipelineChart counts={pipelineCounts} />
-            </CardContent>
-          </Card>
-
-          <Card className="col-span-1 shadow-sm border-slate-200">
-            <CardHeader className="pb-3 border-b border-slate-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base font-semibold text-slate-900">
-                    Match Score Distribution
-                  </CardTitle>
-                  <CardDescription className="text-xs text-slate-500">
-                    AI evaluation scores (0–100%)
-                  </CardDescription>
-                </div>
-                {averageMatchQuality !== null && (
-                  <Badge tone="good">
-                    {averageMatchQuality}% avg
-                  </Badge>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <ScoreDistributionChart scores={matchScores} />
-            </CardContent>
-          </Card>
-        </div>
+        {/* Sourcing Files */}
+        <Card className="shadow-sm border-slate-200">
+          <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                <Briefcase className="h-4 w-4 text-indigo-600" />
+                Sourcing Files
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-500">
+                Your most recent job requisitions and their sourcing runs
+              </CardDescription>
+            </div>
+            {unifiedRows.length > RECENT_FILES_LIMIT && (
+              <Button asChild size="sm" variant="outline">
+                <Link href="/jobs">
+                  View all
+                  <ArrowRight className="ml-1.5 h-4 w-4" aria-hidden="true" />
+                </Link>
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent className="pt-4">
+            <SourcingTable rows={unifiedRows.slice(0, RECENT_FILES_LIMIT)} />
+          </CardContent>
+        </Card>
 
         {/* Today's Searched Candidates */}
         <Card className="shadow-sm border-slate-200">
@@ -221,29 +193,45 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Sourcing Files */}
-        <Card className="shadow-sm border-slate-200">
-          <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-slate-100">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
-                <Briefcase className="h-4 w-4 text-indigo-600" />
-                Sourcing Files
-              </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
-                Your job requisitions and their sourcing runs, in one place
-              </CardDescription>
-            </div>
-            <Button asChild size="sm">
-              <Link href="/jobs/new">
-                <Plus className="mr-1.5 h-4 w-4" />
-                New Job
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <SourcingTable rows={unifiedRows} />
-          </CardContent>
-        </Card>
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <Card className="col-span-1 lg:col-span-2 shadow-sm border-slate-200">
+            <CardHeader className="pb-3 border-b border-slate-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                    <Activity className="h-4 w-4 text-indigo-600" />
+                    Candidate Pipeline Stages
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-500">
+                    Real-time status breakdown across your sourcing jobs
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <PipelineChart counts={pipelineCounts} />
+            </CardContent>
+          </Card>
+
+          <Card className="col-span-1 shadow-sm border-slate-200">
+            <CardHeader className="pb-3 border-b border-slate-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base font-semibold text-slate-900">
+                    Match Score Distribution
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-500">
+                    AI evaluation scores (0–100%)
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <ScoreDistributionChart buckets={scoreBuckets} />
+            </CardContent>
+          </Card>
+        </div>
 
       </div>
     </main>

@@ -1,43 +1,31 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getAIProvider } from "@/lib/ai";
 import { requireUser } from "@/lib/api/requireUser";
 import { forbidUnlessOwner } from "@/lib/auth/ownership";
-import { matchAndPersistCandidate } from "@/lib/candidates/matchAndPersist";
-import {
-  candidateRowToMatchingInput,
-  jobRowToMatchingInput,
-} from "@/lib/candidates/mapToMatchingInput";
+import { matchCandidates } from "@/lib/candidates/match";
 import { withErrorHandling } from "@/lib/errors";
 import { enforceRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { createServiceClient } from "@/lib/supabase/service";
 
 const requestSchema = z.object({
-  candidateId: z.string().trim().min(1),
-  jobId: z.string().trim().min(1),
+  jobId: z.string().uuid("jobId must be a job id."),
+  personId: z.string().uuid("personId must be a person id."),
 });
 
+/** Rescores one candidate for a job (owner only). Returns the new match_results row. */
 export const POST = withErrorHandling(async (request: Request) => {
   const auth = await requireUser();
   if ("error" in auth) return auth.error;
-  const { supabase } = auth;
+  const { supabase, user } = auth;
 
   await enforceRateLimit(
-    `ai:${auth.user.id}`,
+    `ai:${user.id}`,
     RATE_LIMITS.aiRequest.limit,
     RATE_LIMITS.aiRequest.windowSeconds,
   );
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json(
-      { error: "Request body must be valid JSON." },
-      { status: 400 },
-    );
-  }
-
+  const body: unknown = await request.json().catch(() => null);
   const parsed = requestSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -45,50 +33,49 @@ export const POST = withErrorHandling(async (request: Request) => {
       { status: 400 },
     );
   }
-  const { candidateId, jobId } = parsed.data;
+  const { jobId, personId } = parsed.data;
 
-  const [jobResult, candidateResult, jobCandidateResult] = await Promise.all([
-    supabase.from("jobs").select("*").eq("id", jobId).maybeSingle(),
-    supabase.from("candidates").select("*").eq("id", candidateId).maybeSingle(),
-    supabase
-      .from("job_candidates")
-      .select("search_run_id")
-      .eq("job_id", jobId)
-      .eq("candidate_id", candidateId)
-      .maybeSingle(),
-  ]);
-
-  if (jobResult.error || candidateResult.error) {
+  const [{ data: job, error: jobError }, { data: link, error: linkError }] =
+    await Promise.all([
+      supabase
+        .from("jobs")
+        .select("id, owner_id")
+        .eq("id", jobId)
+        .maybeSingle(),
+      supabase
+        .from("job_candidates")
+        .select("person_id")
+        .eq("job_id", jobId)
+        .eq("person_id", personId)
+        .maybeSingle(),
+    ]);
+  if (jobError || linkError) {
     return NextResponse.json(
       { error: "Failed to load job or candidate." },
       { status: 500 },
     );
   }
-  if (!jobResult.data) {
+  if (!job)
     return NextResponse.json({ error: "Job not found." }, { status: 404 });
-  }
-  if (!candidateResult.data) {
-    return NextResponse.json({ error: "Candidate not found." }, { status: 404 });
-  }
-  const forbidden = forbidUnlessOwner(jobResult.data.user_id, auth.user.id, "job");
+  const forbidden = forbidUnlessOwner(job.owner_id, user.id, "job");
   if (forbidden) return forbidden;
+  if (!link)
+    return NextResponse.json(
+      { error: "This candidate is not on this job." },
+      { status: 404 },
+    );
 
-  const jobInput = jobRowToMatchingInput(jobResult.data);
-  const candidateInput = candidateRowToMatchingInput(candidateResult.data);
-
-  const result = await matchAndPersistCandidate(
-    supabase,
-    getAIProvider(),
+  const summary = await matchCandidates(createServiceClient(), {
     jobId,
-    jobInput,
-    candidateId,
-    candidateInput,
-    jobCandidateResult.data?.search_run_id ?? null,
-  );
-
-  if (!result.success) {
-    return NextResponse.json({ error: result.error }, { status: 502 });
+    personIds: [personId],
+    userId: user.id,
+  });
+  const match = summary.matches[0];
+  if (!match) {
+    return NextResponse.json(
+      { error: "Failed to score this candidate. Please try again." },
+      { status: 502 },
+    );
   }
-
-  return NextResponse.json(result.match);
+  return NextResponse.json({ match });
 });

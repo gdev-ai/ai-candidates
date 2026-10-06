@@ -1,28 +1,34 @@
 import { NextResponse } from "next/server";
 
 import { logActivity } from "@/lib/activity/log";
-import { hasAppAccess } from "@/lib/auth/access";
+import { ensureMember } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 
+/** Target of email confirmation links (see signUpWithPassword) and the Microsoft sign-in redirect. */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
+  const method =
+    searchParams.get("method") === "microsoft" ? "microsoft" : "email_link";
 
   if (!code) {
-    return NextResponse.redirect(`${origin}/login?error=oauth_failed`);
+    return NextResponse.redirect(`${origin}/login?error=link_failed`);
   }
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error || !data.user) {
-    return NextResponse.redirect(`${origin}/login?error=oauth_failed`);
+    return NextResponse.redirect(`${origin}/login?error=link_failed`);
   }
 
-  if (!(await hasAppAccess(supabase, data.user.id))) {
+  const member = await ensureMember(supabase);
+  if (member?.status !== "active") {
     await supabase.auth.signOut();
-    return NextResponse.redirect(`${origin}/login?error=not_allowed`);
+    const reason =
+      member?.status === "pending" ? "pending_approval" : "not_allowed";
+    return NextResponse.redirect(`${origin}/login?error=${reason}`);
   }
 
   await logActivity(supabase, {
@@ -30,9 +36,17 @@ export async function GET(request: Request) {
     action: "auth.login",
     entityType: "auth",
     entityId: data.user.id,
-    description: "Signed in with Google",
-    metadata: { method: "google" },
+    description:
+      method === "microsoft"
+        ? "Signed in with Microsoft"
+        : "Signed in from an email link",
+    metadata: { method },
   });
 
-  return NextResponse.redirect(`${origin}${redirectTo}`);
+  // Same-origin paths only ("//host" would leave the site).
+  const safePath =
+    redirectTo.startsWith("/") && !redirectTo.startsWith("//")
+      ? redirectTo
+      : "/dashboard";
+  return NextResponse.redirect(`${origin}${safePath}`);
 }

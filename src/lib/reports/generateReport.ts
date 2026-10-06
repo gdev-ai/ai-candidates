@@ -1,11 +1,9 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 import {
   describeDateRange,
   resolveDateWindow,
   type DateRangeSelection,
 } from "@/lib/dates/dateRange";
-import { fetchSourcingFilesForOwners } from "@/lib/manager/getTeamDashboardData";
+import { toSourcingFileRow } from "@/lib/manager/getTeamDashboardData";
 import { loadUserStats } from "@/lib/performance/userStats";
 import {
   buildActivityReport,
@@ -16,9 +14,14 @@ import {
 } from "@/lib/reports/builders";
 import type { ReportScope } from "@/lib/reports/scope";
 import type { Report, ReportType } from "@/lib/reports/types";
+import type { SourcingClient } from "@/lib/supabase/types";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnySupabaseClient = SupabaseClient<any, any, any>;
+function windowArgs(window: { from: string | null; to: string | null }) {
+  return {
+    ...(window.from ? { p_from: window.from } : {}),
+    ...(window.to ? { p_to: window.to } : {}),
+  };
+}
 
 export class ReportLoadError extends Error {}
 
@@ -29,7 +32,7 @@ export class ReportLoadError extends Error {}
  * scope's member list.
  */
 export async function generateReport(
-  supabase: AnySupabaseClient,
+  supabase: SourcingClient,
   type: ReportType,
   scope: ReportScope,
   selection: DateRangeSelection,
@@ -41,7 +44,8 @@ export async function generateReport(
     generatedAt: new Date().toISOString(),
   };
 
-  const userStats = await loadUserStats(supabase, window);
+  const memberIds = scope.members.map((member) => member.user_id);
+  const userStats = await loadUserStats(supabase, { window, userIds: memberIds });
   if (userStats.error) throw new ReportLoadError("Failed to load report statistics.");
 
   switch (type) {
@@ -53,26 +57,29 @@ export async function generateReport(
 
     case "activity": {
       const { data, error } = await supabase.rpc("activity_summary", {
-        p_from: window.from,
-        p_to: window.to,
+        ...windowArgs(window),
+        p_user_ids: memberIds,
       });
       if (error) throw new ReportLoadError("Failed to load activity.");
       return buildActivityReport(
         scope.members,
         userStats.stats,
-        (data ?? []) as ActivitySummaryRow[],
+        (data ?? []).map(
+          (row): ActivitySummaryRow => ({ ...row, event_count: Number(row.event_count) }),
+        ),
         meta,
       );
     }
 
     case "quality": {
-      const files = await fetchSourcingFilesForOwners(
-        supabase,
-        scope.members.map((member) => member.id),
-        window,
-      );
-      if (files.error) throw new ReportLoadError("Failed to load sourcing files.");
-      return buildQualityReport(scope.members, userStats.stats, files.rows, meta);
+      if (memberIds.length === 0) return buildQualityReport(scope.members, userStats.stats, [], meta);
+      const { data, error } = await supabase.rpc("sourcing_files", {
+        ...windowArgs(window),
+        p_owner_ids: memberIds,
+        p_limit: 500,
+      });
+      if (error) throw new ReportLoadError("Failed to load sourcing files.");
+      return buildQualityReport(scope.members, userStats.stats, (data ?? []).map(toSourcingFileRow), meta);
     }
   }
 }

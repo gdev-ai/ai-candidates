@@ -22,6 +22,7 @@ const STATUS_LABELS: Record<(typeof RUN_STATUSES)[number], string> = {
   running: "Running",
   complete: "Complete",
   error: "Failed",
+  cancelled: "Cancelled",
 };
 
 function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {

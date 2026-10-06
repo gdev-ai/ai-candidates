@@ -1,28 +1,18 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 import {
   ACTIVITY_FEED_COLUMNS,
   toActivityFeedItems,
   type ActivityFeedItem,
-  type ActivityLogRow,
 } from "@/lib/activity/feed";
 import { fetchSourcingFiles, type TeamSourcingFileRow } from "@/lib/manager/getTeamDashboardData";
 import {
   loadUserStats,
+  MEMBER_ROW_COLUMNS,
   pipelineCountsOf,
+  toMemberRow,
   toUserPerformanceRow,
-  type ProfileRow,
   type UserPerformanceRow,
 } from "@/lib/performance/userStats";
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnySupabaseClient = SupabaseClient<any, any, any>;
-
-interface AccessRow {
-  search_run_id: string;
-  accessed_at: string;
-  search_runs: { job_id: string; jobs: { title: string } | null } | null;
-}
+import type { SourcingClient } from "@/lib/supabase/types";
 
 export interface RecentlyOpenedFile {
   runId: string;
@@ -42,33 +32,31 @@ export interface TeamMemberData {
 
 /**
  * Returns null when the member isn't visible to the caller — RLS on
- * `profiles` only exposes a manager's own team (and everyone to an admin),
- * so an out-of-team id is indistinguishable from a nonexistent one.
+ * `members` (visible_owner_ids) only exposes the team a manager leads (and
+ * everyone to an admin), so an out-of-team id looks the same as a missing one.
  */
 export async function getTeamMemberData(
-  supabase: AnySupabaseClient,
+  supabase: SourcingClient,
   memberId: string,
 ): Promise<TeamMemberData | null> {
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("id, email, role, team_id, is_active, created_at, teams(name)")
-    .eq("id", memberId)
+  const { data: row, error: memberError } = await supabase
+    .from("members")
+    .select(`${MEMBER_ROW_COLUMNS}, teams!members_team_id_fkey(name)`)
+    .eq("user_id", memberId)
     .maybeSingle();
 
-  if (profileError || !profile) return null;
-  const memberProfile = profile as unknown as ProfileRow & { teams: { name: string } | null };
+  if (memberError || !row) return null;
+  const member = toMemberRow(row);
 
   const [userStats, filesRes, accessRes, activityRes] = await Promise.all([
-    loadUserStats(supabase),
-    memberProfile.team_id
-      ? fetchSourcingFiles(supabase, memberProfile.team_id, { memberId }, 50)
-      : Promise.resolve({ rows: [], error: false }),
+    loadUserStats(supabase, { userIds: [memberId] }),
+    fetchSourcingFiles(supabase, [memberId], {}, 50),
     supabase
       .from("search_run_access")
-      .select("search_run_id, accessed_at, search_runs(job_id, jobs(title))")
+      .select("search_run_id, last_accessed_at, search_runs(job_id, jobs(title))")
       .eq("user_id", memberId)
-      .order("accessed_at", { ascending: false })
-      .limit(30),
+      .order("last_accessed_at", { ascending: false })
+      .limit(8),
     supabase
       .from("activity_log")
       .select(ACTIVITY_FEED_COLUMNS)
@@ -84,35 +72,31 @@ export async function getTeamMemberData(
 
   const stats = userStats.stats.get(memberId);
 
-  // Every open is logged, so collapse to the latest open per file.
-  const seenRuns = new Set<string>();
-  const recentlyOpened: RecentlyOpenedFile[] = [];
-  for (const row of (accessRes.data ?? []) as unknown as AccessRow[]) {
-    if (seenRuns.has(row.search_run_id) || !row.search_runs) continue;
-    seenRuns.add(row.search_run_id);
-    recentlyOpened.push({
-      runId: row.search_run_id,
-      jobId: row.search_runs.job_id,
-      jobTitle: row.search_runs.jobs?.title ?? "Untitled Role",
-      accessedAt: row.accessed_at,
-    });
-    if (recentlyOpened.length === 8) break;
-  }
+  // One row per (run, user); runs the caller can't see come back without a join.
+  const recentlyOpened: RecentlyOpenedFile[] = (accessRes.data ?? []).flatMap((access) =>
+    access.search_runs
+      ? [
+          {
+            runId: access.search_run_id,
+            jobId: access.search_runs.job_id,
+            jobTitle: access.search_runs.jobs?.title ?? "Untitled Role",
+            accessedAt: access.last_accessed_at,
+          },
+        ]
+      : [],
+  );
 
   return {
     member: toUserPerformanceRow(
-      memberProfile,
+      member,
       stats,
       userStats.signIns.get(memberId) ?? null,
-      memberProfile.teams?.name ?? null,
+      row.teams?.name ?? null,
     ),
     pipelineCounts: pipelineCountsOf(stats ? [stats] : []),
     files: filesRes.rows,
     recentlyOpened,
-    recentActivity: toActivityFeedItems(
-      (activityRes.data ?? []) as ActivityLogRow[],
-      new Map([[memberProfile.id, memberProfile.email]]),
-    ),
+    recentActivity: toActivityFeedItems(activityRes.data ?? [], new Map([[member.user_id, member]])),
     loadError,
   };
 }

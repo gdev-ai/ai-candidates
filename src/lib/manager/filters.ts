@@ -5,7 +5,7 @@ import {
   type SearchParams,
 } from "@/lib/dates/dateRange";
 
-export const RUN_STATUSES = ["pending", "running", "complete", "error"] as const;
+export const RUN_STATUSES = ["pending", "running", "complete", "error", "cancelled"] as const;
 
 export interface SourcingFileFilters extends DateRangeSelection {
   memberId: string | null;

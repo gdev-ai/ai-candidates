@@ -1,59 +1,70 @@
+import { zodTextFormat } from "openai/helpers/zod";
 import { describe, expect, it } from "vitest";
 
-import { jobAnalysisSchema } from "./job-analysis";
+import {
+  analysisToRequirements,
+  jobAnalysisSchema,
+  normalizeSeniority,
+  type JobAnalysis,
+} from "@/types/job-analysis";
+import { matchOutputSchema } from "@/types/matching";
+
+const analysis: JobAnalysis = {
+  job_title: "Senior QA Engineer",
+  seniority: "senior",
+  employment_type: "Full-time",
+  required_skills: ["Selenium", " selenium ", "Cypress"],
+  preferred_skills: ["ISTQB"],
+  years_of_experience: { minimum: 5, maximum: null },
+  education: [],
+  certifications: [],
+  languages: ["English"],
+  industries: [],
+  keywords: [],
+  responsibilities: ["Own test strategy"],
+  search_keywords: ["QA Engineer", "Test Engineer"],
+  search_queries: [],
+};
 
 describe("jobAnalysisSchema", () => {
-  it("accepts a fully populated valid object", () => {
-    const result = jobAnalysisSchema.safeParse({
-      job_title: "Senior React Developer",
-      seniority: "Senior",
-      location: "Cairo, Egypt",
-      employment_type: "Full-time",
-      required_skills: ["React", "TypeScript"],
-      preferred_skills: ["Next.js"],
-      years_of_experience: { minimum: 5, maximum: null },
-      education: ["Bachelor's in Computer Science"],
-      certifications: [],
-      languages: ["English"],
-      industries: ["Software"],
-      keywords: ["frontend"],
-      responsibilities: ["Build UI components"],
-      search_keywords: ["react developer"],
-      search_queries: ["React Developer Cairo"],
-    });
-    expect(result.success).toBe(true);
+  it("has no city/location and restricts seniority to the jobs enum", () => {
+    expect(Object.keys(jobAnalysisSchema.shape)).not.toContain("city");
+    expect(Object.keys(jobAnalysisSchema.shape)).not.toContain("location");
+    expect(jobAnalysisSchema.safeParse({ ...analysis, seniority: "Senior" }).success).toBe(false);
+    expect(jobAnalysisSchema.safeParse(analysis).success).toBe(true);
   });
 
-  it("fills in defaults for a minimal object with only job_title", () => {
-    const result = jobAnalysisSchema.safeParse({ job_title: "Backend Engineer" });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.required_skills).toEqual([]);
-      expect(result.data.years_of_experience).toEqual({
-        minimum: null,
-        maximum: null,
-      });
+  it("converts to a strict JSON schema (every field required)", () => {
+    for (const schema of [jobAnalysisSchema, matchOutputSchema]) {
+      const format = zodTextFormat(schema, "x") as unknown as {
+        strict: boolean;
+        schema: { required: string[]; properties: Record<string, unknown> };
+      };
+      expect(format.strict).toBe(true);
+      expect(format.schema.required.sort()).toEqual(Object.keys(format.schema.properties).sort());
     }
   });
+});
 
-  it("rejects an object missing job_title", () => {
-    const result = jobAnalysisSchema.safeParse({ seniority: "Senior" });
-    expect(result.success).toBe(false);
+describe("analysisToRequirements", () => {
+  it("flattens to job_requirements rows, deduped per kind", () => {
+    expect(analysisToRequirements(analysis)).toEqual([
+      { kind: "skill_required", text: "Selenium" },
+      { kind: "skill_required", text: "Cypress" },
+      { kind: "skill_preferred", text: "ISTQB" },
+      { kind: "language", text: "English" },
+      { kind: "responsibility", text: "Own test strategy" },
+    ]);
   });
+});
 
-  it("rejects an object where required_skills is a string instead of an array", () => {
-    const result = jobAnalysisSchema.safeParse({
-      job_title: "Developer",
-      required_skills: "React, TypeScript",
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects an object where years_of_experience.minimum is a string", () => {
-    const result = jobAnalysisSchema.safeParse({
-      job_title: "Developer",
-      years_of_experience: { minimum: "5", maximum: null },
-    });
-    expect(result.success).toBe(false);
+describe("normalizeSeniority", () => {
+  it("maps free text onto the enum", () => {
+    expect(normalizeSeniority("Sr. Engineer")).toBe("senior");
+    expect(normalizeSeniority("Mid-level")).toBe("mid");
+    expect(normalizeSeniority("Head of Sales")).toBe("director");
+    expect(normalizeSeniority("Team Lead")).toBe("lead");
+    expect(normalizeSeniority("Sales Manager")).toBe("manager");
+    expect(normalizeSeniority("")).toBeNull();
   });
 });

@@ -18,28 +18,28 @@ import { UserManagement } from "@/components/admin/user-management";
 import { UserPerformanceTable } from "@/components/admin/user-performance-table";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { DashboardNav } from "@/components/dashboard/nav";
-import { PipelineChart } from "@/components/dashboard/pipeline-chart";
+import {
+  PipelineChart,
+  STAGE_COLOR,
+} from "@/components/dashboard/pipeline-chart";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { getAdminDashboardData } from "@/lib/admin/getAdminDashboardData";
-import { getProfile } from "@/lib/auth/access";
-import { createClient } from "@/lib/supabase/server";
+import { requirePageMember } from "@/lib/dashboard/session";
 
 export default async function AdminDashboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
+  const { supabase, user, member } = await requirePageMember();
 
   // Every query below is also restricted by RLS; this check just keeps
   // non-admins from landing on an empty page.
-  const profile = await getProfile(supabase, user.id);
-  if (!profile || !profile.is_active || profile.role !== "admin") {
+  if (member.role !== "admin") {
     redirect("/dashboard");
   }
 
@@ -59,24 +59,21 @@ export default async function AdminDashboardPage() {
   return (
     <main className="min-h-screen bg-slate-50/70 pb-16">
       <DashboardNav />
-      <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-8 text-white shadow-xl">
-          <div className="relative z-10 max-w-2xl">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-medium text-indigo-300 ring-1 ring-inset ring-indigo-500/30">
-              <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-              System-wide view
-            </div>
-            <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
-              Admin Dashboard
-            </h1>
-            <p className="mt-2 text-base leading-relaxed text-slate-300">
-              Organization-wide sourcing performance across {totals.teams}{" "}
-              {totals.teams === 1 ? "team" : "teams"} and {totals.activeUsers} active{" "}
-              {totals.activeUsers === 1 ? "user" : "users"}. Manage roles, teams, and managers
-              below.
-            </p>
+      <div className="animate-page-enter mx-auto flex max-w-6xl flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8">
+        <div>
+          <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-200">
+            <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+            System-wide view
           </div>
-          <div className="pointer-events-none absolute -bottom-10 -right-10 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl" />
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-slate-900">
+            Admin Dashboard
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Organization-wide sourcing performance across {totals.teams}{" "}
+            {totals.teams === 1 ? "team" : "teams"} and {totals.activeUsers}{" "}
+            active {totals.activeUsers === 1 ? "user" : "users"}. Manage roles,
+            teams, and managers below.
+          </p>
         </div>
 
         {loadError && (
@@ -93,24 +90,26 @@ export default async function AdminDashboardPage() {
             label="Active Users"
             value={`${totals.activeUsers} / ${totals.users}`}
             icon={Users}
-            tone="indigo"
           />
-          <StatCard label="Total Jobs" value={totals.jobs} icon={Briefcase} tone="sky" />
+          <StatCard label="Total Jobs" value={totals.jobs} icon={Briefcase} />
           <StatCard
             label="Average Match Quality"
             value={
               totals.averageMatchQuality !== null
                 ? `${totals.averageMatchQuality}%`
-                : "No evaluated files yet"
+                : "—"
+            }
+            hint={
+              totals.averageMatchQuality === null
+                ? "No evaluated candidates yet"
+                : undefined
             }
             icon={Target}
-            tone="emerald"
           />
           <StatCard
             label="Shortlisted Talent"
             value={totals.shortlisted}
             icon={UserCheck}
-            tone="amber"
           />
         </div>
 
@@ -164,18 +163,38 @@ export default async function AdminDashboardPage() {
                 <div className="flex items-center justify-between py-2.5">
                   <dt className="text-slate-600">Failed</dt>
                   <dd>
-                    <Badge tone={totals.failedRuns > 0 ? "critical" : "neutral"}>
+                    <Badge
+                      tone={totals.failedRuns > 0 ? "critical" : "neutral"}
+                    >
                       {totals.failedRuns}
                     </Badge>
                   </dd>
                 </div>
                 <div className="flex items-center justify-between py-2.5">
-                  <dt className="text-slate-600">Contacted candidates</dt>
-                  <dd className="font-medium tabular-nums text-slate-900">{totals.contacted}</dd>
+                  <dt className="flex items-center gap-2 text-slate-600">
+                    <span
+                      aria-hidden
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: STAGE_COLOR.Contacted }}
+                    />
+                    Contacted candidates
+                  </dt>
+                  <dd className="font-medium tabular-nums text-slate-900">
+                    {totals.contacted}
+                  </dd>
                 </div>
                 <div className="flex items-center justify-between py-2.5">
-                  <dt className="text-slate-600">Rejected candidates</dt>
-                  <dd className="font-medium tabular-nums text-slate-900">{totals.rejected}</dd>
+                  <dt className="flex items-center gap-2 text-slate-600">
+                    <span
+                      aria-hidden
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: STAGE_COLOR.Rejected }}
+                    />
+                    Rejected candidates
+                  </dt>
+                  <dd className="font-medium tabular-nums text-slate-900">
+                    {totals.rejected}
+                  </dd>
                 </div>
               </dl>
             </CardContent>
@@ -207,7 +226,8 @@ export default async function AdminDashboardPage() {
               User Performance
             </CardTitle>
             <CardDescription className="text-xs text-slate-500">
-              Jobs, sourcing runs (completed / total), and candidate outcomes per user
+              Jobs, sourcing runs (completed / total), and candidate outcomes
+              per user
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-4">
@@ -228,7 +248,8 @@ export default async function AdminDashboardPage() {
             </div>
             {accessRequests.length > 0 && (
               <Badge tone="warning">
-                {accessRequests.length} {accessRequests.length === 1 ? "request" : "requests"}
+                {accessRequests.length}{" "}
+                {accessRequests.length === 1 ? "request" : "requests"}
               </Badge>
             )}
           </CardHeader>
@@ -253,7 +274,11 @@ export default async function AdminDashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-4">
-              <UserManagement users={users} teamOptions={teamOptions} currentUserId={user.id} />
+              <UserManagement
+                users={users}
+                teamOptions={teamOptions}
+                currentUserId={user.id}
+              />
             </CardContent>
           </Card>
 

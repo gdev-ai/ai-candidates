@@ -12,7 +12,10 @@ export const GET = withErrorHandling(async () => {
 
   const result = await loadNotifications(auth.supabase);
   if (result.error) {
-    return NextResponse.json({ error: "Failed to load notifications." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to load notifications." },
+      { status: 500 },
+    );
   }
   return NextResponse.json({ unread: result.unread, items: result.items });
 });
@@ -39,7 +42,10 @@ export const PATCH = withErrorHandling(async (request: Request) => {
   }
   const parsed = markReadSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "ids must be a list of notification ids." }, { status: 400 });
+    return NextResponse.json(
+      { error: "ids must be a list of notification ids." },
+      { status: 400 },
+    );
   }
 
   let query = auth.supabase
@@ -50,7 +56,10 @@ export const PATCH = withErrorHandling(async (request: Request) => {
 
   const { error } = await query;
   if (error) {
-    return NextResponse.json({ error: "Failed to update notifications." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to update notifications." },
+      { status: 500 },
+    );
   }
   return NextResponse.json({ ok: true });
 });

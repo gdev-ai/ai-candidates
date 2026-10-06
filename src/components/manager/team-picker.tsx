@@ -18,7 +18,7 @@ export function TeamPicker({
   return (
     <form method="get" action="/manager" className="flex items-center gap-2">
       <Select name="teamId" defaultValue={currentTeamId}>
-        <SelectTrigger className="h-9 w-52 border-white/20 bg-white/10 text-white" aria-label="Team">
+        <SelectTrigger className="h-9 w-52" aria-label="Team">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -32,7 +32,6 @@ export function TeamPicker({
       <Button
         type="submit"
         variant="outline"
-        className="border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
       >
         View team
       </Button>

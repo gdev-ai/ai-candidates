@@ -1,102 +1,75 @@
 import type { SearchProvider } from "@/lib/search/SearchProvider";
-import type { CandidateSearchParams, CandidateSearchResult } from "@/types/search";
+import type { SearchHit, SearchPageRequest, SearchPageResult } from "@/types/search";
 
 /**
- * Deterministic fixture data for local development and demos. Deliberately
- * includes candidates with missing optional fields (no company, no
- * location, no skills, etc.) so downstream normalization/dedupe/UI code is
- * forced to handle nulls rather than assuming every field is present.
+ * Deterministic results for local development and tests, shaped like real
+ * Serper output (bidi marks, Arabic subtitle, a foreign profile, a company
+ * page that must be ignored, a truncated "at ..." headline).
  */
-const FIXTURE_CANDIDATES: CandidateSearchResult[] = [
+export const MOCK_HITS: SearchHit[] = [
   {
-    source: "mock",
-    source_url: "https://example.com/search?q=react-developer",
-    name: "Amina Hassan",
-    title: "Senior React Developer",
-    company: "Nile Software Solutions",
-    location: "Cairo, Egypt",
-    profile_url: "https://example.com/in/amina-hassan",
-    snippet: "5+ years building React and TypeScript applications.",
-    skills: ["React", "TypeScript", "Next.js"],
+    position: 1,
+    link: "https://www.linkedin.com/in/amina-hassan-mock",
+    title: "Amina Hassan - Senior React Developer - Nile Software",
+    subtitle: "Cairo, Egypt · Senior React Developer · Nile Software",
+    snippet: "5+ years building React and TypeScript applications for fintech in Cairo.",
+    matchedTerms: [],
+    richSnippet: null,
   },
   {
-    source: "mock",
-    source_url: "https://example.com/search?q=react-developer",
-    name: "Omar El-Sayed",
-    title: "Frontend Engineer",
-    location: "Giza, Egypt",
-    profile_url: "https://example.com/in/omar-elsayed",
-    skills: ["React", "JavaScript"],
-    // company deliberately omitted
+    position: 2,
+    link: "https://eg.linkedin.com/in/omar-elsayed-mock",
+    title: "Omar El-Sayed‏ - ‏Frontend Engineer at Delta Digital",
+    subtitle: null,
+    snippet: "Frontend Engineer · Experience: Delta Digital · Location: Giza · 500+ connections.",
+    matchedTerms: [],
+    richSnippet: null,
   },
   {
-    source: "mock",
-    source_url: "https://example.com/search?q=react-developer",
-    name: "Sara Youssef",
-    title: "React Developer",
-    company: "Delta Digital",
-    profile_url: "https://example.com/in/sara-youssef",
-    snippet: "Frontend specialist with a focus on performance.",
-    // location deliberately omitted
+    position: 3,
+    link: "https://ae.linkedin.com/in/sara-youssef-mock",
+    title: "Sara Youssef - React Developer",
+    subtitle: "United Arab Emirates · React Developer · Gulf Apps",
+    snippet: "React developer based in Dubai.",
+    matchedTerms: [],
+    richSnippet: null,
   },
   {
-    source: "mock",
-    source_url: "https://example.com/search?q=react-developer",
-    name: "Karim Mostafa",
-    company: "Alexandria Tech",
-    location: "Alexandria, Egypt",
-    profile_url: "https://example.com/in/karim-mostafa",
-    // title and skills deliberately omitted
+    position: 4,
+    link: "https://www.linkedin.com/company/nile-software",
+    title: "Nile Software | LinkedIn",
+    subtitle: null,
+    snippet: "Company page.",
+    matchedTerms: [],
+    richSnippet: null,
   },
   {
-    source: "mock",
-    source_url: "https://example.com/search?q=react-developer",
-    name: "Nour Adel",
-    title: "Full Stack Developer",
-    company: "Cairo Labs",
-    location: "Cairo, Egypt",
-    skills: ["React", "Node.js", "PostgreSQL"],
-    // profile_url and snippet deliberately omitted
-  },
-  {
-    source: "mock",
-    source_url: "https://example.com/search?q=react-developer",
-    name: "Yasmin Fathy",
-    snippet: "Frontend developer profile found via public search.",
-    // title, company, location, profile_url, skills all omitted
-  },
-  {
-    source: "mock",
-    source_url: "https://example.com/search?q=react-developer",
-    title: "React Developer",
-    company: "Anonymous Corp",
-    location: "Remote",
-    // name deliberately omitted (source didn't expose it)
-  },
-  {
-    source: "mock",
-    source_url: "https://example.com/search?q=react-developer",
-    name: "Hana Ibrahim",
-    title: "Senior Frontend Engineer",
-    company: "Red Sea Apps",
-    location: "Hurghada, Egypt",
-    profile_url: "https://example.com/in/hana-ibrahim",
-    snippet: "8 years of experience across React, Vue, and Angular.",
-    skills: ["React", "Vue", "Angular", "TypeScript"],
+    position: 5,
+    link: "https://eg.linkedin.com/in/karim-mostafa-mock/en",
+    title: "Karim Mostafa - Full Stack Developer at Cairo ...",
+    subtitle: "القاهرة مصر · Full Stack Developer · Cairo Labs",
+    snippet: "Full stack developer working with React, Node.js and PostgreSQL.",
+    matchedTerms: [],
+    richSnippet: null,
   },
 ];
 
 export class MockSearchProvider implements SearchProvider {
-  async searchCandidates(
-    params: CandidateSearchParams,
-  ): Promise<CandidateSearchResult[]> {
-    const page = params.page ?? 1;
-    const limit = params.limit ?? FIXTURE_CANDIDATES.length;
+  readonly name = "mock" as const;
+  readonly maxPages = 1;
 
-    if (page > 1) {
-      return [];
-    }
-
-    return FIXTURE_CANDIDATES.slice(0, limit);
+  async searchPage({ query, page }: SearchPageRequest): Promise<SearchPageResult> {
+    const hits = page === 1 ? MOCK_HITS : [];
+    return {
+      hits,
+      hasNextPage: false,
+      totalResults: hits.length,
+      credits: 0,
+      costUsd: 0,
+      providerRequestId: null,
+      httpStatus: 200,
+      request: { q: query, page },
+      raw: { organic: hits },
+    };
   }
 }

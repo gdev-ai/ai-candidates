@@ -1,6 +1,11 @@
 // Shared by the New Job form's "Job Details" section and the AI-extracted
 // "Requirements Editor" section, so both dropdowns offer the same choices.
-export const EMPLOYMENT_TYPES = ["Full-time", "Part-time", "Contract", "Internship"];
+export const EMPLOYMENT_TYPES = [
+  "Full-time",
+  "Part-time",
+  "Contract",
+  "Internship",
+];
 export const WORK_ARRANGEMENTS = ["Remote", "Hybrid", "On-site"];
 
 // Every job sources nationwide in Egypt — this is the only value the

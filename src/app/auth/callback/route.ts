@@ -9,8 +9,6 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
-  const method =
-    searchParams.get("method") === "microsoft" ? "microsoft" : "email_link";
 
   if (!code) {
     return NextResponse.redirect(`${origin}/login?error=link_failed`);
@@ -23,6 +21,8 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/login?error=link_failed`);
   }
 
+  const method =
+    data.user.app_metadata?.provider === "azure" ? "microsoft" : "email_link";
   const member = await ensureMember(supabase);
   if (member?.status !== "active") {
     await supabase.auth.signOut();

@@ -61,9 +61,7 @@ function LoginForm() {
     setError(null);
     setMessage(null);
     setIsSubmitting(true);
-    const { error: authError } = await signInWithMicrosoft(
-      searchParams.get("redirectTo"),
-    );
+    const { error: authError } = await signInWithMicrosoft();
     // On success the browser is already navigating to Microsoft.
     if (authError) {
       setIsSubmitting(false);

@@ -20,15 +20,17 @@ export async function signUpWithPassword(email: string, password: string) {
  * Microsoft (Entra ID) sign-in. Supabase sends the user back to
  * /auth/callback, which exchanges the code and checks membership.
  */
-export async function signInWithMicrosoft(redirectTo?: string | null) {
+export async function signInWithMicrosoft() {
   const supabase = createClient();
-  const callback = new URL("/auth/callback", window.location.origin);
-  callback.searchParams.set("method", "microsoft");
-  if (redirectTo) callback.searchParams.set("redirectTo", redirectTo);
   return supabase.auth.signInWithOAuth({
     provider: "azure",
-    // Azure only returns the email address when asked for it.
-    options: { scopes: "email", redirectTo: callback.toString() },
+    // Azure only returns the email address when asked for it. The redirect
+    // URL must have no query string: Supabase compares the whole URL with its
+    // allow-list and silently falls back to the Site URL on a mismatch.
+    options: {
+      scopes: "email",
+      redirectTo: `${window.location.origin}/auth/callback`,
+    },
   });
 }
 

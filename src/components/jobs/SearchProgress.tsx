@@ -210,7 +210,7 @@ function Sparkle({
 /** One illustration per step (and one for done). Decorative. */
 function StageIllustration({ step }: { step: number }) {
   const gradientId = useId();
-  const common = "h-36 w-36 sm:h-40 sm:w-40";
+  const common = "h-28 w-28 sm:h-32 sm:w-32";
 
   if (step === 0) {
     return (
@@ -589,32 +589,6 @@ function LiveCandidateCard({ candidate }: { candidate: LiveCandidate }) {
   );
 }
 
-function SkeletonCard({ index }: { index: number }) {
-  return (
-    <li
-      className="relative flex items-center gap-3 overflow-hidden rounded-xl border border-dashed border-slate-200 bg-slate-50/70 p-3"
-      aria-hidden="true"
-    >
-      <span className="h-9 w-9 shrink-0 rounded-full bg-slate-200/80" />
-      <span className="flex-1 space-y-2">
-        <span
-          className="block h-2.5 rounded-full bg-slate-200/80"
-          style={{ width: `${55 + ((index * 17) % 30)}%` }}
-        />
-        <span
-          className="block h-2 rounded-full bg-slate-200/60"
-          style={{ width: `${70 + ((index * 11) % 25)}%` }}
-        />
-      </span>
-      <span className="h-5 w-10 shrink-0 rounded-full bg-slate-200/80" />
-      <span
-        className="sp-shimmer absolute inset-0"
-        style={delay((index % 4) * 0.2)}
-      />
-    </li>
-  );
-}
-
 export interface SearchProgressProps {
   phase: SearchPhase;
   progress: RunProgress | null;
@@ -632,15 +606,11 @@ export interface SearchProgressProps {
   onViewCandidates: () => void;
 }
 
-/** Most result slots shown while running; larger runs show a "+N" note. */
-const MAX_SLOTS = 10;
-
 export function SearchProgress({
   phase,
   progress,
   estimateMinutes,
   startedAt,
-  candidateLimit,
   jobTitle,
   location,
   onHide,
@@ -698,10 +668,7 @@ export function SearchProgress({
   const tips = tipsFor(location);
   const tipIndex = useRotation(tips.length, 9000, null);
 
-  const target = progress?.max_candidates ?? candidateLimit;
-  const slots = Math.min(target, MAX_SLOTS);
   const top = progress?.top ?? [];
-  const shown = top.slice(0, slots);
   const found = progress?.candidates_found ?? 0;
   const scoredTotal = progress?.candidates_scored ?? top.length;
   const unscored = Math.max(0, found - scoredTotal);
@@ -711,14 +678,14 @@ export function SearchProgress({
       role="dialog"
       aria-modal="true"
       aria-labelledby="search-progress-title"
-      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm"
       data-testid="search-progress-screen"
     >
-      <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
-        <div className="sp-pop w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10">
+      <div className="flex h-full items-center justify-center p-4 sm:p-6">
+        <div className="sp-pop flex max-h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10">
           {/* Estimate disclaimer */}
           {!done && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-200 bg-slate-50 px-5 py-2.5 text-xs text-slate-600 sm:px-6">
+            <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-200 bg-slate-50 px-5 py-2.5 text-xs text-slate-600 sm:px-6">
               <Clock
                 className="h-3.5 w-3.5 shrink-0 text-slate-500"
                 aria-hidden="true"
@@ -734,7 +701,7 @@ export function SearchProgress({
           )}
 
           {/* Header */}
-          <div className="flex items-start justify-between gap-4 px-5 pt-5 sm:px-6">
+          <div className="flex shrink-0 items-start justify-between gap-4 px-5 pt-5 sm:px-6">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 {done ? "Search complete" : "Finding candidates"}
@@ -762,7 +729,7 @@ export function SearchProgress({
           </div>
 
           {/* Progress bar */}
-          <div className="px-5 pt-4 sm:px-6">
+          <div className="shrink-0 px-5 pt-4 sm:px-6">
             <div
               className="relative h-2 overflow-hidden rounded-full bg-slate-100"
               role="progressbar"
@@ -794,7 +761,7 @@ export function SearchProgress({
           </div>
 
           {/* Stage + stepper */}
-          <div className="grid gap-6 px-5 py-6 sm:px-6 md:grid-cols-[1fr_260px]">
+          <div className="grid shrink-0 gap-6 px-5 py-4 sm:px-6 md:grid-cols-[1fr_260px]">
             <div className="flex flex-col items-center text-center md:flex-row md:items-center md:gap-6 md:text-left">
               <div key={step} className="sp-fade-up shrink-0">
                 <StageIllustration step={step} />
@@ -916,44 +883,25 @@ export function SearchProgress({
             </ol>
           </div>
 
-          {/* Live results */}
-          <div className="border-t border-slate-200 bg-slate-50/60 px-5 py-5 sm:px-6">
-            <div className="mb-3 flex items-baseline justify-between gap-3">
-              <h3 className="text-sm font-semibold text-slate-900">
-                {done ? "Top matches" : "Live results"}
-              </h3>
-              <span className="text-xs text-slate-500">
-                {done
-                  ? top.length
+          {/* Summary: only once the run is done */}
+          {done && (
+            <div className="min-h-0 flex-1 overflow-y-auto border-t border-slate-200 bg-slate-50/60 px-5 py-4 sm:px-6">
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <h3 className="text-sm font-semibold text-slate-900">
+                  Top matches
+                </h3>
+                <span className="text-xs text-slate-500">
+                  {top.length
                     ? `Best ${Math.min(3, top.length)} of ${scoredTotal} scored`
-                    : "No one was scored"
-                  : top.length
-                    ? `${top.length} of ${target} scored so far`
-                    : "Candidates appear here as they're scored"}
-              </span>
-            </div>
-            <ul className="grid gap-2.5 sm:grid-cols-2">
-              {(done ? top.slice(0, 3) : shown).map((c) => (
-                <LiveCandidateCard key={c.personId} candidate={c} />
-              ))}
-              {!done &&
-                Array.from(
-                  { length: Math.max(0, slots - shown.length) },
-                  (_, i) => (
-                    <SkeletonCard
-                      key={`skeleton-${i}`}
-                      index={i + shown.length}
-                    />
-                  ),
-                )}
-            </ul>
-            {!done && target > MAX_SLOTS && (
-              <p className="mt-3 text-center text-xs text-slate-500">
-                Showing the best {MAX_SLOTS}; all {target} will be on the job.
-              </p>
-            )}
+                    : "No one was scored"}
+                </span>
+              </div>
+              <ul className="grid gap-2.5 sm:grid-cols-2">
+                {top.slice(0, 3).map((c) => (
+                  <LiveCandidateCard key={c.personId} candidate={c} />
+                ))}
+              </ul>
 
-            {done && (
               <div className="mt-5 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
                 <Button type="button" variant="outline" onClick={onHide}>
                   Close
@@ -967,8 +915,8 @@ export function SearchProgress({
                   <ArrowRight className="ml-1.5 h-4 w-4" aria-hidden="true" />
                 </Button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

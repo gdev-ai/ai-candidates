@@ -23,7 +23,7 @@
     --border: 0 0% 87%;
     --input: 0 0% 75%;
     --ring: 0 0% 0%;
-    --radius: 0;
+    --radius: 0.75rem;
   }
 
   .dark {
@@ -137,6 +137,267 @@
 
 @media (prefers-reduced-motion: reduce) {
   .animate-toast-in {
+    animation: none;
+  }
+}
+
+/* Custom tooltips rise and scale in slightly from their anchor. */
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-tooltip-in {
+  transform-origin: bottom center;
+  animation: tooltip-in 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-tooltip-in {
+    animation: none;
+  }
+}
+
+/* Search loading screen (components/jobs/SearchProgress.tsx). One small
+   looping animation per stage illustration, plus entry animations. SVG
+   parts animate around their own box (transform-box: fill-box). */
+.sp-anim {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes sp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.sp-sweep {
+  transform-box: view-box;
+  transform-origin: 80px 80px;
+  animation: sp-spin 2.6s linear infinite;
+}
+@keyframes sp-blip {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  12%,
+  55% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.sp-blip {
+  animation: sp-blip 2.6s ease-out infinite;
+}
+@keyframes sp-ring {
+  from {
+    opacity: 0.55;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+.sp-ring {
+  animation: sp-ring 1.8s cubic-bezier(0.2, 0.6, 0.4, 1) infinite;
+}
+@keyframes sp-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  45% {
+    transform: translateY(-9px);
+  }
+}
+.sp-bounce {
+  animation: sp-bounce 1.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes sp-fall {
+  0% {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+  15% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(46px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(58px);
+  }
+}
+.sp-fall {
+  animation: sp-fall 2.4s cubic-bezier(0.55, 0, 0.6, 1) infinite;
+}
+@keyframes sp-type {
+  0% {
+    transform: scaleX(0);
+  }
+  35%,
+  80% {
+    transform: scaleX(1);
+  }
+  100% {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+}
+.sp-type {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: sp-type 3.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes sp-scan {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(26px, 30px);
+  }
+}
+.sp-scan {
+  animation: sp-scan 3.2s ease-in-out infinite;
+}
+@keyframes sp-gauge {
+  0% {
+    stroke-dashoffset: 170;
+  }
+  60%,
+  85% {
+    stroke-dashoffset: 40;
+  }
+  100% {
+    stroke-dashoffset: 170;
+  }
+}
+.sp-gauge {
+  stroke-dasharray: 170;
+  animation: sp-gauge 3.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes sp-needle {
+  0%,
+  100% {
+    transform: rotate(-80deg);
+  }
+  60%,
+  85% {
+    transform: rotate(48deg);
+  }
+}
+.sp-needle {
+  transform-box: view-box;
+  transform-origin: 80px 104px;
+  animation: sp-needle 3.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes sp-twinkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.3) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1) rotate(45deg);
+  }
+}
+.sp-twinkle {
+  animation: sp-twinkle 1.9s ease-in-out infinite;
+}
+@keyframes sp-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+.sp-float {
+  animation: sp-float 3s ease-in-out infinite;
+}
+@keyframes sp-draw {
+  from {
+    stroke-dashoffset: 60;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.sp-draw {
+  stroke-dasharray: 60;
+  animation: sp-draw 0.6s 0.25s cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+@keyframes sp-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.sp-pop {
+  animation: sp-pop 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes sp-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.sp-fade-up {
+  animation: sp-fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes sp-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+.sp-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: sp-shimmer 1.8s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-sweep,
+  .sp-blip,
+  .sp-ring,
+  .sp-bounce,
+  .sp-fall,
+  .sp-type,
+  .sp-scan,
+  .sp-gauge,
+  .sp-needle,
+  .sp-twinkle,
+  .sp-float,
+  .sp-draw,
+  .sp-pop,
+  .sp-fade-up,
+  .sp-shimmer {
     animation: none;
   }
 }

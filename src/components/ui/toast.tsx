@@ -1,6 +1,12 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+} from "react";
 import { CheckCircle2, AlertTriangle, XCircle, Info, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,17 +38,20 @@ let globalAddToast: ((toast: Omit<ToastItem, "id">) => string) | null = null;
 
 export const toast = {
   success: (message: string, title?: string) => {
-    if (globalAddToast) return globalAddToast({ message, title, type: "success" });
+    if (globalAddToast)
+      return globalAddToast({ message, title, type: "success" });
     console.log("[Toast Success]", message);
     return "";
   },
   error: (message: string, title?: string) => {
-    if (globalAddToast) return globalAddToast({ message, title, type: "error" });
+    if (globalAddToast)
+      return globalAddToast({ message, title, type: "error" });
     console.error("[Toast Error]", message);
     return "";
   },
   warning: (message: string, title?: string) => {
-    if (globalAddToast) return globalAddToast({ message, title, type: "warning" });
+    if (globalAddToast)
+      return globalAddToast({ message, title, type: "warning" });
     console.warn("[Toast Warning]", message);
     return "";
   },
@@ -61,7 +70,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addToast = useCallback(
-    ({ message, title, type = "info", duration = 4000 }: Omit<ToastItem, "id">) => {
+    ({
+      message,
+      title,
+      type = "info",
+      duration = 4000,
+    }: Omit<ToastItem, "id">) => {
       const id = Math.random().toString(36).substring(2, 9);
       setToasts((prev) => [...prev, { id, message, title, type, duration }]);
 
@@ -73,7 +87,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
       return id;
     },
-    [removeToast]
+    [removeToast],
   );
 
   useEffect(() => {
@@ -124,16 +138,22 @@ export function Toaster() {
     >
       {toasts.map((t) => {
         const icons = {
-          success: <CheckCircle2 className="h-5 w-5 text-emerald-600 flex-shrink-0" />,
+          success: (
+            <CheckCircle2 className="h-5 w-5 text-emerald-600 flex-shrink-0" />
+          ),
           error: <XCircle className="h-5 w-5 text-red-600 flex-shrink-0" />,
-          warning: <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />,
+          warning: (
+            <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
+          ),
           info: <Info className="h-5 w-5 text-indigo-600 flex-shrink-0" />,
         };
 
         const borderStyles = {
-          success: "border-emerald-200 bg-emerald-50/95 text-emerald-950 shadow-emerald-900/10",
+          success:
+            "border-emerald-200 bg-emerald-50/95 text-emerald-950 shadow-emerald-900/10",
           error: "border-red-200 bg-red-50/95 text-red-950 shadow-red-900/10",
-          warning: "border-amber-200 bg-amber-50/95 text-amber-950 shadow-amber-900/10",
+          warning:
+            "border-amber-200 bg-amber-50/95 text-amber-950 shadow-amber-900/10",
           info: "border-indigo-200 bg-indigo-50/95 text-indigo-950 shadow-indigo-900/10",
         };
 
@@ -145,7 +165,7 @@ export function Toaster() {
             role="alert"
             className={cn(
               "pointer-events-auto flex items-start gap-3 p-4 rounded-xl border shadow-lg backdrop-blur-md animate-toast-in",
-              borderStyles[type]
+              borderStyles[type],
             )}
           >
             {icons[type]}
@@ -166,4 +186,3 @@ export function Toaster() {
     </div>
   );
 }
-

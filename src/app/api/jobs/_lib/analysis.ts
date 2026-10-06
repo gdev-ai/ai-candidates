@@ -23,7 +23,9 @@ function parseObject(text: unknown): JsonObject | null {
  * that already is the analysis object. Returns null when nothing usable is
  * there — the caller then refuses the analysisCallId rather than store junk.
  */
-export function extractAnalysisOutput(response: Json | null | undefined): JsonObject | null {
+export function extractAnalysisOutput(
+  response: Json | null | undefined,
+): JsonObject | null {
   if (!isObject(response)) return null;
 
   if (isObject(response.output_parsed)) return response.output_parsed;

@@ -11,22 +11,38 @@ import {
 
 describe("extractLinkedInSlug", () => {
   it("normalizes subdomains, locale suffixes, queries and case", () => {
-    expect(extractLinkedInSlug("https://eg.linkedin.com/in/Hossam-Shohdy/en")).toBe("hossam-shohdy");
-    expect(extractLinkedInSlug("https://www.linkedin.com/in/x/?trk=abc")).toBe("x");
-    expect(extractLinkedInSlug("https://www.linkedin.com/in/gina-calbet%C3%B3")).toBe("gina-calbetó");
-    expect(extractLinkedInSlug("https://www.linkedin.com/company/acme")).toBeNull();
+    expect(
+      extractLinkedInSlug("https://eg.linkedin.com/in/Hossam-Shohdy/en"),
+    ).toBe("hossam-shohdy");
+    expect(extractLinkedInSlug("https://www.linkedin.com/in/x/?trk=abc")).toBe(
+      "x",
+    );
+    expect(
+      extractLinkedInSlug("https://www.linkedin.com/in/gina-calbet%C3%B3"),
+    ).toBe("gina-calbetó");
+    expect(
+      extractLinkedInSlug("https://www.linkedin.com/company/acme"),
+    ).toBeNull();
   });
 
   it("keeps john and johnsmith distinct (the old ilike prefix bug)", () => {
-    expect(identityKey({ profileUrl: "https://linkedin.com/in/john" })).toBe("linkedin:john");
-    expect(identityKey({ profileUrl: "https://linkedin.com/in/johnsmith" })).toBe("linkedin:johnsmith");
+    expect(identityKey({ profileUrl: "https://linkedin.com/in/john" })).toBe(
+      "linkedin:john",
+    );
+    expect(
+      identityKey({ profileUrl: "https://linkedin.com/in/johnsmith" }),
+    ).toBe("linkedin:johnsmith");
   });
 });
 
 describe("identityKey", () => {
   it("falls back to a normalized URL, then name + company", () => {
-    expect(identityKey({ profileUrl: "HTTPS://www.Example.com/p/1/?x=1" })).toBe("url:example.com/p/1");
-    expect(identityKey({ name: " Amina  Hassan ", company: "Acme Inc." })).toBe("name-company:amina hassan|acme");
+    expect(
+      identityKey({ profileUrl: "HTTPS://www.Example.com/p/1/?x=1" }),
+    ).toBe("url:example.com/p/1");
+    expect(identityKey({ name: " Amina  Hassan ", company: "Acme Inc." })).toBe(
+      "name-company:amina hassan|acme",
+    );
     expect(identityKey({ name: "Only Name" })).toBeNull();
   });
   it("normalizeUrl drops protocol, www, query and trailing slash", () => {
@@ -36,18 +52,29 @@ describe("identityKey", () => {
 
 describe("filters", () => {
   it("rejects company pages and job boards", () => {
-    expect(isIndividualProfileUrl("https://www.linkedin.com/company/x")).toBe(false);
+    expect(isIndividualProfileUrl("https://www.linkedin.com/company/x")).toBe(
+      false,
+    );
     expect(isIndividualProfileUrl("https://wuzzuf.net/jobs/p/1")).toBe(false);
     expect(isIndividualProfileUrl("https://eg.linkedin.com/in/x")).toBe(true);
   });
   it("recognises our own company", () => {
     expect(isOwnCompany("G Developments")).toBe(true);
+    expect(isOwnCompany("G Developments – ISC")).toBe(true);
+    expect(isOwnCompany("New Giza")).toBe(true);
+    expect(isOwnCompany("NEWGIZA")).toBe(true);
+    expect(isOwnCompany("G Lifestyle")).toBe(true);
     expect(isOwnCompany("Other Developments")).toBe(false);
+    expect(isOwnCompany("Giza Systems")).toBe(false);
   });
 });
 
 describe("groupHits", () => {
-  const hit = (id: string, link: string, extra: Partial<{ title: string; subtitle: string; snippet: string }> = {}) => ({
+  const hit = (
+    id: string,
+    link: string,
+    extra: Partial<{ title: string; subtitle: string; snippet: string }> = {},
+  ) => ({
     id,
     link,
     title: extra.title ?? "Name - Title",
@@ -59,7 +86,9 @@ describe("groupHits", () => {
 
   it("merges the same profile across subdomains and skips non-profiles", () => {
     const groups = groupHits([
-      hit("1", "https://www.linkedin.com/in/amina", { subtitle: "Cairo, Egypt · Dev · Nile" }),
+      hit("1", "https://www.linkedin.com/in/amina", {
+        subtitle: "Cairo, Egypt · Dev · Nile",
+      }),
       hit("2", "https://eg.linkedin.com/in/Amina/en"),
       hit("3", "https://www.linkedin.com/company/nile"),
     ]);
@@ -73,8 +102,22 @@ describe("groupHits", () => {
     });
   });
 
+  it("flags people at our own company from any of their hits", () => {
+    const [group] = groupHits([
+      hit("1", "https://www.linkedin.com/in/sara", {
+        subtitle: "Cairo, Egypt · Engineer · Nile",
+      }),
+      hit("2", "https://eg.linkedin.com/in/sara", {
+        subtitle: "Cairo, Egypt · Engineer · G Developments",
+      }),
+    ]);
+    expect(group).toMatchObject({ ownCompany: true, company: "Nile" });
+  });
+
   it("never turns the headline into a skill list", () => {
-    const [group] = groupHits([hit("1", "https://linkedin.com/in/x", { title: "X - React, Node" })]);
+    const [group] = groupHits([
+      hit("1", "https://linkedin.com/in/x", { title: "X - React, Node" }),
+    ]);
     expect(group).not.toHaveProperty("skills");
   });
 });

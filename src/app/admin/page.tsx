@@ -18,10 +18,19 @@ import { UserManagement } from "@/components/admin/user-management";
 import { UserPerformanceTable } from "@/components/admin/user-performance-table";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { DashboardNav } from "@/components/dashboard/nav";
-import { PipelineChart } from "@/components/dashboard/pipeline-chart";
+import {
+  PipelineChart,
+  STAGE_COLOR,
+} from "@/components/dashboard/pipeline-chart";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { getAdminDashboardData } from "@/lib/admin/getAdminDashboardData";
 import { requirePageMember } from "@/lib/dashboard/session";
 
@@ -61,9 +70,9 @@ export default async function AdminDashboardPage() {
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             Organization-wide sourcing performance across {totals.teams}{" "}
-            {totals.teams === 1 ? "team" : "teams"} and {totals.activeUsers} active{" "}
-            {totals.activeUsers === 1 ? "user" : "users"}. Manage roles, teams, and managers
-            below.
+            {totals.teams === 1 ? "team" : "teams"} and {totals.activeUsers}{" "}
+            active {totals.activeUsers === 1 ? "user" : "users"}. Manage roles,
+            teams, and managers below.
           </p>
         </div>
 
@@ -81,7 +90,6 @@ export default async function AdminDashboardPage() {
             label="Active Users"
             value={`${totals.activeUsers} / ${totals.users}`}
             icon={Users}
-           
           />
           <StatCard label="Total Jobs" value={totals.jobs} icon={Briefcase} />
           <StatCard
@@ -91,15 +99,17 @@ export default async function AdminDashboardPage() {
                 ? `${totals.averageMatchQuality}%`
                 : "—"
             }
-            hint={totals.averageMatchQuality === null ? "No evaluated candidates yet" : undefined}
+            hint={
+              totals.averageMatchQuality === null
+                ? "No evaluated candidates yet"
+                : undefined
+            }
             icon={Target}
-           
           />
           <StatCard
             label="Shortlisted Talent"
             value={totals.shortlisted}
             icon={UserCheck}
-           
           />
         </div>
 
@@ -153,18 +163,38 @@ export default async function AdminDashboardPage() {
                 <div className="flex items-center justify-between py-2.5">
                   <dt className="text-slate-600">Failed</dt>
                   <dd>
-                    <Badge tone={totals.failedRuns > 0 ? "critical" : "neutral"}>
+                    <Badge
+                      tone={totals.failedRuns > 0 ? "critical" : "neutral"}
+                    >
                       {totals.failedRuns}
                     </Badge>
                   </dd>
                 </div>
                 <div className="flex items-center justify-between py-2.5">
-                  <dt className="text-slate-600">Contacted candidates</dt>
-                  <dd className="font-medium tabular-nums text-slate-900">{totals.contacted}</dd>
+                  <dt className="flex items-center gap-2 text-slate-600">
+                    <span
+                      aria-hidden
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: STAGE_COLOR.Contacted }}
+                    />
+                    Contacted candidates
+                  </dt>
+                  <dd className="font-medium tabular-nums text-slate-900">
+                    {totals.contacted}
+                  </dd>
                 </div>
                 <div className="flex items-center justify-between py-2.5">
-                  <dt className="text-slate-600">Rejected candidates</dt>
-                  <dd className="font-medium tabular-nums text-slate-900">{totals.rejected}</dd>
+                  <dt className="flex items-center gap-2 text-slate-600">
+                    <span
+                      aria-hidden
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: STAGE_COLOR.Rejected }}
+                    />
+                    Rejected candidates
+                  </dt>
+                  <dd className="font-medium tabular-nums text-slate-900">
+                    {totals.rejected}
+                  </dd>
                 </div>
               </dl>
             </CardContent>
@@ -196,7 +226,8 @@ export default async function AdminDashboardPage() {
               User Performance
             </CardTitle>
             <CardDescription className="text-xs text-slate-500">
-              Jobs, sourcing runs (completed / total), and candidate outcomes per user
+              Jobs, sourcing runs (completed / total), and candidate outcomes
+              per user
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-4">
@@ -217,7 +248,8 @@ export default async function AdminDashboardPage() {
             </div>
             {accessRequests.length > 0 && (
               <Badge tone="warning">
-                {accessRequests.length} {accessRequests.length === 1 ? "request" : "requests"}
+                {accessRequests.length}{" "}
+                {accessRequests.length === 1 ? "request" : "requests"}
               </Badge>
             )}
           </CardHeader>
@@ -242,7 +274,11 @@ export default async function AdminDashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-4">
-              <UserManagement users={users} teamOptions={teamOptions} currentUserId={user.id} />
+              <UserManagement
+                users={users}
+                teamOptions={teamOptions}
+                currentUserId={user.id}
+              />
             </CardContent>
           </Card>
 

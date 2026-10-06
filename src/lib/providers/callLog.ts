@@ -3,10 +3,12 @@ import "server-only";
 import { createLogger } from "@/lib/logger";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { Insert } from "@/lib/supabase/types";
+import { tenantKey } from "@/lib/usage/tenant";
 import type { Json } from "@/types/database.types";
 
 /** Mirrors the provider_calls check constraints. */
-export type ProviderName = "openai" | "serper" | "serpapi" | "exa" | "apify" | "harvestapi";
+export type ProviderName =
+  "openai" | "serper" | "serpapi" | "exa" | "apify" | "harvestapi";
 export type ProviderPurpose =
   | "search"
   | "enrich"
@@ -16,7 +18,8 @@ export type ProviderPurpose =
   | "pre_score"
   | "match"
   | "embed";
-export type ProviderCallStatus = "ok" | "empty" | "error" | "refused" | "truncated";
+export type ProviderCallStatus =
+  "ok" | "empty" | "error" | "refused" | "truncated";
 
 export interface ProviderCallRecord {
   provider: ProviderName;
@@ -52,7 +55,9 @@ export interface ProviderCallRecord {
  * match_results...). Never throws: a logging failure must not fail the
  * work it describes, so callers get null and carry on.
  */
-export async function recordProviderCall(record: ProviderCallRecord): Promise<string | null> {
+export async function recordProviderCall(
+  record: ProviderCallRecord,
+): Promise<string | null> {
   const row: Insert<"provider_calls"> = {
     provider: record.provider,
     purpose: record.purpose,
@@ -61,6 +66,7 @@ export async function recordProviderCall(record: ProviderCallRecord): Promise<st
     job_id: record.jobId ?? null,
     person_id: record.personId ?? null,
     user_id: record.userId ?? null,
+    tenant_key: tenantKey(),
     provider_request_id: record.providerRequestId ?? null,
     model: record.model ?? null,
     prompt_version: record.promptVersion ?? null,

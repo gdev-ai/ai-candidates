@@ -1,7 +1,11 @@
 import { APIError } from "openai";
 
 import { AIProviderError } from "@/lib/ai/AIProvider";
-import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, getOpenAIClient } from "@/lib/ai/client";
+import {
+  EMBEDDING_DIMENSIONS,
+  EMBEDDING_MODEL,
+  getOpenAIClient,
+} from "@/lib/ai/client";
 import type { CallContext } from "@/lib/ai/structured";
 import { recordProviderCall } from "@/lib/providers/callLog";
 import { openAICostUsd } from "@/lib/providers/pricing";
@@ -15,7 +19,10 @@ const MAX_CHARS = 8_000;
  * Embeds texts with text-embedding-3-small (1536 dims). One provider_calls
  * row per request; the vectors themselves are not stored in the log.
  */
-export async function embedTexts(texts: string[], context: CallContext = {}): Promise<number[][]> {
+export async function embedTexts(
+  texts: string[],
+  context: CallContext = {},
+): Promise<number[][]> {
   if (texts.length === 0) return [];
   const client = getOpenAIClient();
   const vectors: number[][] = [];
@@ -33,7 +40,11 @@ export async function embedTexts(texts: string[], context: CallContext = {}): Pr
       personId: context.personId,
       searchRunId: context.searchRunId,
       userId: context.userId,
-      request: { model: EMBEDDING_MODEL, inputs: batch.length, dimensions: EMBEDDING_DIMENSIONS },
+      request: {
+        model: EMBEDDING_MODEL,
+        inputs: batch.length,
+        dimensions: EMBEDDING_DIMENSIONS,
+      },
     };
     try {
       const { data, request_id } = await client.embeddings
@@ -44,7 +55,9 @@ export async function embedTexts(texts: string[], context: CallContext = {}): Pr
           encoding_format: "float",
         })
         .withResponse();
-      const ordered = [...data.data].sort((a, b) => a.index - b.index).map((d) => d.embedding);
+      const ordered = [...data.data]
+        .sort((a, b) => a.index - b.index)
+        .map((d) => d.embedding);
       vectors.push(...ordered);
       const tokens = data.usage?.prompt_tokens ?? 0;
       await recordProviderCall({
@@ -53,10 +66,17 @@ export async function embedTexts(texts: string[], context: CallContext = {}): Pr
         providerRequestId: request_id ?? null,
         promptTokens: tokens,
         completionTokens: 0,
-        costUsd: openAICostUsd(EMBEDDING_MODEL, { inputTokens: tokens, outputTokens: 0 }),
+        costUsd: openAICostUsd(EMBEDDING_MODEL, {
+          inputTokens: tokens,
+          outputTokens: 0,
+        }),
         latencyMs: Date.now() - startedAt,
         httpStatus: 200,
-        response: { model: data.model, usage: data.usage, count: data.data.length },
+        response: {
+          model: data.model,
+          usage: data.usage,
+          count: data.data.length,
+        },
       });
     } catch (error) {
       await recordProviderCall({
@@ -93,7 +113,9 @@ export function toPgVector(vector: number[]): string {
   return `[${vector.join(",")}]`;
 }
 
-export function fromPgVector(value: string | null | undefined): number[] | null {
+export function fromPgVector(
+  value: string | null | undefined,
+): number[] | null {
   if (!value) return null;
   try {
     const parsed = JSON.parse(value) as unknown;

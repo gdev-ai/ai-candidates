@@ -7,20 +7,22 @@ const STAGE_ORDER = [
   "Rejected",
 ] as const;
 
-// Grey ramp for the four in-progress stages, darkening as a candidate moves
-// further along. Hired and Rejected are terminal exits, so they carry the
-// two status accents instead of a ramp step.
-const STAGE_COLOR: Record<(typeof STAGE_ORDER)[number], string> = {
-  New: "#BFBFBF",
-  Reviewed: "#808080",
-  Shortlisted: "#404040",
-  Contacted: "#000000",
-  Hired: "#1E6B3A",
-  Rejected: "#B3261E",
+// One distinct hue per stage so the bars read at a glance. Hired and Rejected
+// keep the green/red status accents used by badges elsewhere.
+export const STAGE_COLOR: Record<(typeof STAGE_ORDER)[number], string> = {
+  New: "#94A3B8",
+  Reviewed: "#0EA5E9",
+  Shortlisted: "#8B5CF6",
+  Contacted: "#F59E0B",
+  Hired: "#10B981",
+  Rejected: "#EF4444",
 };
 
 export function PipelineChart({ counts }: { counts: Record<string, number> }) {
-  const total = STAGE_ORDER.reduce((sum, stage) => sum + (counts[stage] ?? 0), 0);
+  const total = STAGE_ORDER.reduce(
+    (sum, stage) => sum + (counts[stage] ?? 0),
+    0,
+  );
   const max = Math.max(1, ...STAGE_ORDER.map((stage) => counts[stage] ?? 0));
 
   if (total === 0) {
@@ -32,14 +34,25 @@ export function PipelineChart({ counts }: { counts: Record<string, number> }) {
   }
 
   return (
-    <div className="flex flex-col gap-3" role="img" aria-label="Candidate pipeline by stage">
+    <div
+      className="flex flex-col gap-3"
+      role="img"
+      aria-label="Candidate pipeline by stage"
+    >
       {STAGE_ORDER.map((stage, index) => {
         const count = counts[stage] ?? 0;
         const widthPct = Math.max(4, (count / max) * 100);
         return (
           <div key={stage} className="flex items-center gap-3">
-            <span className="w-24 shrink-0 text-sm text-muted-foreground">{stage}</span>
-            <div className="h-4 flex-1 overflow-hidden bg-muted">
+            <span className="flex w-28 shrink-0 items-center gap-2 text-sm text-muted-foreground">
+              <span
+                aria-hidden
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: STAGE_COLOR[stage] }}
+              />
+              {stage}
+            </span>
+            <div className="h-4 flex-1 overflow-hidden rounded-sm bg-muted">
               {count > 0 && (
                 <div
                   className="animate-bar-x h-full"

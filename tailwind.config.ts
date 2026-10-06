@@ -59,14 +59,17 @@ const danger = {
 
 const config: Config = {
   darkMode: ["class"],
-  content: [
-    "./src/app/**/*.{ts,tsx}",
-    "./src/components/**/*.{ts,tsx}",
-  ],
+  content: ["./src/app/**/*.{ts,tsx}", "./src/components/**/*.{ts,tsx}"],
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"Helvetica Now Text"', '"Helvetica Neue"', "Helvetica", "Arial", "sans-serif"],
+        sans: [
+          '"Helvetica Now Text"',
+          '"Helvetica Neue"',
+          "Helvetica",
+          "Arial",
+          "sans-serif",
+        ],
         display: [
           '"Helvetica Now Display"',
           '"Helvetica Neue"',
@@ -74,6 +77,16 @@ const config: Config = {
           "Arial",
           "sans-serif",
         ],
+      },
+      // Soft, rounded surfaces with light neutral shadows (monochrome palette).
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+      boxShadow: {
+        soft: "0 1px 2px 0 rgb(0 0 0 / 0.03), 0 2px 8px -2px rgb(0 0 0 / 0.06)",
+        glow: "0 8px 24px -6px rgb(0 0 0 / 0.25)",
       },
       transitionDuration: {
         DEFAULT: "140ms",
@@ -135,33 +148,6 @@ const config: Config = {
           foreground: "hsl(var(--card-foreground))",
         },
       },
-    },
-    // Architectural, square corners everywhere; only true circles (avatars,
-    // status dots) keep `rounded-full`.
-    borderRadius: {
-      none: "0",
-      sm: "0",
-      DEFAULT: "0",
-      md: "0",
-      lg: "0",
-      xl: "0",
-      "2xl": "0",
-      "3xl": "0",
-      full: "9999px",
-    },
-    // Separation comes from hairlines, not shadows. Floating layers (menus,
-    // toasts) keep one flat, tight shadow so they read above the page.
-    boxShadow: {
-      none: "none",
-      sm: "none",
-      DEFAULT: "none",
-      md: "none",
-      lg: "0 1px 0 0 rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.18)",
-      xl: "0 1px 0 0 rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.18)",
-      "2xl": "none",
-      inner: "none",
-      soft: "none",
-      glow: "none",
     },
   },
   plugins: [],

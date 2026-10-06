@@ -6,6 +6,10 @@ import {
   requirementRefs,
   toMatchItems,
 } from "@/lib/ai/prompts/candidate-matching";
+import {
+  experienceScore,
+  yearsFitScore,
+} from "@/lib/ai/prompts/candidate-matching";
 import { variantsToQueries } from "@/lib/ai/prompts/search-query-generation";
 import type { MatchingJob, MatchingPerson } from "@/types/matching";
 
@@ -55,9 +59,19 @@ const person: MatchingPerson = {
       description: "Selenium automation",
     },
   ],
-  education: [{ school: "Cairo University", degree: "BSc", field_of_study: "CS", start_year: 2014, end_year: 2018 }],
+  education: [
+    {
+      school: "Cairo University",
+      degree: "BSc",
+      field_of_study: "CS",
+      start_year: 2014,
+      end_year: 2018,
+    },
+  ],
   skills: [{ name: "Selenium", endorsements: 12, is_top: true }],
-  certifications: [{ title: "ISTQB", issuer: "ISTQB", issued_on: "2020-01-01" }],
+  certifications: [
+    { title: "ISTQB", issuer: "ISTQB", issued_on: "2020-01-01" },
+  ],
   languages: [{ name: "English", proficiency: "full_professional" }],
 };
 
@@ -104,14 +118,38 @@ describe("candidate matching prompt", () => {
         seniority_score: 0,
         summary: "",
         items: [
-          { kind: "skill_required", requirement_ref: "r1", status: "met", text: "Selenium", evidence: "Selenium (12)" },
-          { kind: "concern", requirement_ref: null, status: "missing", text: "No ISTQB advanced", evidence: "" },
-          { kind: "keyword", requirement_ref: "R9", status: "partial", text: "x", evidence: "" },
+          {
+            kind: "skill_required",
+            requirement_ref: "r1",
+            status: "met",
+            text: "Selenium",
+            evidence: "Selenium (12)",
+          },
+          {
+            kind: "concern",
+            requirement_ref: null,
+            status: "missing",
+            text: "No ISTQB advanced",
+            evidence: "",
+          },
+          {
+            kind: "keyword",
+            requirement_ref: "R9",
+            status: "partial",
+            text: "x",
+            evidence: "",
+          },
         ],
       },
       requirementRefs(job),
     );
-    expect(items[0]).toEqual({ kind: "skill_required", requirement_id: "req-a", status: "met", text: "Selenium", evidence: "Selenium (12)" });
+    expect(items[0]).toEqual({
+      kind: "skill_required",
+      requirement_id: "req-a",
+      status: "met",
+      text: "Selenium",
+      evidence: "Selenium (12)",
+    });
     expect(items[1]).not.toHaveProperty("requirement_id");
     expect(items[2]).not.toHaveProperty("requirement_id");
   });
@@ -129,8 +167,31 @@ describe("variantsToQueries", () => {
         ],
       },
       location,
-      ['site:linkedin.com/in "QA Engineer" "Egypt"'],
+      ['site:eg.linkedin.com/in "QA Engineer"'],
     );
-    expect(queries).toEqual(['site:linkedin.com/in ("QA Engineer" OR "Test Engineer") "Selenium" "Egypt"']);
+    expect(queries).toEqual([
+      'site:eg.linkedin.com/in ("QA Engineer" OR "Test Engineer") "Selenium"',
+    ]);
+  });
+});
+
+describe("yearsFitScore / experienceScore", () => {
+  it("is 100 inside the range and penalises under- more than over-qualification", () => {
+    expect(yearsFitScore(8, 7, 10)).toBe(100);
+    expect(yearsFitScore(5, 7, 10)).toBe(70);
+    expect(yearsFitScore(14, 7, 10)).toBe(84);
+    expect(yearsFitScore(30, 7, 10)).toBe(60);
+    expect(yearsFitScore(0, 7, 10)).toBe(0);
+    expect(yearsFitScore(20, 3, null)).toBe(100);
+  });
+
+  it("is null when years or the range are unknown", () => {
+    expect(yearsFitScore(null, 7, 10)).toBeNull();
+    expect(yearsFitScore(5, null, null)).toBeNull();
+  });
+
+  it("averages relevance with years fit, or uses relevance alone", () => {
+    expect(experienceScore(90, 60)).toBe(75);
+    expect(experienceScore(90, null)).toBe(90);
   });
 });

@@ -1,4 +1,5 @@
 import { verifyLocationWithAI } from "@/lib/ai/prompts/location-verification";
+import { mapWithConcurrency } from "@/lib/concurrency";
 import { createLogger } from "@/lib/logger";
 import type { SourcingClient } from "@/lib/supabase/types";
 
@@ -8,23 +9,6 @@ const CONCURRENCY = 3;
 
 const log = createLogger("location-check");
 
-export async function mapWithConcurrency<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let next = 0;
-  async function worker() {
-    while (next < items.length) {
-      const index = next++;
-      results[index] = await fn(items[index] as T);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return results;
-}
-
 /**
  * AI tier of the location check, for people linked by this run whose
  * location the deterministic tier couldn't decide. A confirmed "elsewhere"
@@ -33,7 +17,12 @@ export async function mapWithConcurrency<T, R>(
  */
 export async function checkAmbiguousLocations(
   db: SourcingClient,
-  input: { runId: string; jobId: string; countryCode: string; userId: string | null },
+  input: {
+    runId: string;
+    jobId: string;
+    countryCode: string;
+    userId: string | null;
+  },
 ): Promise<{ checked: number; excluded: number; failed: number }> {
   const { data, error } = await db
     .from("job_candidates")
@@ -60,7 +49,12 @@ export async function checkAmbiguousLocations(
           currentCompany: person.current_company,
         },
         input.countryCode,
-        { jobId: input.jobId, personId: person.id, searchRunId: input.runId, userId: input.userId },
+        {
+          jobId: input.jobId,
+          personId: person.id,
+          searchRunId: input.runId,
+          userId: input.userId,
+        },
       );
       if (verdict.in_country === null) return;
       await db
@@ -72,7 +66,11 @@ export async function checkAmbiguousLocations(
         })
         .eq("id", person.id)
         .is("location_verified", null);
-      if (verdict.in_country === false && row.status === "New" && !row.latest_match_id) {
+      if (
+        verdict.in_country === false &&
+        row.status === "New" &&
+        !row.latest_match_id
+      ) {
         await db
           .from("job_candidates")
           .delete()

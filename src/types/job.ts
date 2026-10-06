@@ -2,7 +2,25 @@ import { z } from "zod";
 
 /** Mirror the sourcing.jobs / job_requirements check constraints. */
 export const CITIES = ["Cairo", "Alexandria", "Giza", "Suez"] as const;
-export const EMPLOYMENT_TYPE_VALUES = ["Full-time", "Part-time", "Contract", "Internship"] as const;
+export const EMPLOYMENT_TYPE_VALUES = [
+  "Full-time",
+  "Part-time",
+  "Contract",
+  "Internship",
+] as const;
+/**
+ * Red outline for a New Job field the AI couldn't fill and the recruiter
+ * hasn't filled yet.
+ */
+export const MISSING_FIELD_CLASS = "border-red-500 focus-visible:ring-red-500";
+
+/**
+ * Every run AI-scores exactly this many candidates (the most promising by
+ * pre-score), so all searches cost about the same and the search credits
+ * stay predictable.
+ */
+export const CANDIDATES_PER_RUN = 10;
+
 export const WORK_ARRANGEMENT_VALUES = ["Remote", "Hybrid", "On-site"] as const;
 export const SENIORITIES = [
   "intern",
@@ -57,16 +75,28 @@ export interface RequirementInput {
 }
 
 /** Form values arrive as "" for "not chosen"; the DB wants null. */
-function optionalEnum<const T extends readonly [string, ...string[]]>(values: T, message: string) {
+function optionalEnum<const T extends readonly [string, ...string[]]>(
+  values: T,
+  message: string,
+) {
   return z.preprocess(
-    (v) => (v === undefined || (typeof v === "string" && v.trim() === "") ? null : typeof v === "string" ? v.trim() : v),
+    (v) =>
+      v === undefined || (typeof v === "string" && v.trim() === "")
+        ? null
+        : typeof v === "string"
+          ? v.trim()
+          : v,
     z.enum(values, { message }).nullable(),
   );
 }
 
 const optionalYears = z.preprocess(
   (v) => (v === "" || v === undefined ? null : v),
-  z.number().min(0, "Experience can't be negative.").max(99, "Experience is too large.").nullable(),
+  z
+    .number()
+    .min(0, "Experience can't be negative.")
+    .max(99, "Experience is too large.")
+    .nullable(),
 );
 
 export const requirementSchema = z.object({
@@ -100,15 +130,28 @@ const jobFieldsSchema = z.object({
     z.uuid("Select a company.").nullable(),
   ),
   city: optionalEnum(CITIES, "Pick one of the listed cities."),
-  employment_type: optionalEnum(EMPLOYMENT_TYPE_VALUES, "Invalid employment type."),
-  work_arrangement: optionalEnum(WORK_ARRANGEMENT_VALUES, "Invalid work arrangement."),
+  employment_type: optionalEnum(
+    EMPLOYMENT_TYPE_VALUES,
+    "Invalid employment type.",
+  ),
+  work_arrangement: optionalEnum(
+    WORK_ARRANGEMENT_VALUES,
+    "Invalid work arrangement.",
+  ),
   seniority: optionalEnum(SENIORITIES, "Invalid seniority."),
   min_experience: optionalYears,
   max_experience: optionalYears,
 });
 
-function experienceRangeOk(v: { min_experience?: number | null; max_experience?: number | null }) {
-  return v.min_experience == null || v.max_experience == null || v.min_experience <= v.max_experience;
+function experienceRangeOk(v: {
+  min_experience?: number | null;
+  max_experience?: number | null;
+}) {
+  return (
+    v.min_experience == null ||
+    v.max_experience == null ||
+    v.min_experience <= v.max_experience
+  );
 }
 const RANGE_ERROR = {
   message: "Minimum experience can't be more than maximum.",
@@ -189,8 +232,8 @@ export interface JobDetailResponse {
 
 /**
  * The editable part of the New Job form that the AI analysis pre-fills
- * (title, company, employment type and work arrangement live in the form's
- * "Job Details" section).
+ * (title, company, employment type and work arrangement are separate form
+ * state, rendered alongside it).
  */
 export interface RequirementsDraft {
   seniority: Seniority | "";
@@ -242,7 +285,8 @@ export function analysisToDraft(analysis: AnalysisLike): RequirementsDraft {
     const items = analysis[field];
     if (!Array.isArray(items)) continue;
     for (const text of items) {
-      if (typeof text === "string" && text.trim()) requirements.push({ kind, text: text.trim() });
+      if (typeof text === "string" && text.trim())
+        requirements.push({ kind, text: text.trim() });
     }
   }
   return {

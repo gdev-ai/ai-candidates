@@ -31,10 +31,20 @@ export async function loadPipelineRow(
 ): Promise<{ row: PipelineRow } | { error: NextResponse }> {
   const jobId = new URL(request.url).searchParams.get("jobId");
   if (!jobId || !uuid.safeParse(jobId).success) {
-    return { error: NextResponse.json({ error: "A valid jobId query parameter is required." }, { status: 400 }) };
+    return {
+      error: NextResponse.json(
+        { error: "A valid jobId query parameter is required." },
+        { status: 400 },
+      ),
+    };
   }
   if (!uuid.safeParse(personId).success) {
-    return { error: NextResponse.json({ error: "Candidate not found." }, { status: 404 }) };
+    return {
+      error: NextResponse.json(
+        { error: "Candidate not found." },
+        { status: 404 },
+      ),
+    };
   }
 
   const { data, error } = await supabase
@@ -49,11 +59,21 @@ export async function loadPipelineRow(
     .maybeSingle();
 
   if (error) {
-    return { error: NextResponse.json({ error: "Failed to load candidate." }, { status: 500 }) };
+    return {
+      error: NextResponse.json(
+        { error: "Failed to load candidate." },
+        { status: 500 },
+      ),
+    };
   }
   // RLS: a pair on a job the caller can't see reads as not found.
   if (!data || !data.job) {
-    return { error: NextResponse.json({ error: "Candidate not found for this job." }, { status: 404 }) };
+    return {
+      error: NextResponse.json(
+        { error: "Candidate not found for this job." },
+        { status: 404 },
+      ),
+    };
   }
 
   return {

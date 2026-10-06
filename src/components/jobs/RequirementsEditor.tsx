@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { X, Plus, GraduationCap, Briefcase, Tag, MapPin } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -12,9 +12,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { OverflowTooltip } from "@/components/ui/overflow-tooltip";
 import { cn } from "@/lib/utils";
 import {
   CITIES,
+  MISSING_FIELD_CLASS,
   REQUIREMENT_KIND_LABELS,
   SENIORITIES,
   SENIORITY_LABELS,
@@ -32,6 +34,8 @@ const UNSPECIFIED_VALUE = "unspecified";
 interface RequirementsEditorProps {
   value: RequirementsDraft;
   onChange: (updated: RequirementsDraft) => void;
+  /** Job detail fields (title, company, ...) shown at the top of the profile card. */
+  children?: ReactNode;
 }
 
 /** Replaces one kind's rows, keeping the other kinds (and their order). */
@@ -44,7 +48,10 @@ export function replaceKind(
   return [...others, ...texts.map((text) => ({ kind, text }))];
 }
 
-function textsOf(requirements: RequirementInput[], kind: RequirementKind): string[] {
+function textsOf(
+  requirements: RequirementInput[],
+  kind: RequirementKind,
+): string[] {
   return requirements.filter((r) => r.kind === kind).map((r) => r.text);
 }
 
@@ -54,22 +61,39 @@ const TABS: {
   id: TabId;
   label: string;
   icon: typeof Tag;
-  kinds: { kind: RequirementKind; tone?: "good" | "warning"; placeholder?: string }[];
+  kinds: {
+    kind: RequirementKind;
+    tone?: "good" | "warning";
+    placeholder?: string;
+  }[];
 }[] = [
   {
     id: "skills",
     label: "Skills & Technologies",
     icon: Tag,
     kinds: [
-      { kind: "skill_required", tone: "good", placeholder: "Add required skill (e.g. React)..." },
-      { kind: "skill_preferred", tone: "warning", placeholder: "Add nice-to-have skill..." },
+      {
+        kind: "skill_required",
+        tone: "good",
+        placeholder: "Add required skill (e.g. React)...",
+      },
+      {
+        kind: "skill_preferred",
+        tone: "warning",
+        placeholder: "Add nice-to-have skill...",
+      },
     ],
   },
   {
     id: "qualifications",
     label: "Education & Qualifications",
     icon: GraduationCap,
-    kinds: [{ kind: "education" }, { kind: "certification" }, { kind: "language" }, { kind: "industry" }],
+    kinds: [
+      { kind: "education" },
+      { kind: "certification" },
+      { kind: "language" },
+      { kind: "industry" },
+    ],
   },
   {
     id: "overview",
@@ -120,32 +144,39 @@ function EditableList({
         </span>
       </div>
 
-      <div className="flex flex-wrap gap-2" data-testid={testId}>
+      <div
+        className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+        data-testid={testId}
+      >
         {items.map((item, index) => (
-          <div
-            key={index}
-            className={cn(
-              "group inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50/80 py-1 pl-2.5 pr-1.5 text-xs transition-all hover:bg-white hover:shadow-xs",
-              badgeTone === "good" && "border-emerald-200 bg-emerald-50/60 text-emerald-950",
-              badgeTone === "warning" && "border-amber-200 bg-amber-50/60 text-amber-950",
-            )}
-          >
-            <input
-              value={item}
-              onChange={(e) => editItem(index, e.target.value)}
-              data-testid={`${testId}-item-${index}`}
-              className="min-w-[60px] bg-transparent text-xs font-medium text-slate-800 focus:outline-none"
-              aria-label={`${label} item ${index + 1}`}
-            />
-            <button
-              type="button"
-              className="rounded p-0.5 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-700"
-              aria-label={`Remove ${item}`}
-              onClick={() => removeItem(index)}
+          <OverflowTooltip key={index} text={item} className="min-w-0">
+            <div
+              className={cn(
+                "group flex min-w-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50/80 py-1 pl-2.5 pr-1.5 text-xs transition-all hover:bg-white hover:shadow-xs",
+                badgeTone === "good" &&
+                  "border-emerald-200 bg-emerald-50/60 text-emerald-950",
+                badgeTone === "warning" &&
+                  "border-amber-200 bg-amber-50/60 text-amber-950",
+              )}
             >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
+              <input
+                value={item}
+                onChange={(e) => editItem(index, e.target.value)}
+                data-testid={`${testId}-item-${index}`}
+                data-overflow-target
+                className="min-w-0 flex-1 truncate bg-transparent text-xs font-medium text-slate-800 focus:outline-none"
+                aria-label={`${label} item ${index + 1}`}
+              />
+              <button
+                type="button"
+                className="rounded p-0.5 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-700"
+                aria-label={`Remove ${item}`}
+                onClick={() => removeItem(index)}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </OverflowTooltip>
         ))}
       </div>
 
@@ -186,13 +217,20 @@ function parseYears(raw: string): number | null {
 }
 
 /**
- * Edits the AI-prefilled part of a job: seniority, city, experience range
- * and the requirement rows ({kind, text}) that become job_requirements.
+ * Edits the AI-prefilled part of a job: any job detail fields passed as
+ * children, then seniority, city, experience range and the requirement rows ({kind, text}) that become job_requirements.
  */
-export function RequirementsEditor({ value, onChange }: RequirementsEditorProps) {
+export function RequirementsEditor({
+  value,
+  onChange,
+  children,
+}: RequirementsEditorProps) {
   const [activeTab, setActiveTab] = useState<TabId>("skills");
 
-  function update<K extends keyof RequirementsDraft>(field: K, fieldValue: RequirementsDraft[K]) {
+  function update<K extends keyof RequirementsDraft>(
+    field: K,
+    fieldValue: RequirementsDraft[K],
+  ) {
     onChange({ ...value, [field]: fieldValue });
   }
 
@@ -204,25 +242,42 @@ export function RequirementsEditor({ value, onChange }: RequirementsEditorProps)
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="border border-border bg-card p-5">
+      <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50/80 via-white to-slate-50 p-5 shadow-sm">
         <div className="mb-4 flex items-center justify-between border-b border-indigo-100/80 pb-3">
-          <h3 className="text-sm font-semibold text-slate-900">Role Profile</h3>
+          <h3 className="text-sm font-semibold text-slate-900">Job Details</h3>
           <span className="flex items-center gap-1 rounded-full border border-indigo-200/60 bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-600">
             <MapPin className="h-3 w-3" aria-hidden="true" />
             Egypt
           </span>
         </div>
 
+        {children && <div className="mb-4 flex flex-col gap-4">{children}</div>}
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-slate-700" htmlFor="ra-seniority">
+            <label
+              className="text-xs font-semibold text-slate-700"
+              htmlFor="ra-seniority"
+            >
               Seniority
             </label>
             <Select
               value={value.seniority || UNSPECIFIED_VALUE}
-              onValueChange={(v) => update("seniority", v === UNSPECIFIED_VALUE ? "" : (v as Seniority))}
+              onValueChange={(v) =>
+                update(
+                  "seniority",
+                  v === UNSPECIFIED_VALUE ? "" : (v as Seniority),
+                )
+              }
             >
-              <SelectTrigger id="ra-seniority" className="h-9 bg-white text-sm" data-testid="ra-seniority">
+              <SelectTrigger
+                id="ra-seniority"
+                className={cn(
+                  "h-9 bg-white text-sm",
+                  !value.seniority && MISSING_FIELD_CLASS,
+                )}
+                data-testid="ra-seniority"
+              >
                 <SelectValue placeholder="Select seniority" />
               </SelectTrigger>
               <SelectContent>
@@ -237,18 +292,29 @@ export function RequirementsEditor({ value, onChange }: RequirementsEditorProps)
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-slate-700" htmlFor="ra-city">
+            <label
+              className="text-xs font-semibold text-slate-700"
+              htmlFor="ra-city"
+            >
               City
             </label>
             <Select
               value={value.city || UNSPECIFIED_VALUE}
-              onValueChange={(v) => update("city", v === UNSPECIFIED_VALUE ? "" : (v as City))}
+              onValueChange={(v) =>
+                update("city", v === UNSPECIFIED_VALUE ? "" : (v as City))
+              }
             >
-              <SelectTrigger id="ra-city" className="h-9 bg-white text-sm" data-testid="ra-city">
+              <SelectTrigger
+                id="ra-city"
+                className="h-9 bg-white text-sm"
+                data-testid="ra-city"
+              >
                 <SelectValue placeholder="Select a city" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={UNSPECIFIED_VALUE}>Anywhere in Egypt</SelectItem>
+                <SelectItem value={UNSPECIFIED_VALUE}>
+                  Anywhere in Egypt
+                </SelectItem>
                 {CITIES.map((city) => (
                   <SelectItem key={city} value={city}>
                     {city}
@@ -262,7 +328,10 @@ export function RequirementsEditor({ value, onChange }: RequirementsEditorProps)
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-slate-700" htmlFor="ra-min-exp">
+            <label
+              className="text-xs font-semibold text-slate-700"
+              htmlFor="ra-min-exp"
+            >
               Min Experience (Years)
             </label>
             <Input
@@ -271,14 +340,22 @@ export function RequirementsEditor({ value, onChange }: RequirementsEditorProps)
               min={0}
               step={0.5}
               value={value.min_experience ?? ""}
-              onChange={(e) => update("min_experience", parseYears(e.target.value))}
-              className="h-9 bg-white text-sm"
+              onChange={(e) =>
+                update("min_experience", parseYears(e.target.value))
+              }
+              className={cn(
+                "h-9 bg-white text-sm",
+                value.min_experience === null && MISSING_FIELD_CLASS,
+              )}
               aria-invalid={rangeInvalid}
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-slate-700" htmlFor="ra-max-exp">
+            <label
+              className="text-xs font-semibold text-slate-700"
+              htmlFor="ra-max-exp"
+            >
               Max Experience (Years)
             </label>
             <Input
@@ -287,8 +364,13 @@ export function RequirementsEditor({ value, onChange }: RequirementsEditorProps)
               min={0}
               step={0.5}
               value={value.max_experience ?? ""}
-              onChange={(e) => update("max_experience", parseYears(e.target.value))}
-              className="h-9 bg-white text-sm"
+              onChange={(e) =>
+                update("max_experience", parseYears(e.target.value))
+              }
+              className={cn(
+                "h-9 bg-white text-sm",
+                value.max_experience === null && MISSING_FIELD_CLASS,
+              )}
               aria-invalid={rangeInvalid}
             />
           </div>
@@ -303,7 +385,10 @@ export function RequirementsEditor({ value, onChange }: RequirementsEditorProps)
       <div className="flex flex-wrap border-b border-slate-200">
         {TABS.map((t) => {
           const Icon = t.icon;
-          const count = t.kinds.reduce((n, k) => n + textsOf(value.requirements, k.kind).length, 0);
+          const count = t.kinds.reduce(
+            (n, k) => n + textsOf(value.requirements, k.kind).length,
+            0,
+          );
           return (
             <button
               key={t.id}
@@ -318,7 +403,9 @@ export function RequirementsEditor({ value, onChange }: RequirementsEditorProps)
             >
               <Icon className="h-4 w-4" />
               {t.label}
-              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-xs">{count}</span>
+              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-xs">
+                {count}
+              </span>
             </button>
           );
         })}
@@ -330,7 +417,12 @@ export function RequirementsEditor({ value, onChange }: RequirementsEditorProps)
             key={kind}
             label={REQUIREMENT_KIND_LABELS[kind]}
             items={textsOf(value.requirements, kind)}
-            onChangeItems={(items) => update("requirements", replaceKind(value.requirements, kind, items))}
+            onChangeItems={(items) =>
+              update(
+                "requirements",
+                replaceKind(value.requirements, kind, items),
+              )
+            }
             testId={`requirements-${kind}`}
             badgeTone={tone}
             placeholder={placeholder}

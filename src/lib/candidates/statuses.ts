@@ -11,5 +11,8 @@ export const CANDIDATE_STATUSES = [
 export type CandidateStatus = (typeof CANDIDATE_STATUSES)[number];
 
 export function isCandidateStatus(value: unknown): value is CandidateStatus {
-  return typeof value === "string" && (CANDIDATE_STATUSES as readonly string[]).includes(value);
+  return (
+    typeof value === "string" &&
+    (CANDIDATE_STATUSES as readonly string[]).includes(value)
+  );
 }

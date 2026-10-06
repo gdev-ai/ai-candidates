@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+/** An empty `NAME=` line in .env means "not set". */
+const blankToUndefined = (value: unknown) =>
+  typeof value === "string" && value.trim() === "" ? undefined : value;
+
 const envSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url({
     message: "NEXT_PUBLIC_SUPABASE_URL must be a valid URL",
@@ -25,6 +29,18 @@ const envSchema = z.object({
   APIFY_API_TOKEN: z.string().optional(),
   APIFY_ACTOR_ID: z.string().default("supreme_coder~linkedin-profile-scraper"),
   HARVESTAPI_API_KEY: z.string().optional(),
+  // "auto": Apify while its credit lasts, then HarvestAPI. "harvestapi" or
+  // "apify" forces that provider (if configured).
+  ENRICHMENT_PROVIDER: z.enum(["auto", "apify", "harvestapi"]).default("auto"),
+  // HarvestAPI has no balance endpoint: the prepaid amount, if set, lets the
+  // credits panel show what's left (prepaid minus measured spend).
+  HARVESTAPI_PREPAID_USD: z.preprocess(
+    blankToUndefined,
+    z.coerce.number().nonnegative().optional(),
+  ),
+  // Search limits are shared by everyone on the same API keys. Set a name
+  // here to keep the same budget across a key rotation.
+  USAGE_TENANT: z.preprocess(blankToUndefined, z.string().trim().optional()),
 });
 
 export type Env = z.infer<typeof envSchema>;

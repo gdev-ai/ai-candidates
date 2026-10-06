@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { Brandmark } from "@/components/brand/brandmark";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
+import { CreditsMeter } from "@/components/usage/CreditsMeter";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -123,6 +124,7 @@ export function DashboardNav() {
           </nav>
         </div>
         <div className="flex items-center gap-2">
+          {role && <CreditsMeter />}
           {(role === "hr_manager" || role === "admin") && <NotificationBell />}
           <Link
             href="/settings"

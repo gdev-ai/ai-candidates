@@ -59,7 +59,20 @@ const EGYPT_TERMS = [
   "ash sharqiyah",
   "al qalyubiyah",
 ];
-const EGYPT_TERMS_AR = ["مصر", "القاهرة", "الجيزة", "الإسكندرية", "الاسكندرية", "المنصورة", "طنطا", "الزقازيق", "أسيوط", "بورسعيد", "السويس", "الإسماعيلية"];
+const EGYPT_TERMS_AR = [
+  "مصر",
+  "القاهرة",
+  "الجيزة",
+  "الإسكندرية",
+  "الاسكندرية",
+  "المنصورة",
+  "طنطا",
+  "الزقازيق",
+  "أسيوط",
+  "بورسعيد",
+  "السويس",
+  "الإسماعيلية",
+];
 
 // Countries and big regional cities whose presence means "not Egypt". A
 // place name that also exists in Egypt (Alexandria, Cairo) is disambiguated
@@ -112,7 +125,18 @@ const FOREIGN_TERMS = [
   "illinois",
   "ontario",
 ];
-const FOREIGN_TERMS_AR = ["الإمارات", "الامارات", "السعودية", "قطر", "الكويت", "البحرين", "الأردن", "لبنان", "المملكة المتحدة", "الولايات المتحدة"];
+const FOREIGN_TERMS_AR = [
+  "الإمارات",
+  "الامارات",
+  "السعودية",
+  "قطر",
+  "الكويت",
+  "البحرين",
+  "الأردن",
+  "لبنان",
+  "المملكة المتحدة",
+  "الولايات المتحدة",
+];
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -120,7 +144,8 @@ function escapeRegExp(value: string): string {
 
 function containsTerm(lower: string, terms: string[]): string | null {
   for (const term of terms) {
-    if (new RegExp(`(^|[^a-z])${escapeRegExp(term)}([^a-z]|$)`).test(lower)) return term;
+    if (new RegExp(`(^|[^a-z])${escapeRegExp(term)}([^a-z]|$)`).test(lower))
+      return term;
   }
   return null;
 }
@@ -131,17 +156,29 @@ function containsArabic(text: string, terms: string[]): string | null {
 
 export function mentionsEgypt(text: string | null | undefined): string | null {
   if (!text) return null;
-  return containsTerm(text.toLowerCase(), EGYPT_TERMS) ?? containsArabic(text, EGYPT_TERMS_AR);
+  return (
+    containsTerm(text.toLowerCase(), EGYPT_TERMS) ??
+    containsArabic(text, EGYPT_TERMS_AR)
+  );
 }
 
-export function mentionsForeignPlace(text: string | null | undefined): string | null {
+export function mentionsForeignPlace(
+  text: string | null | undefined,
+): string | null {
   if (!text) return null;
-  return containsTerm(text.toLowerCase(), FOREIGN_TERMS) ?? containsArabic(text, FOREIGN_TERMS_AR);
+  return (
+    containsTerm(text.toLowerCase(), FOREIGN_TERMS) ??
+    containsArabic(text, FOREIGN_TERMS_AR)
+  );
 }
 
 /** Whether a short text (a subtitle segment) reads like a place. */
 export function looksLikeLocation(text: string): boolean {
-  return Boolean(mentionsEgypt(text) || mentionsForeignPlace(text) || /\b(area|governorate|region)\b/i.test(text));
+  return Boolean(
+    mentionsEgypt(text) ||
+    mentionsForeignPlace(text) ||
+    /\b(area|governorate|region)\b/i.test(text),
+  );
 }
 
 export interface LocationVerdict {
@@ -160,7 +197,8 @@ export function classifyLocationText(
   countryCode: string,
 ): LocationVerdict {
   const value = text?.trim();
-  if (!value || countryCode.toUpperCase() !== "EG") return { inCountry: null, evidence: null };
+  if (!value || countryCode.toUpperCase() !== "EG")
+    return { inCountry: null, evidence: null };
   const foreign = mentionsForeignPlace(value);
   const egypt = mentionsEgypt(value);
   const explicitEgypt = /egypt|مصر/i.test(value);
@@ -179,7 +217,10 @@ const SERPAPI_CANONICAL: Record<string, string> = {
   mansoura: "Mansoura,Dakahlia Governorate,Egypt",
 };
 
-export function serpApiLocation(city: string | null, countryCode: string): string | null {
+export function serpApiLocation(
+  city: string | null,
+  countryCode: string,
+): string | null {
   if (countryCode.toUpperCase() !== "EG") return null;
   if (city) return SERPAPI_CANONICAL[city.trim().toLowerCase()] ?? "Egypt";
   return "Egypt";

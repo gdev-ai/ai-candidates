@@ -18,7 +18,9 @@ export class AIProviderError extends Error {
  */
 export class AIResponseValidationError extends Error {
   constructor(context: string, cause?: unknown) {
-    super(`AI response for "${context}" was not valid JSON matching the expected schema.`);
+    super(
+      `AI response for "${context}" was not valid JSON matching the expected schema.`,
+    );
     this.name = "AIResponseValidationError";
     this.cause = cause;
   }
@@ -30,7 +32,10 @@ export class AIIncompleteResponseError extends AIResponseValidationError {
     context: string,
     public readonly reason: string | null,
   ) {
-    super(context, new Error(`Response incomplete: ${reason ?? "unknown reason"}`));
+    super(
+      context,
+      new Error(`Response incomplete: ${reason ?? "unknown reason"}`),
+    );
     this.name = "AIIncompleteResponseError";
   }
 }

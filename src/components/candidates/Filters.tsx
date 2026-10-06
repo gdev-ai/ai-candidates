@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  ArrowDownWideNarrow,
+  ArrowUpNarrowWide,
+  GitBranch,
+} from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -12,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CANDIDATE_STATUSES } from "@/lib/candidates/statuses";
+import { cn } from "@/lib/utils";
 import type {
   CandidateSortField,
   SortDirection,
@@ -23,7 +29,6 @@ export interface CandidateFilterState {
   location: string;
   company: string;
   status: string;
-  openToWork: boolean;
   sortBy: CandidateSortField;
   sortDir: SortDirection;
 }
@@ -34,12 +39,29 @@ export const DEFAULT_CANDIDATE_FILTERS: CandidateFilterState = {
   location: "",
   company: "",
   status: "",
-  openToWork: false,
   sortBy: "match_score",
   sortDir: "desc",
 };
 
 const ALL_STATUSES_VALUE = "all";
+const ALL_VERSIONS_VALUE = "all";
+
+/** How each sort field reads in each direction. */
+const DIRECTION_LABELS: Record<
+  CandidateSortField,
+  { desc: string; asc: string }
+> = {
+  match_score: { desc: "Highest first", asc: "Lowest first" },
+  experience_years: { desc: "Most first", asc: "Least first" },
+  name: { desc: "Z → A", asc: "A → Z" },
+  found_at: { desc: "Newest first", asc: "Oldest first" },
+};
+
+export interface VersionOption {
+  id: string;
+  version: number;
+  candidates: number;
+}
 
 const SORT_OPTIONS: { value: CandidateSortField; label: string }[] = [
   { value: "match_score", label: "Match Score" },
@@ -51,6 +73,10 @@ const SORT_OPTIONS: { value: CandidateSortField; label: string }[] = [
 interface FiltersProps {
   value: CandidateFilterState;
   onChange: (value: CandidateFilterState) => void;
+  /** The job's search versions; shows a version filter when given. */
+  versions?: VersionOption[];
+  versionId?: string | null;
+  onVersionChange?: (versionId: string | null) => void;
 }
 
 /** URL params understood by GET /api/jobs/[id]/candidates and the export route. */
@@ -61,13 +87,18 @@ export function buildFilterQueryString(filters: CandidateFilterState): string {
   if (filters.location.trim()) params.set("location", filters.location.trim());
   if (filters.company.trim()) params.set("company", filters.company.trim());
   if (filters.status) params.set("status", filters.status);
-  if (filters.openToWork) params.set("open_to_work", "true");
   params.set("sort_by", filters.sortBy);
   params.set("sort_dir", filters.sortDir);
   return params.toString();
 }
 
-export function Filters({ value, onChange }: FiltersProps) {
+export function Filters({
+  value,
+  onChange,
+  versions,
+  versionId = null,
+  onVersionChange,
+}: FiltersProps) {
   const [draft, setDraft] = useState(value);
 
   function updateDraft<K extends keyof CandidateFilterState>(
@@ -82,13 +113,20 @@ export function Filters({ value, onChange }: FiltersProps) {
   }
 
   function clearFilters() {
-    const cleared = { ...DEFAULT_CANDIDATE_FILTERS, sortBy: value.sortBy, sortDir: value.sortDir };
+    const cleared = {
+      ...DEFAULT_CANDIDATE_FILTERS,
+      sortBy: value.sortBy,
+      sortDir: value.sortDir,
+    };
     setDraft(cleared);
     onChange(cleared);
   }
 
   function updateStatus(status: string) {
-    const updated = { ...draft, status: status === ALL_STATUSES_VALUE ? "" : status };
+    const updated = {
+      ...draft,
+      status: status === ALL_STATUSES_VALUE ? "" : status,
+    };
     setDraft(updated);
     onChange(updated);
   }
@@ -99,14 +137,14 @@ export function Filters({ value, onChange }: FiltersProps) {
     onChange(updated);
   }
 
-  function toggleSortDir() {
-    const updated: CandidateFilterState = {
-      ...draft,
-      sortDir: draft.sortDir === "asc" ? "desc" : "asc",
-    };
+  function setSortDir(sortDir: SortDirection) {
+    if (sortDir === draft.sortDir) return;
+    const updated: CandidateFilterState = { ...draft, sortDir };
     setDraft(updated);
     onChange(updated);
   }
+
+  const directionLabels = DIRECTION_LABELS[draft.sortBy];
 
   return (
     <div className="flex flex-col gap-4" data-testid="candidate-filters">
@@ -154,31 +192,56 @@ export function Filters({ value, onChange }: FiltersProps) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-2 text-sm text-muted-foreground">
-          <input
-            type="checkbox"
-            checked={draft.openToWork}
-            onChange={(e) => {
-              const updated = { ...draft, openToWork: e.target.checked };
-              setDraft(updated);
-              onChange(updated);
-            }}
-            data-testid="filter-open-to-work"
-            className="h-4 w-4 rounded border-border"
-          />
-          Open to work only
-        </label>
+        {versions && versions.length > 0 && onVersionChange && (
+          <Select
+            value={versionId ?? ALL_VERSIONS_VALUE}
+            onValueChange={(v) =>
+              onVersionChange(v === ALL_VERSIONS_VALUE ? null : v)
+            }
+          >
+            <SelectTrigger className="w-[190px]" data-testid="filter-version">
+              <span className="flex items-center gap-2">
+                <GitBranch
+                  className="h-3.5 w-3.5 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <SelectValue />
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_VERSIONS_VALUE}>
+                All versions · {versions.reduce((n, v) => n + v.candidates, 0)}
+              </SelectItem>
+              {versions.map((v) => (
+                <SelectItem key={v.id} value={v.id}>
+                  Version {v.version} · {v.candidates}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Button type="button" onClick={applyFilters} data-testid="filter-apply">
           Apply Filters
         </Button>
-        <Button type="button" variant="outline" onClick={clearFilters} data-testid="filter-clear">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={clearFilters}
+          data-testid="filter-clear"
+        >
           Clear
         </Button>
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <span className="text-sm text-muted-foreground">Sort by</span>
-          <Select value={draft.sortBy} onValueChange={(v) => updateSort(v as CandidateSortField)}>
-            <SelectTrigger className="w-[160px]" data-testid="filter-sort-field">
+          <Select
+            value={draft.sortBy}
+            onValueChange={(v) => updateSort(v as CandidateSortField)}
+          >
+            <SelectTrigger
+              className="w-[160px]"
+              data-testid="filter-sort-field"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -189,14 +252,37 @@ export function Filters({ value, onChange }: FiltersProps) {
               ))}
             </SelectContent>
           </Select>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={toggleSortDir}
+          <div
+            className="flex h-10 items-center rounded-md border border-input bg-background p-1"
+            role="radiogroup"
+            aria-label="Sort direction"
             data-testid="filter-sort-direction"
           >
-            {draft.sortDir === "desc" ? "High → Low" : "Low → High"}
-          </Button>
+            {(["desc", "asc"] as const).map((dir) => {
+              const Icon =
+                dir === "desc" ? ArrowDownWideNarrow : ArrowUpNarrowWide;
+              const active = draft.sortDir === dir;
+              return (
+                <button
+                  key={dir}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setSortDir(dir)}
+                  data-testid={`filter-sort-${dir}`}
+                  className={cn(
+                    "flex h-full items-center gap-1.5 rounded px-2.5 text-xs font-medium transition-colors",
+                    active
+                      ? "bg-foreground text-background"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                  {directionLabels[dir]}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

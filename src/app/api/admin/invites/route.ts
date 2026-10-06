@@ -24,7 +24,10 @@ export const POST = withErrorHandling(async (request: Request) => {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Request body must be valid JSON." },
+      { status: 400 },
+    );
   }
   const parsed = inviteSchema.safeParse(body);
   if (!parsed.success) {
@@ -37,8 +40,13 @@ export const POST = withErrorHandling(async (request: Request) => {
   const teamId = parsed.data.teamId ?? null;
 
   if (teamId) {
-    const { data: team } = await supabase.from("teams").select("id").eq("id", teamId).maybeSingle();
-    if (!team) return NextResponse.json({ error: "Team not found." }, { status: 400 });
+    const { data: team } = await supabase
+      .from("teams")
+      .select("id")
+      .eq("id", teamId)
+      .maybeSingle();
+    if (!team)
+      return NextResponse.json({ error: "Team not found." }, { status: 400 });
   }
 
   // members.email is stored lowercase (check constraint), so eq is exact.
@@ -48,11 +56,17 @@ export const POST = withErrorHandling(async (request: Request) => {
     .eq("email", email)
     .maybeSingle();
   if (lookupError) {
-    return NextResponse.json({ error: "Failed to look up the user." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to look up the user." },
+      { status: 500 },
+    );
   }
 
   if (existing?.status === "active") {
-    return NextResponse.json({ error: "This person already has access." }, { status: 409 });
+    return NextResponse.json(
+      { error: "This person already has access." },
+      { status: 409 },
+    );
   }
 
   if (existing) {
@@ -63,7 +77,10 @@ export const POST = withErrorHandling(async (request: Request) => {
       .select("user_id, role, status, team_id")
       .single();
     if (error) {
-      return NextResponse.json({ error: "Failed to grant access." }, { status: 500 });
+      return NextResponse.json(
+        { error: "Failed to grant access." },
+        { status: 500 },
+      );
     }
     await syncManagerAfterMemberChange(supabase, member);
     // A stale invite for the same email would otherwise linger in the list.
@@ -71,9 +88,15 @@ export const POST = withErrorHandling(async (request: Request) => {
   } else {
     const { error } = await supabase
       .from("invites")
-      .upsert({ email, role, team_id: teamId, invited_by: user.id }, { onConflict: "email" });
+      .upsert(
+        { email, role, team_id: teamId, invited_by: user.id },
+        { onConflict: "email" },
+      );
     if (error) {
-      return NextResponse.json({ error: "Failed to save the invite." }, { status: 500 });
+      return NextResponse.json(
+        { error: "Failed to save the invite." },
+        { status: 500 },
+      );
     }
   }
 
@@ -100,9 +123,14 @@ export const DELETE = withErrorHandling(async (request: Request) => {
   if ("error" in auth) return auth.error;
   const { user, supabase } = auth;
 
-  const parsed = inviteSchema.shape.email.safeParse(new URL(request.url).searchParams.get("email"));
+  const parsed = inviteSchema.shape.email.safeParse(
+    new URL(request.url).searchParams.get("email"),
+  );
   if (!parsed.success) {
-    return NextResponse.json({ error: "A valid email is required." }, { status: 400 });
+    return NextResponse.json(
+      { error: "A valid email is required." },
+      { status: 400 },
+    );
   }
 
   const { data, error } = await supabase
@@ -111,7 +139,10 @@ export const DELETE = withErrorHandling(async (request: Request) => {
     .eq("email", parsed.data)
     .select("email");
   if (error) {
-    return NextResponse.json({ error: "Failed to withdraw the invite." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to withdraw the invite." },
+      { status: 500 },
+    );
   }
   if (!data || data.length === 0) {
     return NextResponse.json({ error: "Invite not found." }, { status: 404 });

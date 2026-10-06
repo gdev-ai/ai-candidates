@@ -43,6 +43,9 @@ export interface JobCandidateListItem {
   person_id: string;
   /** The search run that found this person for this job. */
   search_run_id: string | null;
+  /** The job version whose search found them, and its number. */
+  job_version_id: string | null;
+  version: number | null;
   name: string | null;
   headline: string | null;
   current_title: string | null;

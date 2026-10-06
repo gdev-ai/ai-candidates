@@ -9,7 +9,10 @@ import {
   AIResponseValidationError,
 } from "@/lib/ai/AIProvider";
 import { getChatModel, getOpenAIClient } from "@/lib/ai/client";
-import { recordProviderCall, type ProviderPurpose } from "@/lib/providers/callLog";
+import {
+  recordProviderCall,
+  type ProviderPurpose,
+} from "@/lib/providers/callLog";
 import { openAICostUsd } from "@/lib/providers/pricing";
 
 export type ReasoningEffort = "none" | "low" | "medium" | "high";
@@ -36,6 +39,11 @@ export interface StructuredCallOptions<S extends z.ZodType> {
   temperature?: number;
   /** "flex" for bulk work: half price, slower; falls back to default on 429. */
   serviceTier?: "flex" | "default";
+  /**
+   * Default tier only: abort a call that runs longer than this and retry
+   * it once. Cuts rare 90s+ stragglers that hold up a whole batch.
+   */
+  timeoutMs?: number;
   context?: CallContext;
   model?: string;
 }
@@ -96,7 +104,10 @@ export async function runStructured<S extends z.ZodType>(
     model,
     instructions: options.instructions,
     input: options.input,
-    text: { format: zodTextFormat(options.schema, options.schemaName), verbosity: "low" as const },
+    text: {
+      format: zodTextFormat(options.schema, options.schemaName),
+      verbosity: "low" as const,
+    },
     reasoning: { effort: options.effort },
     max_output_tokens: options.maxOutputTokens,
     store: false,
@@ -134,7 +145,11 @@ export async function runStructured<S extends z.ZodType>(
       client.responses
         .parse(
           useFlex ? { ...body, service_tier: "flex" as const } : body,
-          useFlex ? { timeout: FLEX_TIMEOUT_MS, maxRetries: 0 } : undefined,
+          useFlex
+            ? { timeout: FLEX_TIMEOUT_MS, maxRetries: 0 }
+            : options.timeoutMs
+              ? { timeout: options.timeoutMs, maxRetries: 1 }
+              : undefined,
         )
         .withResponse();
     let result;
@@ -156,7 +171,8 @@ export async function runStructured<S extends z.ZodType>(
       status: "error",
       latencyMs: Date.now() - startedAt,
       httpStatus: error instanceof APIError ? (error.status ?? null) : null,
-      providerRequestId: error instanceof APIError ? (error.requestID ?? null) : null,
+      providerRequestId:
+        error instanceof APIError ? (error.requestID ?? null) : null,
       error: error instanceof Error ? error.message : String(error),
     });
     throw new AIProviderError("openai", error);
@@ -176,7 +192,8 @@ export async function runStructured<S extends z.ZodType>(
     ...base,
     model: servedModel,
     providerRequestId: requestId ?? response.id ?? null,
-    finishReason: response.incomplete_details?.reason ?? response.status ?? null,
+    finishReason:
+      response.incomplete_details?.reason ?? response.status ?? null,
     promptTokens: inputTokens,
     completionTokens: outputTokens,
     cachedTokens,
@@ -189,7 +206,11 @@ export async function runStructured<S extends z.ZodType>(
 
   if (response.status === "incomplete") {
     const reason = response.incomplete_details?.reason ?? null;
-    await recordProviderCall({ ...metrics, status: "truncated", error: `incomplete: ${reason}` });
+    await recordProviderCall({
+      ...metrics,
+      status: "truncated",
+      error: `incomplete: ${reason}`,
+    });
     throw new AIIncompleteResponseError(options.schemaName, reason);
   }
 
@@ -201,8 +222,14 @@ export async function runStructured<S extends z.ZodType>(
 
   const parsed = options.schema.safeParse(response.output_parsed);
   if (response.output_parsed == null || !parsed.success) {
-    const issue = parsed.success ? "no parsed output" : parsed.error.issues[0]?.message;
-    await recordProviderCall({ ...metrics, status: "error", error: `invalid output: ${issue}` });
+    const issue = parsed.success
+      ? "no parsed output"
+      : parsed.error.issues[0]?.message;
+    await recordProviderCall({
+      ...metrics,
+      status: "error",
+      error: `invalid output: ${issue}`,
+    });
     throw new AIResponseValidationError(
       options.schemaName,
       parsed.success ? undefined : parsed.error,

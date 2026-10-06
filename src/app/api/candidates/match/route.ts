@@ -35,22 +35,35 @@ export const POST = withErrorHandling(async (request: Request) => {
   }
   const { jobId, personId } = parsed.data;
 
-  const [{ data: job, error: jobError }, { data: link, error: linkError }] = await Promise.all([
-    supabase.from("jobs").select("id, owner_id").eq("id", jobId).maybeSingle(),
-    supabase
-      .from("job_candidates")
-      .select("person_id")
-      .eq("job_id", jobId)
-      .eq("person_id", personId)
-      .maybeSingle(),
-  ]);
+  const [{ data: job, error: jobError }, { data: link, error: linkError }] =
+    await Promise.all([
+      supabase
+        .from("jobs")
+        .select("id, owner_id")
+        .eq("id", jobId)
+        .maybeSingle(),
+      supabase
+        .from("job_candidates")
+        .select("person_id")
+        .eq("job_id", jobId)
+        .eq("person_id", personId)
+        .maybeSingle(),
+    ]);
   if (jobError || linkError) {
-    return NextResponse.json({ error: "Failed to load job or candidate." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to load job or candidate." },
+      { status: 500 },
+    );
   }
-  if (!job) return NextResponse.json({ error: "Job not found." }, { status: 404 });
+  if (!job)
+    return NextResponse.json({ error: "Job not found." }, { status: 404 });
   const forbidden = forbidUnlessOwner(job.owner_id, user.id, "job");
   if (forbidden) return forbidden;
-  if (!link) return NextResponse.json({ error: "This candidate is not on this job." }, { status: 404 });
+  if (!link)
+    return NextResponse.json(
+      { error: "This candidate is not on this job." },
+      { status: 404 },
+    );
 
   const summary = await matchCandidates(createServiceClient(), {
     jobId,

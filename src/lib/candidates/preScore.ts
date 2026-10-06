@@ -1,4 +1,9 @@
-import { cosineSimilarity, embedTexts, fromPgVector, toPgVector } from "@/lib/ai/embeddings";
+import {
+  cosineSimilarity,
+  embedTexts,
+  fromPgVector,
+  toPgVector,
+} from "@/lib/ai/embeddings";
 import { isFresh } from "@/lib/enrichment/persist";
 import type { SourcingClient } from "@/lib/supabase/types";
 
@@ -19,7 +24,10 @@ export function jobEmbeddingText(job: {
   requirements: { kind: string; text: string }[];
 }): string {
   const pick = (kinds: string[]) =>
-    job.requirements.filter((r) => kinds.includes(r.kind)).map((r) => r.text).join(", ");
+    job.requirements
+      .filter((r) => kinds.includes(r.kind))
+      .map((r) => r.text)
+      .join(", ");
   return [
     `Job title: ${job.title}`,
     job.seniority ? `Seniority: ${job.seniority}` : "",
@@ -52,6 +60,28 @@ export interface ShortlistRow {
   preScore: number;
   thin: boolean;
   locationVerified: boolean | null;
+  /** Headline says junior/intern/trainee while the job is senior or above. */
+  tooJunior?: boolean;
+}
+
+const SENIOR_LEVELS = new Set([
+  "senior",
+  "lead",
+  "manager",
+  "director",
+  "executive",
+]);
+const JUNIOR_TITLE =
+  /\b(junior|jr\.?|intern|internship|trainee|fresh graduate|entry[-\s]level|student)\b/i;
+
+/** A headline that clearly marks someone as too junior for a senior+ job. */
+export function isTooJunior(
+  headline: string | null,
+  jobSeniority: string | null,
+): boolean {
+  if (!headline || !jobSeniority || !SENIOR_LEVELS.has(jobSeniority))
+    return false;
+  return JUNIOR_TITLE.test(headline);
 }
 
 /**
@@ -64,10 +94,13 @@ export function chooseShortlist(
   extra = UNCERTAIN_EXTRA,
 ): string[] {
   const eligible = rows
-    .filter((r) => r.locationVerified !== false)
+    .filter((r) => r.locationVerified !== false && !r.tooJunior)
     .sort((a, b) => b.preScore - a.preScore);
   const top = eligible.slice(0, size);
-  const uncertain = eligible.slice(size).filter((r) => r.thin).slice(0, extra);
+  const uncertain = eligible
+    .slice(size)
+    .filter((r) => r.thin)
+    .slice(0, extra);
   return [...top, ...uncertain].map((r) => r.personId);
 }
 
@@ -75,13 +108,24 @@ export function chooseShortlist(
  * Pre-scores this run's candidates with embeddings (no enrichment cost):
  * job text vs each person's headline/snippet. Writes
  * job_candidates.pre_score, caches the vectors on jobs/people, and returns
- * the shortlist to enrich and match.
+ * the shortlist to enrich and match. With `limit`, the shortlist is the
+ * top `limit`; the rest of the run's people stay on the job with only
+ * their pre-score.
  */
 export async function preScoreRun(
   db: SourcingClient,
-  input: { runId: string; jobId: string; userId: string | null },
+  input: {
+    runId: string;
+    jobId: string;
+    userId: string | null;
+    limit?: number;
+  },
 ): Promise<{ scored: number; shortlist: string[] }> {
-  const ctx = { jobId: input.jobId, searchRunId: input.runId, userId: input.userId };
+  const ctx = {
+    jobId: input.jobId,
+    searchRunId: input.runId,
+    userId: input.userId,
+  };
   const { data: job, error: jobError } = await db
     .from("jobs")
     .select("id, title, seniority, embedding, job_requirements(kind, text)")
@@ -92,11 +136,21 @@ export async function preScoreRun(
   let jobVector = fromPgVector(job.embedding);
   if (!jobVector) {
     const [vector] = await embedTexts(
-      [jobEmbeddingText({ title: job.title, seniority: job.seniority, requirements: job.job_requirements })],
+      [
+        jobEmbeddingText({
+          title: job.title,
+          seniority: job.seniority,
+          requirements: job.job_requirements,
+        }),
+      ],
       ctx,
     );
     jobVector = vector ?? null;
-    if (jobVector) await db.from("jobs").update({ embedding: toPgVector(jobVector) }).eq("id", job.id);
+    if (jobVector)
+      await db
+        .from("jobs")
+        .update({ embedding: toPgVector(jobVector) })
+        .eq("id", job.id);
   }
   if (!jobVector) return { scored: 0, shortlist: [] };
 
@@ -112,7 +166,10 @@ export async function preScoreRun(
   if (candidates.length === 0) return { scored: 0, shortlist: [] };
 
   const missing = candidates.filter((r) => !fromPgVector(r.people.embedding));
-  const fresh = await embedTexts(missing.map((r) => personEmbeddingText(r.people)), ctx);
+  const fresh = await embedTexts(
+    missing.map((r) => personEmbeddingText(r.people)),
+    ctx,
+  );
   const vectors = new Map<string, number[]>();
   missing.forEach((r, i) => {
     const v = fresh[i];
@@ -120,22 +177,32 @@ export async function preScoreRun(
   });
   for (const r of missing) {
     const v = vectors.get(r.person_id);
-    if (v) await db.from("people").update({ embedding: toPgVector(v) }).eq("id", r.person_id);
+    if (v)
+      await db
+        .from("people")
+        .update({ embedding: toPgVector(v) })
+        .eq("id", r.person_id);
   }
 
   const shortlistRows: ShortlistRow[] = [];
-  const updates: { job_id: string; person_id: string; pre_score: number }[] = [];
+  const updates: { job_id: string; person_id: string; pre_score: number }[] =
+    [];
   for (const r of candidates) {
     const vector = vectors.get(r.person_id) ?? fromPgVector(r.people.embedding);
     if (!vector) continue;
     const preScore = similarityToScore(cosineSimilarity(jobVector, vector));
-    updates.push({ job_id: input.jobId, person_id: r.person_id, pre_score: preScore });
+    updates.push({
+      job_id: input.jobId,
+      person_id: r.person_id,
+      pre_score: preScore,
+    });
     const text = r.people.about ?? r.people.search_snippet ?? "";
     shortlistRows.push({
       personId: r.person_id,
       preScore,
       thin: !isFresh(r.people) && text.length < THIN_SNIPPET_CHARS,
       locationVerified: r.people.location_verified,
+      tooJunior: isTooJunior(r.people.headline, job.seniority),
     });
   }
   if (updates.length) {
@@ -144,5 +211,15 @@ export async function preScoreRun(
       .upsert(updates, { onConflict: "job_id,person_id" });
     if (upsertError) throw upsertError;
   }
-  return { scored: updates.length, shortlist: chooseShortlist(shortlistRows) };
+  if (input.limit === undefined) {
+    return {
+      scored: updates.length,
+      shortlist: chooseShortlist(shortlistRows),
+    };
+  }
+
+  return {
+    scored: updates.length,
+    shortlist: chooseShortlist(shortlistRows, input.limit, 0),
+  };
 }

@@ -6,11 +6,15 @@ const ANALYSIS = { job_title: "Dev", required_skills: ["React"] };
 
 describe("extractAnalysisOutput", () => {
   it("reads output_parsed", () => {
-    expect(extractAnalysisOutput({ output_parsed: ANALYSIS })).toEqual(ANALYSIS);
+    expect(extractAnalysisOutput({ output_parsed: ANALYSIS })).toEqual(
+      ANALYSIS,
+    );
   });
 
   it("parses output_text JSON", () => {
-    expect(extractAnalysisOutput({ output_text: JSON.stringify(ANALYSIS) })).toEqual(ANALYSIS);
+    expect(
+      extractAnalysisOutput({ output_text: JSON.stringify(ANALYSIS) }),
+    ).toEqual(ANALYSIS);
   });
 
   it("parses Responses API output content", () => {
@@ -18,7 +22,10 @@ describe("extractAnalysisOutput", () => {
       id: "resp_1",
       output: [
         { type: "reasoning", summary: [] },
-        { type: "message", content: [{ type: "output_text", text: JSON.stringify(ANALYSIS) }] },
+        {
+          type: "message",
+          content: [{ type: "output_text", text: JSON.stringify(ANALYSIS) }],
+        },
       ],
     };
     expect(extractAnalysisOutput(response)).toEqual(ANALYSIS);
@@ -32,7 +39,9 @@ describe("extractAnalysisOutput", () => {
     expect(extractAnalysisOutput(null)).toBeNull();
     expect(extractAnalysisOutput("text")).toBeNull();
     expect(extractAnalysisOutput({ output_text: "not json" })).toBeNull();
-    expect(extractAnalysisOutput({ output: [{ content: [{ text: "[1,2]" }] }] })).toBeNull();
+    expect(
+      extractAnalysisOutput({ output: [{ content: [{ text: "[1,2]" }] }] }),
+    ).toBeNull();
     expect(extractAnalysisOutput({ error: "x" })).toBeNull();
   });
 });

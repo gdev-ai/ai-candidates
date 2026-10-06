@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 
 import { logActivity } from "@/lib/activity/log";
 import { requireRole } from "@/lib/auth/roles";
-import { parseDateRange, singleParam, type SearchParams } from "@/lib/dates/dateRange";
+import {
+  parseDateRange,
+  singleParam,
+  type SearchParams,
+} from "@/lib/dates/dateRange";
 import { withErrorHandling } from "@/lib/errors";
 import { parseUuid } from "@/lib/manager/filters";
 import { enforceRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
@@ -37,15 +41,23 @@ export const GET = withErrorHandling(async (request: Request) => {
   const type = parseReportType(singleParam(params, "type"));
   if (!type) {
     return NextResponse.json(
-      { error: "type must be one of: performance, activity, pipeline, quality" },
+      {
+        error: "type must be one of: performance, activity, pipeline, quality",
+      },
       { status: 400 },
     );
   }
 
   const rawFormat = singleParam(params, "format") ?? "json";
-  const format = rawFormat === "json" ? "json" : EXPORT_FORMATS.find((value) => value === rawFormat);
+  const format =
+    rawFormat === "json"
+      ? "json"
+      : EXPORT_FORMATS.find((value) => value === rawFormat);
   if (!format) {
-    return NextResponse.json({ error: "format must be one of: json, csv, xlsx" }, { status: 400 });
+    return NextResponse.json(
+      { error: "format must be one of: json, csv, xlsx" },
+      { status: 400 },
+    );
   }
 
   if (format !== "json") {
@@ -82,7 +94,13 @@ export const GET = withErrorHandling(async (request: Request) => {
     action: "report.exported",
     entityType: "report",
     description: `Exported the ${report.title} report (${report.scopeLabel}, ${report.rangeLabel}) as ${format.toUpperCase()}`,
-    metadata: { type, format, scope: scope.kind, teamId: scope.teamId, range: { range: selection.range, from: selection.from, to: selection.to } },
+    metadata: {
+      type,
+      format,
+      scope: scope.kind,
+      teamId: scope.teamId,
+      range: { range: selection.range, from: selection.from, to: selection.to },
+    },
   });
 
   const fileName = reportFileName(report, format as ExportFormat);

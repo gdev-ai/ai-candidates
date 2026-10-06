@@ -22,8 +22,14 @@ export const GET = withErrorHandling(async (request: Request) => {
   const { user, supabase } = auth;
 
   const { searchParams } = new URL(request.url);
-  const page = Math.max(1, Math.floor(Number(searchParams.get("page") ?? "1")) || 1);
-  const limit = Math.min(100, Math.max(1, Math.floor(Number(searchParams.get("limit") ?? "20")) || 20));
+  const page = Math.max(
+    1,
+    Math.floor(Number(searchParams.get("page") ?? "1")) || 1,
+  );
+  const limit = Math.min(
+    100,
+    Math.max(1, Math.floor(Number(searchParams.get("limit") ?? "20")) || 20),
+  );
   const from = (page - 1) * limit;
 
   let query = supabase
@@ -32,17 +38,55 @@ export const GET = withErrorHandling(async (request: Request) => {
       "id, title, company_id, city, employment_type, work_arrangement, seniority, created_at, job_candidates(count)",
       { count: "exact" },
     )
-    .order("created_at", { ascending: false })
     .range(from, from + limit - 1);
-  if (searchParams.get("scope") !== "visible") query = query.eq("owner_id", user.id);
+  const sortBy =
+    searchParams.get("sort_by") === "title" ? "title" : "created_at";
+  const sortDir = searchParams.get("sort_dir");
+  // Newest first by default; A → Z by default when sorting by title.
+  const ascending = sortDir ? sortDir === "asc" : sortBy === "title";
+  query = query.order(sortBy, { ascending }).order("id");
+  if (searchParams.get("scope") !== "visible")
+    query = query.eq("owner_id", user.id);
+
+  const city = searchParams.get("city");
+  if (city) query = query.eq("city", city);
+  const employmentType = searchParams.get("employment_type");
+  if (employmentType) query = query.eq("employment_type", employmentType);
+  const seniority = searchParams.get("seniority");
+  if (seniority) query = query.eq("seniority", seniority);
+
+  // Free-text search: job title or company name. Characters that are
+  // syntax in a PostgREST `or` filter or an ilike pattern are dropped.
+  const q = (searchParams.get("q") ?? "").replace(/[,()%*_\\]/g, " ").trim();
+  if (q) {
+    const { data: matchingCompanies } = await supabase
+      .schema("public")
+      .from("companies")
+      .select("id")
+      .ilike("name", `%${q}%`)
+      .limit(200);
+    const matchingIds = (matchingCompanies ?? []).map((c) => c.id);
+    query = query.or(
+      matchingIds.length > 0
+        ? `title.ilike.%${q}%,company_id.in.(${matchingIds.join(",")})`
+        : `title.ilike.%${q}%`,
+    );
+  }
 
   const { data, error, count } = await query;
   if (error) {
     log.error("Failed to load jobs", { error });
-    return NextResponse.json({ error: "Failed to load jobs." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to load jobs." },
+      { status: 500 },
+    );
   }
 
-  const companyIds = [...new Set((data ?? []).map((j) => j.company_id).filter((id): id is string => !!id))];
+  const companyIds = [
+    ...new Set(
+      (data ?? []).map((j) => j.company_id).filter((id): id is string => !!id),
+    ),
+  ];
   const companyNames = new Map<string, string>();
   if (companyIds.length > 0) {
     const { data: companies } = await supabase
@@ -57,7 +101,9 @@ export const GET = withErrorHandling(async (request: Request) => {
     id: j.id,
     title: j.title,
     company_id: j.company_id,
-    company_name: j.company_id ? (companyNames.get(j.company_id) ?? null) : null,
+    company_name: j.company_id
+      ? (companyNames.get(j.company_id) ?? null)
+      : null,
     city: j.city,
     employment_type: j.employment_type,
     work_arrangement: j.work_arrangement,
@@ -83,7 +129,10 @@ export const POST = withErrorHandling(async (request: Request) => {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Request body must be valid JSON." },
+      { status: 400 },
+    );
   }
 
   const parsed = jobCreateSchema.safeParse(body);
@@ -98,8 +147,12 @@ export const POST = withErrorHandling(async (request: Request) => {
   // Users can't read or write provider_calls / job_analyses, so the
   // service client does it — scoped to this user's own successful call.
   const service = analysisCallId ? createServiceClient() : null;
-  let analysisCall: { id: string; model: string | null; prompt_version: string | null; output: Json } | null =
-    null;
+  let analysisCall: {
+    id: string;
+    model: string | null;
+    prompt_version: string | null;
+    output: Json;
+  } | null = null;
   if (service && analysisCallId) {
     const { data: call, error: callError } = await service
       .from("provider_calls")
@@ -108,16 +161,33 @@ export const POST = withErrorHandling(async (request: Request) => {
       .maybeSingle();
     if (callError) {
       log.error("Failed to load analysis call", { error: callError });
-      return NextResponse.json({ error: "Failed to load the job analysis." }, { status: 500 });
+      return NextResponse.json(
+        { error: "Failed to load the job analysis." },
+        { status: 500 },
+      );
     }
     const output = call ? extractAnalysisOutput(call.response) : null;
-    if (!call || call.user_id !== user.id || call.purpose !== "job_analysis" || call.status !== "ok" || !output) {
+    if (
+      !call ||
+      call.user_id !== user.id ||
+      call.purpose !== "job_analysis" ||
+      call.status !== "ok" ||
+      !output
+    ) {
       return NextResponse.json(
-        { error: "That job analysis can't be used. Analyze the description again." },
+        {
+          error:
+            "That job analysis can't be used. Analyze the description again.",
+        },
         { status: 400 },
       );
     }
-    analysisCall = { id: call.id, model: call.model, prompt_version: call.prompt_version, output: output as Json };
+    analysisCall = {
+      id: call.id,
+      model: call.model,
+      prompt_version: call.prompt_version,
+      output: output as Json,
+    };
   }
 
   const { data: job, error } = await supabase
@@ -130,19 +200,32 @@ export const POST = withErrorHandling(async (request: Request) => {
     log.error("Failed to create job", { error });
     const status = error?.code === "23503" ? 400 : 500;
     return NextResponse.json(
-      { error: status === 400 ? "The selected company doesn't exist." : "Failed to create job." },
+      {
+        error:
+          status === 400
+            ? "The selected company doesn't exist."
+            : "Failed to create job.",
+      },
       { status },
     );
   }
 
   if (requirements.length > 0) {
-    const { error: reqError } = await supabase
-      .from("job_requirements")
-      .insert(requirements.map((r, i) => ({ job_id: job.id, kind: r.kind, text: r.text, sort_order: i })));
+    const { error: reqError } = await supabase.from("job_requirements").insert(
+      requirements.map((r, i) => ({
+        job_id: job.id,
+        kind: r.kind,
+        text: r.text,
+        sort_order: i,
+      })),
+    );
     if (reqError) {
       log.error("Failed to save job requirements", { error: reqError });
       await supabase.from("jobs").delete().eq("id", job.id);
-      return NextResponse.json({ error: "Failed to save the job requirements." }, { status: 500 });
+      return NextResponse.json(
+        { error: "Failed to save the job requirements." },
+        { status: 500 },
+      );
     }
   }
 
@@ -157,7 +240,10 @@ export const POST = withErrorHandling(async (request: Request) => {
     if (analysisError) {
       // The job and its (recruiter-reviewed) requirements are saved; only
       // the audit copy of the AI output is missing. Don't fail the request.
-      log.error("Failed to store job analysis", { error: analysisError, jobId: job.id });
+      log.error("Failed to store job analysis", {
+        error: analysisError,
+        jobId: job.id,
+      });
     }
     await service
       .from("provider_calls")

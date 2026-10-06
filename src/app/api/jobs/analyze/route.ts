@@ -39,6 +39,11 @@ export const POST = withErrorHandling(async (request: Request) => {
     );
   }
 
-  const result = await analyzeJobDescription(parsed.data.description, { userId: auth.user.id });
-  return NextResponse.json({ analysis: result.data, analysisCallId: result.callId });
+  const result = await analyzeJobDescription(parsed.data.description, {
+    userId: auth.user.id,
+  });
+  return NextResponse.json({
+    analysis: result.data,
+    analysisCallId: result.callId,
+  });
 });

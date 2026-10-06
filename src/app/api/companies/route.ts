@@ -21,7 +21,10 @@ export const GET = withErrorHandling(async () => {
 
   if (error) {
     log.error("Failed to load companies", { error });
-    return NextResponse.json({ error: "Failed to load companies." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to load companies." },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({ companies: data ?? [] });

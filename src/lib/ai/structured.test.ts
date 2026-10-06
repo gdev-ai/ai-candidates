@@ -3,15 +3,26 @@ import type OpenAI from "openai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { AIIncompleteResponseError, AIProviderError, AIRefusalError } from "@/lib/ai/AIProvider";
+import {
+  AIIncompleteResponseError,
+  AIProviderError,
+  AIRefusalError,
+} from "@/lib/ai/AIProvider";
 import { setOpenAIClientForTesting } from "@/lib/ai/client";
 import { runStructured } from "@/lib/ai/structured";
 import { recordProviderCall } from "@/lib/providers/callLog";
 
-vi.mock("@/lib/env", () => ({ env: { OPENAI_API_KEY: "test", OPENAI_MODEL: undefined } }));
-vi.mock("@/lib/providers/callLog", () => ({ recordProviderCall: vi.fn(async () => "call-1") }));
+vi.mock("@/lib/env", () => ({
+  env: { OPENAI_API_KEY: "test", OPENAI_MODEL: undefined },
+}));
+vi.mock("@/lib/providers/callLog", () => ({
+  recordProviderCall: vi.fn(async () => "call-1"),
+}));
 
-const schema = z.object({ in_country: z.boolean().nullable(), evidence: z.string() });
+const schema = z.object({
+  in_country: z.boolean().nullable(),
+  evidence: z.string(),
+});
 
 function response(overrides: Record<string, unknown> = {}) {
   return {
@@ -26,13 +37,17 @@ function response(overrides: Record<string, unknown> = {}) {
       input_tokens_details: { cached_tokens: 0 },
       output_tokens_details: { reasoning_tokens: 40 },
     },
-    output: [{ type: "message", content: [{ type: "output_text", text: "{}" }] }],
+    output: [
+      { type: "message", content: [{ type: "output_text", text: "{}" }] },
+    ],
     output_parsed: { in_country: true, evidence: "Cairo, Egypt" },
     ...overrides,
   };
 }
 
-function fakeClient(parse: (body: Record<string, unknown>, opts?: unknown) => unknown) {
+function fakeClient(
+  parse: (body: Record<string, unknown>, opts?: unknown) => unknown,
+) {
   const fn = vi.fn((body: Record<string, unknown>, opts?: unknown) => ({
     withResponse: async () => {
       const data = await parse(body, opts);
@@ -59,9 +74,18 @@ afterEach(() => setOpenAIClientForTesting(null));
 describe("runStructured", () => {
   it("sends the §8.1 request shape and logs tokens + cost", async () => {
     const parse = fakeClient(() => response());
-    const result = await runStructured({ ...base, effort: "none", temperature: 0, context: { userId: "u1" } });
+    const result = await runStructured({
+      ...base,
+      effort: "none",
+      temperature: 0,
+      context: { userId: "u1" },
+    });
 
-    expect(result).toMatchObject({ data: { in_country: true }, callId: "call-1", model: "gpt-5.6-luna" });
+    expect(result).toMatchObject({
+      data: { in_country: true },
+      callId: "call-1",
+      model: "gpt-5.6-luna",
+    });
     const body = parse.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(body).toMatchObject({
       model: "gpt-5.6-luna",
@@ -94,9 +118,15 @@ describe("runStructured", () => {
 
   it("records a truncated response and throws without retrying", async () => {
     const parse = fakeClient(() =>
-      response({ status: "incomplete", incomplete_details: { reason: "max_output_tokens" }, output_parsed: null }),
+      response({
+        status: "incomplete",
+        incomplete_details: { reason: "max_output_tokens" },
+        output_parsed: null,
+      }),
     );
-    await expect(runStructured({ ...base, effort: "low" })).rejects.toBeInstanceOf(AIIncompleteResponseError);
+    await expect(
+      runStructured({ ...base, effort: "low" }),
+    ).rejects.toBeInstanceOf(AIIncompleteResponseError);
     expect(parse).toHaveBeenCalledTimes(1);
     expect(vi.mocked(recordProviderCall).mock.calls[0]?.[0]).toMatchObject({
       status: "truncated",
@@ -106,26 +136,45 @@ describe("runStructured", () => {
 
   it("records a refusal", async () => {
     fakeClient(() =>
-      response({ output: [{ type: "message", content: [{ type: "refusal", refusal: "no" }] }], output_parsed: null }),
+      response({
+        output: [
+          { type: "message", content: [{ type: "refusal", refusal: "no" }] },
+        ],
+        output_parsed: null,
+      }),
     );
-    await expect(runStructured({ ...base, effort: "low" })).rejects.toBeInstanceOf(AIRefusalError);
-    expect(vi.mocked(recordProviderCall).mock.calls[0]?.[0]).toMatchObject({ status: "refused" });
+    await expect(
+      runStructured({ ...base, effort: "low" }),
+    ).rejects.toBeInstanceOf(AIRefusalError);
+    expect(vi.mocked(recordProviderCall).mock.calls[0]?.[0]).toMatchObject({
+      status: "refused",
+    });
   });
 
   it("logs HTTP errors as AIProviderError", async () => {
     fakeClient(() => {
       throw new APIError(500, undefined, "boom", new Headers());
     });
-    await expect(runStructured({ ...base, effort: "low" })).rejects.toBeInstanceOf(AIProviderError);
-    expect(vi.mocked(recordProviderCall).mock.calls[0]?.[0]).toMatchObject({ status: "error", httpStatus: 500 });
+    await expect(
+      runStructured({ ...base, effort: "low" }),
+    ).rejects.toBeInstanceOf(AIProviderError);
+    expect(vi.mocked(recordProviderCall).mock.calls[0]?.[0]).toMatchObject({
+      status: "error",
+      httpStatus: 500,
+    });
   });
 
   it("uses flex for bulk calls and falls back to the default tier on 429", async () => {
     const parse = fakeClient((body) => {
-      if (body.service_tier === "flex") throw new APIError(429, undefined, "no capacity", new Headers());
+      if (body.service_tier === "flex")
+        throw new APIError(429, undefined, "no capacity", new Headers());
       return response();
     });
-    const result = await runStructured({ ...base, effort: "low", serviceTier: "flex" });
+    const result = await runStructured({
+      ...base,
+      effort: "low",
+      serviceTier: "flex",
+    });
     expect(result.data.in_country).toBe(true);
     expect(parse).toHaveBeenCalledTimes(2);
     expect(parse.mock.calls[0]?.[1]).toMatchObject({ maxRetries: 0 });

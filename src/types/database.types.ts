@@ -1171,6 +1171,41 @@ export type Database = {
           },
         ]
       }
+      job_versions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          job_id: string
+          snapshot: Json
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          job_id: string
+          snapshot: Json
+          version: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          job_id?: string
+          snapshot?: Json
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_versions_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       match_results: {
         Row: {
           created_at: string
@@ -1189,6 +1224,7 @@ export type Database = {
           skills_score: number | null
           summary: string | null
           weights: Json | null
+          job_version_id: string | null
         }
         Insert: {
           created_at?: string
@@ -1207,6 +1243,7 @@ export type Database = {
           skills_score?: number | null
           summary?: string | null
           weights?: Json | null
+          job_version_id?: string | null
         }
         Update: {
           created_at?: string
@@ -1225,6 +1262,7 @@ export type Database = {
           skills_score?: number | null
           summary?: string | null
           weights?: Json | null
+          job_version_id?: string | null
         }
         Relationships: [
           {
@@ -1817,6 +1855,7 @@ export type Database = {
           response: Json | null
           search_run_id: string | null
           status: string
+          tenant_key: string | null
           user_id: string | null
         }
         Insert: {
@@ -1843,6 +1882,7 @@ export type Database = {
           response?: Json | null
           search_run_id?: string | null
           status: string
+          tenant_key?: string | null
           user_id?: string | null
         }
         Update: {
@@ -1869,6 +1909,7 @@ export type Database = {
           response?: Json | null
           search_run_id?: string | null
           status?: string
+          tenant_key?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -2005,56 +2046,83 @@ export type Database = {
         Row: {
           candidates_found: number
           candidates_new: number
+          candidates_scored: number | null
           completed_at: string | null
           cost_usd: number
           created_at: string
           created_by: string | null
+          enrich_total: number | null
           error: string | null
           heartbeat_at: string | null
           id: string
           job_id: string
+          max_candidates: number | null
           provider: string
           queries: string[]
+          shortlist_size: number | null
+          stage: string | null
           started_at: string | null
           status: string
+          tenant_key: string | null
           total_results: number | null
           workflow_run_id: string | null
+          job_version_id: string | null
+          kind: string
+          target_person_ids: string[] | null
         }
         Insert: {
           candidates_found?: number
           candidates_new?: number
+          candidates_scored?: number | null
           completed_at?: string | null
           cost_usd?: number
           created_at?: string
           created_by?: string | null
+          enrich_total?: number | null
           error?: string | null
           heartbeat_at?: string | null
           id?: string
           job_id: string
+          max_candidates?: number | null
           provider: string
           queries?: string[]
+          shortlist_size?: number | null
+          stage?: string | null
           started_at?: string | null
           status?: string
+          tenant_key?: string | null
           total_results?: number | null
           workflow_run_id?: string | null
+          job_version_id?: string | null
+          kind?: string
+          target_person_ids?: string[] | null
         }
         Update: {
           candidates_found?: number
           candidates_new?: number
+          candidates_scored?: number | null
           completed_at?: string | null
           cost_usd?: number
           created_at?: string
           created_by?: string | null
+          enrich_total?: number | null
           error?: string | null
           heartbeat_at?: string | null
           id?: string
           job_id?: string
+          max_candidates?: number | null
           provider?: string
           queries?: string[]
+          shortlist_size?: number | null
+          stage?: string | null
           started_at?: string | null
           status?: string
+          tenant_key?: string | null
           total_results?: number | null
           workflow_run_id?: string | null
+          job_version_id?: string | null
+          kind?: string
+          target_person_ids?: string[] | null
         }
         Relationships: [
           {
@@ -2063,6 +2131,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "members"
             referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "search_runs_job_version_id_fkey"
+            columns: ["job_version_id"]
+            isOneToOne: false
+            referencedRelation: "job_versions"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "search_runs_job_id_fkey"
@@ -2101,6 +2176,33 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
         ]
+      }
+      usage_limits: {
+        Row: {
+          daily_searches: number
+          monthly_searches: number
+          tenant_key: string
+          updated_at: string
+          updated_by: string | null
+          weekly_searches: number
+        }
+        Insert: {
+          daily_searches: number
+          monthly_searches: number
+          tenant_key: string
+          updated_at?: string
+          updated_by?: string | null
+          weekly_searches: number
+        }
+        Update: {
+          daily_searches?: number
+          monthly_searches?: number
+          tenant_key?: string
+          updated_at?: string
+          updated_by?: string | null
+          weekly_searches?: number
+        }
+        Relationships: []
       }
     }
     Views: {
@@ -2148,6 +2250,16 @@ export type Database = {
       my_job_ids: { Args: never; Returns: string[] }
       my_role: { Args: never; Returns: string }
       my_team_id: { Args: never; Returns: string }
+      search_usage: {
+        Args: { p_tenant: string; p_tz?: string }
+        Returns: {
+          period: string
+          resets_at: string
+          searches: number
+          spend_usd: number
+          starts_at: string
+        }[]
+      }
       sourcing_files: {
         Args: {
           p_from?: string

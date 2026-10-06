@@ -11,14 +11,19 @@ import { createServiceClient } from "@/lib/supabase/service";
 const eventSchema = z.discriminatedUnion("event", [
   z.object({ event: z.literal("login") }),
   z.object({ event: z.literal("logout") }),
-  z.object({ event: z.literal("login_failed"), email: z.string().trim().email().max(320) }),
+  z.object({
+    event: z.literal("login_failed"),
+    email: z.string().trim().email().max(320),
+  }),
 ]);
 
 /** Most failed-login entries kept per account per hour. */
 const FAILED_LOGIN_CAP_PER_HOUR = 10;
 
 function clientIp(request: Request): string {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown"
+  );
 }
 
 /**
@@ -66,7 +71,10 @@ export const POST = withErrorHandling(async (request: Request) => {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Request body must be valid JSON." },
+      { status: 400 },
+    );
   }
 
   const parsed = eventSchema.safeParse(body);

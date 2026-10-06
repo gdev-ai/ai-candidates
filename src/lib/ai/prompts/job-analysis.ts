@@ -1,4 +1,8 @@
-import { runStructured, type CallContext, type StructuredResult } from "@/lib/ai/structured";
+import {
+  runStructured,
+  type CallContext,
+  type StructuredResult,
+} from "@/lib/ai/structured";
 import { jobAnalysisSchema, type JobAnalysis } from "@/types/job-analysis";
 
 export const JOB_ANALYSIS_PROMPT_VERSION = "job-analysis/2026-10-04";

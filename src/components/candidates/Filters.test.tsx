@@ -3,7 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { Filters, DEFAULT_CANDIDATE_FILTERS, buildFilterQueryString } from "./Filters";
+import {
+  Filters,
+  DEFAULT_CANDIDATE_FILTERS,
+  buildFilterQueryString,
+} from "./Filters";
 
 describe("Filters", () => {
   it("does not call onChange while typing (only on Apply)", async () => {
@@ -30,12 +34,15 @@ describe("Filters", () => {
     );
   });
 
-  it("changing sort field applies immediately without needing Apply", async () => {
+  it("changing sort direction applies immediately without needing Apply", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
 
     render(<Filters value={DEFAULT_CANDIDATE_FILTERS} onChange={onChange} />);
-    await user.click(screen.getByTestId("filter-sort-direction"));
+    expect(screen.getByTestId("filter-sort-desc").textContent).toContain(
+      "Highest first",
+    );
+    await user.click(screen.getByTestId("filter-sort-asc"));
 
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({ sortDir: "asc" }),
@@ -59,14 +66,22 @@ describe("Filters", () => {
     );
   });
 
-  it("open-to-work toggle applies immediately", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-
-    render(<Filters value={DEFAULT_CANDIDATE_FILTERS} onChange={onChange} />);
-    await user.click(screen.getByTestId("filter-open-to-work"));
-
-    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ openToWork: true }));
+  it("shows a version filter with the chosen version", () => {
+    render(
+      <Filters
+        value={DEFAULT_CANDIDATE_FILTERS}
+        onChange={vi.fn()}
+        versions={[
+          { id: "v1", version: 1, candidates: 77 },
+          { id: "v2", version: 2, candidates: 54 },
+        ]}
+        versionId="v2"
+        onVersionChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("filter-version").textContent).toContain(
+      "Version 2 · 54",
+    );
   });
 });
 
@@ -75,13 +90,11 @@ describe("buildFilterQueryString", () => {
     const qs = buildFilterQueryString({
       ...DEFAULT_CANDIDATE_FILTERS,
       name: " Amina ",
-      openToWork: true,
       sortBy: "found_at",
       sortDir: "asc",
     });
     expect(Object.fromEntries(new URLSearchParams(qs))).toEqual({
       name: "Amina",
-      open_to_work: "true",
       sort_by: "found_at",
       sort_dir: "asc",
     });

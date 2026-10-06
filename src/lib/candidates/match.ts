@@ -1,15 +1,23 @@
 import { scoreCandidate } from "@/lib/ai/prompts/candidate-matching";
-import { mapWithConcurrency } from "@/lib/candidates/locationCheck";
+import { mapWithConcurrency } from "@/lib/concurrency";
 import { createLogger } from "@/lib/logger";
 import type { Row, SourcingClient } from "@/lib/supabase/types";
 import type { Json } from "@/types/database.types";
 import type { RequirementKind } from "@/types/job-analysis";
-import { MATCH_WEIGHTS, STRONG_MATCH_THRESHOLD, type MatchingJob, type MatchingPerson } from "@/types/matching";
+import {
+  MATCH_WEIGHTS,
+  STRONG_MATCH_THRESHOLD,
+  type MatchingJob,
+  type MatchingPerson,
+} from "@/types/matching";
 
 const log = createLogger("match");
 const CONCURRENCY = 3;
 
-export async function loadMatchingJob(db: SourcingClient, jobId: string): Promise<MatchingJob | null> {
+export async function loadMatchingJob(
+  db: SourcingClient,
+  jobId: string,
+): Promise<MatchingJob | null> {
   const { data, error } = await db
     .from("jobs")
     .select(
@@ -21,7 +29,12 @@ export async function loadMatchingJob(db: SourcingClient, jobId: string): Promis
   if (!data) return null;
   const requirements = [...data.job_requirements]
     .sort((a, b) => a.kind.localeCompare(b.kind) || a.sort_order - b.sort_order)
-    .map((r) => ({ id: r.id, kind: r.kind as RequirementKind, text: r.text, weight: Number(r.weight) }));
+    .map((r) => ({
+      id: r.id,
+      kind: r.kind as RequirementKind,
+      text: r.text,
+      weight: Number(r.weight),
+    }));
   return {
     id: data.id,
     title: data.title,
@@ -31,8 +44,10 @@ export async function loadMatchingJob(db: SourcingClient, jobId: string): Promis
     work_arrangement: data.work_arrangement,
     city: data.city,
     country_code: data.country_code,
-    min_experience: data.min_experience === null ? null : Number(data.min_experience),
-    max_experience: data.max_experience === null ? null : Number(data.max_experience),
+    min_experience:
+      data.min_experience === null ? null : Number(data.min_experience),
+    max_experience:
+      data.max_experience === null ? null : Number(data.max_experience),
     requirements,
   };
 }
@@ -41,7 +56,10 @@ export async function loadMatchingJob(db: SourcingClient, jobId: string): Promis
  * A person with every child table. Exa's partial rows are used only when no
  * full-enrichment rows exist.
  */
-export async function loadMatchingPerson(db: SourcingClient, personId: string): Promise<MatchingPerson | null> {
+export async function loadMatchingPerson(
+  db: SourcingClient,
+  personId: string,
+): Promise<MatchingPerson | null> {
   const { data, error } = await db
     .from("people")
     .select(
@@ -57,9 +75,13 @@ export async function loadMatchingPerson(db: SourcingClient, personId: string): 
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
-  const preferFull = <T extends { source: string; sort_order: number }>(rows: T[]): T[] => {
+  const preferFull = <T extends { source: string; sort_order: number }>(
+    rows: T[],
+  ): T[] => {
     const full = rows.filter((r) => r.source !== "exa");
-    return (full.length ? full : rows).sort((a, b) => a.sort_order - b.sort_order);
+    return (full.length ? full : rows).sort(
+      (a, b) => a.sort_order - b.sort_order,
+    );
   };
   return {
     id: data.id,
@@ -72,12 +94,15 @@ export async function loadMatchingPerson(db: SourcingClient, personId: string): 
     location_text: data.location_text,
     country_code: data.country_code,
     location_verified: data.location_verified,
-    experience_years: data.experience_years === null ? null : Number(data.experience_years),
+    experience_years:
+      data.experience_years === null ? null : Number(data.experience_years),
     enriched: data.enrichment_status === "enriched",
     experiences: preferFull(data.person_experiences),
     education: preferFull(data.person_education),
     skills: [...data.person_skills].sort(
-      (a, b) => Number(b.is_top) - Number(a.is_top) || (b.endorsements ?? 0) - (a.endorsements ?? 0),
+      (a, b) =>
+        Number(b.is_top) - Number(a.is_top) ||
+        (b.endorsements ?? 0) - (a.endorsements ?? 0),
     ),
     certifications: data.person_certifications,
     languages: data.person_languages,
@@ -106,6 +131,8 @@ export async function matchCandidates(
     personIds: string[];
     userId: string | null;
     searchRunId?: string | null;
+    /** The job version the score is against (recorded on match_results). */
+    jobVersionId?: string | null;
     bulk?: boolean;
     skipScoredSince?: string | null;
   },
@@ -133,13 +160,19 @@ export async function matchCandidates(
       if (!person) throw new Error("person not found");
       const scored = await scoreCandidate(job, person, {
         bulk: input.bulk,
-        context: { jobId: job.id, personId, searchRunId: input.searchRunId ?? null, userId: input.userId },
+        context: {
+          jobId: job.id,
+          personId,
+          searchRunId: input.searchRunId ?? null,
+          userId: input.userId,
+        },
       });
       const { data: match, error } = await db
         .from("match_results")
         .insert({
           job_id: job.id,
           person_id: personId,
+          job_version_id: input.jobVersionId ?? null,
           provider_call_id: scored.callId,
           model: scored.model,
           prompt_version: scored.promptVersion,
@@ -158,7 +191,11 @@ export async function matchCandidates(
       if (error) throw error;
       const { error: linkError } = await db
         .from("job_candidates")
-        .update({ latest_match_id: match.id, match_score: match.match_score, scored_at: match.created_at })
+        .update({
+          latest_match_id: match.id,
+          match_score: match.match_score,
+          scored_at: match.created_at,
+        })
         .eq("job_id", job.id)
         .eq("person_id", personId);
       if (linkError) throw linkError;
@@ -172,7 +209,9 @@ export async function matchCandidates(
   return {
     scored: matches.length,
     failed,
-    strongMatches: matches.filter((m) => Number(m.match_score) >= STRONG_MATCH_THRESHOLD).length,
+    strongMatches: matches.filter(
+      (m) => Number(m.match_score) >= STRONG_MATCH_THRESHOLD,
+    ).length,
     matches,
   };
 }

@@ -3,13 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowRight,
-  Building2,
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
   FileText,
+  Clock,
+  Gauge,
   Loader2,
+  Maximize2,
   Search,
   Sparkles,
   UploadCloud,
@@ -17,10 +17,19 @@ import {
 } from "lucide-react";
 
 import { DashboardNav } from "@/components/dashboard/nav";
+import { refreshCredits, useCredits } from "@/components/usage/useCredits";
+import {
+  JobDetailsFields,
+  jobDetailsErrorsOf,
+} from "@/components/jobs/JobDetailsFields";
 import { RequirementsEditor } from "@/components/jobs/RequirementsEditor";
-import { SearchQueries } from "@/components/jobs/SearchQueries";
+import {
+  currentStepIndex,
+  SEARCH_STEPS,
+  SearchProgress,
+  type SearchPhase,
+} from "@/components/jobs/SearchProgress";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
@@ -29,35 +38,23 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/toast";
+import {
+  FALLBACK_ESTIMATE_MINUTES,
+  type RunProgress,
+} from "@/lib/jobs/runProgress";
+import { formatResetsIn } from "@/lib/usage/credits";
 import { cn } from "@/lib/utils";
 import {
   EMPLOYMENT_TYPE_VALUES as EMPLOYMENT_TYPES,
-  WORK_ARRANGEMENT_VALUES as WORK_ARRANGEMENTS,
   analysisToDraft,
+  CANDIDATES_PER_RUN,
   type AnalysisLike,
   type RequirementsDraft,
 } from "@/types/job";
 
 type InputMode = "paste" | "upload";
-
-/** GET /api/search/[runId]/status (see docs/api-contract.md #5). */
-interface RunStatus {
-  status: string;
-  error: string | null;
-  candidates_found: number | null;
-  candidates_new: number | null;
-  started_at: string | null;
-  completed_at: string | null;
-}
 
 const TERMINAL_RUN_STATUSES = new Set(["complete", "error", "cancelled"]);
 
@@ -78,18 +75,21 @@ export default function NewJobPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Accordion state
-  const [isJobDetailsOpen, setIsJobDetailsOpen] = useState(true);
   const [isJdOpen, setIsJdOpen] = useState(true);
 
   // Job details
   const [title, setTitle] = useState("");
   const [companyId, setCompanyId] = useState("");
-  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>(
+    [],
+  );
   const [isLoadingCompanies, setIsLoadingCompanies] = useState(true);
   const [companiesError, setCompaniesError] = useState<string | null>(null);
   const [employmentType, setEmploymentType] = useState("");
   const [workArrangement, setWorkArrangement] = useState("");
-  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>(
+    {},
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -102,7 +102,9 @@ export default function NewJobPage() {
           setCompaniesError(errorOf(data, "Failed to load companies."));
           return;
         }
-        setCompanies((data.companies as { id: string; name: string }[] | undefined) ?? []);
+        setCompanies(
+          (data.companies as { id: string; name: string }[] | undefined) ?? [],
+        );
       })
       .catch((err) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
@@ -113,8 +115,6 @@ export default function NewJobPage() {
       });
     return () => controller.abort();
   }, []);
-
-  const selectedCompanyName = companies.find((c) => c.id === companyId)?.name ?? null;
 
   // Job description & file upload
   const [mode, setMode] = useState<InputMode>("upload");
@@ -135,20 +135,48 @@ export default function NewJobPage() {
   // Save -> queries -> search
   const [savedJobId, setSavedJobId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [queries, setQueries] = useState<string[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
-  const [runStatus, setRunStatus] = useState<RunStatus | null>(null);
+  const [runStatus, setRunStatus] = useState<RunProgress | null>(null);
 
-  // Success modal
-  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  // Loading screen: open from save until the user closes the summary;
+  // "Run in background" only hides it.
+  const [searchPhase, setSearchPhase] = useState<SearchPhase | null>(null);
+  const [isProgressHidden, setIsProgressHidden] = useState(false);
+  const [searchStartedAt, setSearchStartedAt] = useState(0);
+  const [estimateMinutes, setEstimateMinutes] = useState(
+    FALLBACK_ESTIMATE_MINUTES,
+  );
 
-  const jobDetailsErrors: Record<string, string> = {};
-  if (!title.trim()) jobDetailsErrors.title = "Job title is required.";
-  if (!companyId) jobDetailsErrors.company = "Company is required.";
-  if (!employmentType) jobDetailsErrors.employmentType = "Employment type is required.";
-  if (!workArrangement) jobDetailsErrors.workArrangement = "Work arrangement is required.";
+  // Search credits are shared by everyone on the same API keys.
+  const credits = useCredits();
+  const searchBlocked = credits?.blocked ?? null;
+  const searchBlockedMessage = searchBlocked
+    ? `${searchBlocked.reason}${searchBlocked.resetsAt ? ` New searches open ${formatResetsIn(searchBlocked.resetsAt)}.` : ""}`
+    : null;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/search/estimate", {
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { minutes?: unknown } | null) => {
+        if (typeof data?.minutes === "number") setEstimateMinutes(data.minutes);
+      })
+      .catch(() => {
+        // Keep the fallback estimate.
+      });
+    return () => controller.abort();
+  }, []);
+
+  const jobDetailsErrors = jobDetailsErrorsOf({
+    title,
+    companyId,
+    employmentType,
+    workArrangement,
+  });
   const isJobDetailsValid = Object.keys(jobDetailsErrors).length === 0;
   const isRangeValid =
     !draft ||
@@ -157,7 +185,12 @@ export default function NewJobPage() {
     draft.min_experience <= draft.max_experience;
 
   function markAllFieldsTouched() {
-    setTouchedFields({ title: true, company: true, employmentType: true, workArrangement: true });
+    setTouchedFields({
+      title: true,
+      company: true,
+      employmentType: true,
+      workArrangement: true,
+    });
   }
 
   function formatFileSize(bytes: number): string {
@@ -176,7 +209,10 @@ export default function NewJobPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const response = await fetch("/api/files/extract", { method: "POST", body: formData });
+      const response = await fetch("/api/files/extract", {
+        method: "POST",
+        body: formData,
+      });
       const data = await readJson(response);
 
       if (!response.ok) {
@@ -186,8 +222,17 @@ export default function NewJobPage() {
         return;
       }
 
-      setDescription(typeof data.text === "string" ? data.text : "");
-      toast.success(`Extracted content from ${file.name}`, "Upload Successful");
+      const text = typeof data.text === "string" ? data.text : "";
+      if (text.trim().length < 50) {
+        const msg =
+          "Couldn't read enough text from this file. Upload another file or paste the text instead.";
+        setExtractError(msg);
+        toast.error(msg);
+        return;
+      }
+      setDescription(text);
+      // A readable file goes straight to analysis; there's nothing to review here.
+      void handleAnalyze(text);
     } catch {
       setExtractError("Failed to upload or process the file.");
       toast.error("Failed to upload or process the file.");
@@ -216,16 +261,14 @@ export default function NewJobPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  /** Anything edited after queries were generated makes them stale. */
+  /** Edits after a save are picked up by the next "Update Job & Search Again". */
   function handleDraftChange(updated: RequirementsDraft) {
     setDraft(updated);
-    if (queries && !runId) setQueries(null);
   }
 
-  async function handleAnalyze() {
-    if (description.trim().length < 50) return;
+  async function handleAnalyze(text: string = description) {
+    if (text.trim().length < 50) return;
 
-    setIsJobDetailsOpen(false);
     setIsJdOpen(false);
     setAnalyzeError(null);
     setIsAnalyzing(true);
@@ -235,7 +278,7 @@ export default function NewJobPage() {
       const response = await fetch("/api/jobs/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description }),
+        body: JSON.stringify({ description: text }),
       });
       const data = await readJson(response);
 
@@ -248,17 +291,23 @@ export default function NewJobPage() {
 
       const analysis = data.analysis as AnalysisLike;
       setDraft(analysisToDraft(analysis));
-      setAnalysisCallId(typeof data.analysisCallId === "string" ? data.analysisCallId : null);
-      setQueries(null);
+      setAnalysisCallId(
+        typeof data.analysisCallId === "string" ? data.analysisCallId : null,
+      );
       if (!title && analysis.job_title) setTitle(analysis.job_title);
       if (
         !employmentType &&
         analysis.employment_type &&
-        (EMPLOYMENT_TYPES as readonly string[]).includes(analysis.employment_type)
+        (EMPLOYMENT_TYPES as readonly string[]).includes(
+          analysis.employment_type,
+        )
       ) {
         setEmploymentType(analysis.employment_type);
       }
-      toast.success("Requirements extracted from the job description.", "Analysis Complete");
+      toast.success(
+        "Requirements extracted from the job description.",
+        "Analysis Complete",
+      );
     } catch {
       setAnalyzeError("Failed to analyze the job description.");
       toast.error("Failed to analyze the job description.");
@@ -267,12 +316,18 @@ export default function NewJobPage() {
     }
   }
 
-  /** Creates the job (or updates it if already saved), then generates queries. */
-  async function handleSaveAndGenerate() {
-    if (!draft || isSaving) return;
+  /**
+   * Creates the job (or updates it if already saved), generates search
+   * queries and, if that succeeds, starts the search with them right away.
+   */
+  async function handleSaveAndSearch() {
+    if (!draft || isSaving || isSearching) return;
+    if (searchBlockedMessage) {
+      toast.error(searchBlockedMessage, "Search Limit Reached");
+      return;
+    }
     if (!isJobDetailsValid || !isRangeValid) {
       markAllFieldsTouched();
-      if (!isJobDetailsValid) setIsJobDetailsOpen(true);
       const msg = !isJobDetailsValid
         ? "Please complete all required job details before continuing."
         : "Minimum experience can't be more than maximum.";
@@ -283,6 +338,12 @@ export default function NewJobPage() {
 
     setSearchError(null);
     setIsSaving(true);
+    setRunStatus(null);
+    setSearchStartedAt(Date.now());
+    setSearchPhase("preparing");
+    setIsProgressHidden(false);
+    let generated: string[] | null = null;
+    let jobId = savedJobId;
 
     const fields = {
       title: title.trim(),
@@ -298,7 +359,6 @@ export default function NewJobPage() {
     };
 
     try {
-      let jobId = savedJobId;
       const jobResponse = jobId
         ? await fetch(`/api/jobs/${jobId}`, {
             method: "PATCH",
@@ -308,7 +368,10 @@ export default function NewJobPage() {
         : await fetch("/api/jobs", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...fields, ...(analysisCallId ? { analysisCallId } : {}) }),
+            body: JSON.stringify({
+              ...fields,
+              ...(analysisCallId ? { analysisCallId } : {}),
+            }),
           });
       const jobData = await readJson(jobResponse);
       if (!jobResponse.ok) {
@@ -326,7 +389,6 @@ export default function NewJobPage() {
         setSavedJobId(jobId);
       }
 
-      toast.info("Generating search queries...", "Job Saved");
       const queryResponse = await fetch("/api/jobs/generate-queries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -339,14 +401,24 @@ export default function NewJobPage() {
         toast.error(msg);
         return;
       }
-      setQueries((queryData.queries as unknown[]).filter((q): q is string => typeof q === "string"));
-      toast.success("Review the search queries, then start the search.", "Queries Ready");
+      generated = (queryData.queries as unknown[])
+        .filter((q): q is string => typeof q === "string")
+        .map((q) => q.trim())
+        .filter(Boolean);
+      if (generated.length === 0) {
+        setSearchError("No search queries could be generated for this job.");
+        toast.error("No search queries could be generated for this job.");
+        generated = null;
+      }
     } catch {
       setSearchError("Failed to save the job or generate queries.");
       toast.error("Failed to save the job or generate queries.");
     } finally {
       setIsSaving(false);
     }
+
+    if (jobId && generated) await startSearch(jobId, generated);
+    else setSearchPhase(null);
   }
 
   async function pollRun(currentRunId: string) {
@@ -371,18 +443,30 @@ export default function NewJobPage() {
         const msg = errorOf(data, "Failed to check search status.");
         setSearchError(msg);
         toast.error(msg, "Search Error");
+        setSearchPhase(null);
         return;
       }
 
-      const run = data as unknown as RunStatus;
+      const run = data as unknown as RunProgress;
       setRunStatus(run);
 
       if (TERMINAL_RUN_STATUSES.has(run.status)) {
         if (run.status === "complete") {
-          setIsSuccessModalOpen(true);
-          toast.success(`Found ${run.candidates_found ?? 0} candidates.`, "Sourcing Complete");
+          // Reopen the screen on its summary, even if it was hidden.
+          setSearchPhase("complete");
+          setIsProgressHidden(false);
+          void refreshCredits();
+          toast.success(
+            `Found ${run.candidates_found ?? 0} candidates.`,
+            "Sourcing Complete",
+          );
         } else {
-          const msg = run.error || (run.status === "cancelled" ? "The search was cancelled." : "The search failed.");
+          setSearchPhase(null);
+          const msg =
+            run.error ||
+            (run.status === "cancelled"
+              ? "The search was cancelled."
+              : "The search failed.");
           setSearchError(msg);
           toast.error(msg, "Sourcing Failed");
         }
@@ -392,35 +476,35 @@ export default function NewJobPage() {
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     }
 
-    setSearchError("The search is taking longer than expected. Check the job's candidates shortly.");
-    toast.warning("The search is taking longer than expected. Check back shortly.");
+    setSearchPhase(null);
+    setSearchError(
+      "The search is taking longer than expected. Check the job's candidates shortly.",
+    );
+    toast.warning(
+      "The search is taking longer than expected. Check back shortly.",
+    );
   }
 
-  async function handleStartSearch() {
-    if (!savedJobId || !queries || isSearching) return;
-    const cleaned = queries.map((q) => q.trim()).filter(Boolean);
-    if (cleaned.length === 0) {
-      setSearchError("Add at least one search query.");
-      return;
-    }
-
+  async function startSearch(jobId: string, queries: string[]) {
     setSearchError(null);
     setIsSearching(true);
     setRunStatus(null);
-    toast.info("Searching for candidates...", "Sourcing Started");
+    setSearchPhase("running");
 
     try {
-      const res = await fetch(`/api/jobs/${savedJobId}/search`, {
+      const res = await fetch(`/api/jobs/${jobId}/search`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ queries: cleaned }),
+        body: JSON.stringify({ queries }),
       });
       const data = await readJson(res);
       const run = data.run as { id: string; status: string } | undefined;
+      void refreshCredits();
       if (!res.ok || !run?.id) {
         const msg = errorOf(data, "Failed to start the candidate search.");
         setSearchError(msg);
         toast.error(msg);
+        setSearchPhase(null);
         return;
       }
       setRunId(run.id);
@@ -428,6 +512,7 @@ export default function NewJobPage() {
     } catch {
       setSearchError("An unexpected error occurred during candidate sourcing.");
       toast.error("An unexpected error occurred during candidate sourcing.");
+      setSearchPhase(null);
     } finally {
       setIsSearching(false);
     }
@@ -436,6 +521,26 @@ export default function NewJobPage() {
   const candidatesHref = savedJobId
     ? `/candidates?jobId=${savedJobId}${runId ? `&runId=${runId}` : ""}`
     : "/candidates";
+  const searchLocation = draft?.city?.trim() || "Egypt";
+
+  const jobDetailsFields = (
+    <JobDetailsFields
+      value={{ title, companyId, employmentType, workArrangement }}
+      onChange={(patch) => {
+        if (patch.title !== undefined) setTitle(patch.title);
+        if (patch.companyId !== undefined) setCompanyId(patch.companyId);
+        if (patch.employmentType !== undefined)
+          setEmploymentType(patch.employmentType);
+        if (patch.workArrangement !== undefined)
+          setWorkArrangement(patch.workArrangement);
+      }}
+      companies={companies}
+      isLoadingCompanies={isLoadingCompanies}
+      companiesError={companiesError}
+      touchedFields={touchedFields}
+      setTouchedFields={setTouchedFields}
+    />
+  );
 
   return (
     <main className="min-h-screen bg-slate-50/70 pb-24">
@@ -449,188 +554,13 @@ export default function NewJobPage() {
             Create New Job Opening
           </h1>
           <p className="text-sm text-slate-500">
-            Provide the role details and job description. The AI extracts the requirements, you
-            review them and the search queries, then candidates are sourced and scored.
+            Provide the job description. The AI extracts the role details and
+            requirements, you review them, then candidates are sourced and
+            scored.
           </p>
         </div>
 
-        {/* 1. Job Details Accordion */}
-        <Card className="shadow-sm border-slate-200 transition-all">
-          <CardHeader
-            className="cursor-pointer select-none pb-4 border-b border-slate-100 hover:bg-slate-50/50 transition-colors"
-            onClick={() => setIsJobDetailsOpen((prev) => !prev)}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 font-semibold text-sm">
-                  1
-                </div>
-                <div>
-                  <CardTitle className="text-base font-semibold text-slate-900">
-                    Job Details
-                  </CardTitle>
-                  <CardDescription className="text-xs text-slate-500">
-                    {isJobDetailsOpen
-                      ? "Specify job title, company, and employment structure"
-                      : `${title || "Role Title"} • ${selectedCompanyName || "Company"} • ${employmentType || "Full-time"} • ${workArrangement || "Remote"}`}
-                  </CardDescription>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {!isJobDetailsOpen && (
-                  <Badge tone="neutral" className="text-xs font-normal">
-                    {title || "Configured"}
-                  </Badge>
-                )}
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500">
-                  {isJobDetailsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-
-          {isJobDetailsOpen && (
-            <CardContent className="pt-6 flex flex-col gap-5 animate-in fade-in duration-200">
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="job-title" className="text-xs font-semibold text-slate-700">
-                  Job Title <span className="text-red-600">*</span>
-                </label>
-                <Input
-                  id="job-title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  onBlur={() => setTouchedFields((prev) => ({ ...prev, title: true }))}
-                  placeholder="e.g. Senior React Developer"
-                  className="bg-white"
-                  aria-invalid={touchedFields.title && !!jobDetailsErrors.title}
-                  data-testid="job-title-input"
-                />
-                {touchedFields.title && jobDetailsErrors.title && (
-                  <p role="alert" className="text-xs font-medium text-red-600">
-                    {jobDetailsErrors.title}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="job-company" className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                  <Building2 className="h-3.5 w-3.5 text-slate-400" />
-                  Company <span className="text-red-600">*</span>
-                </label>
-                <Select
-                  value={companyId}
-                  onValueChange={(value) => {
-                    setCompanyId(value);
-                    setTouchedFields((prev) => ({ ...prev, company: true }));
-                  }}
-                  disabled={isLoadingCompanies}
-                >
-                  <SelectTrigger
-                    id="job-company"
-                    className="bg-white"
-                    aria-invalid={touchedFields.company && !!jobDetailsErrors.company}
-                    data-testid="job-company-trigger"
-                  >
-                    <SelectValue
-                      placeholder={isLoadingCompanies ? "Loading companies..." : "Select a company"}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {companies.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {touchedFields.company && jobDetailsErrors.company && (
-                  <p role="alert" className="text-xs font-medium text-red-600">
-                    {jobDetailsErrors.company}
-                  </p>
-                )}
-                {companiesError && (
-                  <p role="alert" className="text-xs font-medium text-red-600">
-                    {companiesError}
-                  </p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-semibold text-slate-700">
-                    Employment Type <span className="text-red-600">*</span>
-                  </span>
-                  <Select
-                    value={employmentType}
-                    onValueChange={(value) => {
-                      setEmploymentType(value);
-                      setTouchedFields((prev) => ({ ...prev, employmentType: true }));
-                    }}
-                  >
-                    <SelectTrigger className="bg-white" data-testid="job-employment-type-trigger">
-                      <SelectValue placeholder="Select type (e.g. Full-time)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {EMPLOYMENT_TYPES.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {touchedFields.employmentType && jobDetailsErrors.employmentType && (
-                    <p role="alert" className="text-xs font-medium text-red-600">
-                      {jobDetailsErrors.employmentType}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-semibold text-slate-700">
-                    Work Arrangement <span className="text-red-600">*</span>
-                  </span>
-                  <Select
-                    value={workArrangement}
-                    onValueChange={(value) => {
-                      setWorkArrangement(value);
-                      setTouchedFields((prev) => ({ ...prev, workArrangement: true }));
-                    }}
-                  >
-                    <SelectTrigger className="bg-white" data-testid="job-work-arrangement-trigger">
-                      <SelectValue placeholder="Select arrangement (e.g. Remote)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {WORK_ARRANGEMENTS.map((arrangement) => (
-                        <SelectItem key={arrangement} value={arrangement}>
-                          {arrangement}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {touchedFields.workArrangement && jobDetailsErrors.workArrangement && (
-                    <p role="alert" className="text-xs font-medium text-red-600">
-                      {jobDetailsErrors.workArrangement}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsJobDetailsOpen(false)}
-                  className="text-xs text-slate-600"
-                >
-                  Save & Collapse
-                </Button>
-              </div>
-            </CardContent>
-          )}
-        </Card>
-
-        {/* 2. Job Description Accordion */}
+        {/* 1. Job Description Accordion */}
         <Card className="shadow-sm border-slate-200 transition-all">
           <CardHeader
             className="cursor-pointer select-none pb-4 border-b border-slate-100 hover:bg-slate-50/50 transition-colors"
@@ -639,7 +569,7 @@ export default function NewJobPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 font-semibold text-sm">
-                  2
+                  1
                 </div>
                 <div>
                   <CardTitle className="text-base font-semibold text-slate-900">
@@ -659,11 +589,21 @@ export default function NewJobPage() {
               <div className="flex items-center gap-2">
                 {!isJdOpen && description && (
                   <Badge tone="good" className="text-xs font-normal">
-                    {uploadedFileName ? "File Attached" : `${description.length} chars`}
+                    {uploadedFileName
+                      ? "File Attached"
+                      : `${description.length} chars`}
                   </Badge>
                 )}
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500">
-                  {isJdOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-slate-500"
+                >
+                  {isJdOpen ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
                 </Button>
               </div>
             </div>
@@ -671,7 +611,6 @@ export default function NewJobPage() {
 
           {isJdOpen && (
             <CardContent className="pt-6 flex flex-col gap-5 animate-in fade-in duration-200">
-              
               {/* Mode Toggle */}
               <div className="flex items-center gap-2 p-1 bg-slate-100/80 rounded-lg w-fit">
                 <button
@@ -681,7 +620,7 @@ export default function NewJobPage() {
                     "flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-all",
                     mode === "upload"
                       ? "bg-white text-slate-900 shadow-xs"
-                      : "text-slate-500 hover:text-slate-900"
+                      : "text-slate-500 hover:text-slate-900",
                   )}
                 >
                   <UploadCloud className="h-3.5 w-3.5" />
@@ -694,7 +633,7 @@ export default function NewJobPage() {
                     "flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-all",
                     mode === "paste"
                       ? "bg-white text-slate-900 shadow-xs"
-                      : "text-slate-500 hover:text-slate-900"
+                      : "text-slate-500 hover:text-slate-900",
                   )}
                 >
                   <FileText className="h-3.5 w-3.5" />
@@ -727,7 +666,7 @@ export default function NewJobPage() {
                         "flex flex-col items-center justify-center p-8 rounded-xl border-2 border-dashed transition-all cursor-pointer text-center",
                         isDragging
                           ? "border-indigo-500 bg-indigo-50/50"
-                          : "border-slate-200 hover:border-indigo-400 hover:bg-slate-50/80"
+                          : "border-slate-200 hover:border-indigo-400 hover:bg-slate-50/80",
                       )}
                     >
                       <div className="h-12 w-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 mb-3 shadow-xs">
@@ -740,9 +679,15 @@ export default function NewJobPage() {
                         Supports PDF, DOCX, or TXT documents up to 10MB
                       </p>
                       <div className="flex items-center gap-2 mt-4">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600">PDF</span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600">DOCX</span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600">TXT</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600">
+                          PDF
+                        </span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600">
+                          DOCX
+                        </span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600">
+                          TXT
+                        </span>
                       </div>
                     </div>
                   ) : (
@@ -753,8 +698,17 @@ export default function NewJobPage() {
                             DOC
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-slate-900">{uploadedFileName}</p>
-                            <p className="text-xs text-slate-500">{uploadedFileSize} • Ready for analysis</p>
+                            <p className="text-sm font-semibold text-slate-900">
+                              {uploadedFileName}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {uploadedFileSize} •{" "}
+                              {isExtracting
+                                ? "Reading file..."
+                                : extractError
+                                  ? "Couldn’t read this file"
+                                  : "Text extracted"}
+                            </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -778,13 +732,6 @@ export default function NewJobPage() {
                           </Button>
                         </div>
                       </div>
-
-                      {description && (
-                        <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600 max-h-40 overflow-y-auto leading-relaxed">
-                          <span className="font-semibold text-slate-900 block mb-1">Extracted Text Preview:</span>
-                          {description}
-                        </div>
-                      )}
                     </div>
                   )}
 
@@ -796,7 +743,10 @@ export default function NewJobPage() {
                   )}
 
                   {extractError && (
-                    <p role="alert" className="text-xs font-medium text-red-600">
+                    <p
+                      role="alert"
+                      className="text-xs font-medium text-red-600"
+                    >
                       {extractError}
                     </p>
                   )}
@@ -819,27 +769,32 @@ export default function NewJobPage() {
                 </div>
               )}
 
-              {/* Action: Analyze Job Button */}
-              <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
-                <Button
-                  type="button"
-                  onClick={handleAnalyze}
-                  disabled={isAnalyzing || description.trim().length < 50}
-                  className="w-full sm:w-auto self-end bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
-                >
-                  Analyze Job with AI
-                </Button>
-                {analyzeError && (
-                  <p role="alert" className="text-xs font-medium text-red-600 text-right">
-                    {analyzeError}
-                  </p>
-                )}
-              </div>
+              {/* Action: Analyze Job Button (uploads analyze automatically; shown there only to retry) */}
+              {(mode === "paste" || (analyzeError && description)) && (
+                <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => handleAnalyze()}
+                    disabled={isAnalyzing || description.trim().length < 50}
+                    className="w-full sm:w-auto self-end bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
+                  >
+                    {analyzeError ? "Retry Analysis" : "Analyze Job with AI"}
+                  </Button>
+                  {analyzeError && (
+                    <p
+                      role="alert"
+                      className="text-xs font-medium text-red-600 text-right"
+                    >
+                      {analyzeError}
+                    </p>
+                  )}
+                </div>
+              )}
             </CardContent>
           )}
         </Card>
 
-        {/* 3. Loading Screen when Analyzing */}
+        {/* 2. Loading Screen when Analyzing */}
         {isAnalyzing && (
           <Card className="p-8 text-center animate-in fade-in duration-300">
             <div className="flex flex-col items-center justify-center max-w-md mx-auto">
@@ -853,7 +808,8 @@ export default function NewJobPage() {
                 Analyzing Job Description...
               </h3>
               <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                Our AI model is extracting required technical skills, preferred competencies, seniority level, and candidate qualifications.
+                Our AI model is extracting required technical skills, preferred
+                competencies, seniority level, and candidate qualifications.
               </p>
               <div className="w-full bg-indigo-100 rounded-full h-1.5 mt-6 overflow-hidden">
                 <div className="bg-indigo-600 h-full rounded-full animate-indeterminate" />
@@ -861,119 +817,159 @@ export default function NewJobPage() {
             </div>
           </Card>
         )}
-        {/* 4. Extracted requirements */}
+        {/* 3. Job details & extracted requirements */}
         {draft && (
           <Card className="animate-in fade-in border-slate-200 shadow-sm duration-300">
             <CardHeader className="border-b border-slate-100 pb-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="font-display text-xl font-bold text-slate-900">
-                    Extracted Requirements
-                  </CardTitle>
-                  <CardDescription className="text-xs text-slate-500">
-                    Review and fine-tune what the AI extracted before saving the job
-                  </CardDescription>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-sm font-semibold text-indigo-600">
+                    2
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-semibold text-slate-900">
+                      Job Details & Requirements
+                    </CardTitle>
+                    <CardDescription className="text-xs text-slate-500">
+                      Review, complete and fine-tune what the AI extracted
+                      before saving the job
+                    </CardDescription>
+                  </div>
                 </div>
-                <Badge tone={savedJobId ? "good" : "neutral"} className="text-xs font-medium">
+                <Badge
+                  tone={savedJobId ? "good" : "neutral"}
+                  className="text-xs font-medium"
+                >
                   {savedJobId ? "Job saved" : "Not saved yet"}
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="pt-6">
-              <RequirementsEditor value={draft} onChange={handleDraftChange} />
+              <RequirementsEditor value={draft} onChange={handleDraftChange}>
+                {jobDetailsFields}
+              </RequirementsEditor>
 
-              <div className="mt-8 bg-black p-6 text-white">
+              <div className="mt-8 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-6 text-white shadow-md">
                 <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
                   <div>
                     <h4 className="flex items-center gap-2 text-base font-bold text-white">
                       <Sparkles className="h-4 w-4 text-indigo-400" />
-                      {queries ? "Search Queries" : "Save & Build Search Queries"}
+                      {savedJobId
+                        ? "Update & Search Again"
+                        : "Save & Find Candidates"}
                     </h4>
                     <p className="mt-1 max-w-xl text-xs leading-relaxed text-slate-300">
-                      {queries
-                        ? "Edit, remove or add queries, then start the search. Location targeting is added automatically."
-                        : "Saves the job with these requirements and generates targeted search queries for you to review."}
+                      Saves the job with these requirements, then finds
+                      candidates and AI-scores the {CANDIDATES_PER_RUN} most
+                      promising. Everyone else found is kept on the job
+                      unscored.
                     </p>
-                  </div>
-                  {!queries && (
-                    <Button
-                      type="button"
-                      size="lg"
-                      onClick={handleSaveAndGenerate}
-                      disabled={isSaving || isSearching || !isJobDetailsValid || !isRangeValid}
-                      className="shrink-0 bg-indigo-600 font-semibold text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 disabled:opacity-60"
-                      data-testid="save-generate-button"
-                    >
-                      {isSaving ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="mr-2 h-4 w-4" />
-                          {savedJobId ? "Update Job & Regenerate Queries" : "Save Job & Generate Queries"}
-                        </>
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <span className="flex items-center gap-1.5 text-xs text-slate-400">
+                        <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                        Takes about {estimateMinutes} min
+                      </span>
+                      {credits && !searchBlocked && (
+                        <span
+                          className={cn(
+                            "flex items-center gap-1.5 text-xs",
+                            credits.searchesLeft <= 3
+                              ? "text-amber-300"
+                              : "text-slate-400",
+                          )}
+                          data-testid="searches-left"
+                        >
+                          <Gauge className="h-3.5 w-3.5" aria-hidden="true" />
+                          {credits.searchesLeft}{" "}
+                          {credits.searchesLeft === 1 ? "search" : "searches"}{" "}
+                          left
+                        </span>
                       )}
-                    </Button>
-                  )}
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    size="lg"
+                    onClick={handleSaveAndSearch}
+                    disabled={
+                      isSaving ||
+                      isSearching ||
+                      !isJobDetailsValid ||
+                      !isRangeValid ||
+                      Boolean(searchBlocked)
+                    }
+                    className="shrink-0 bg-indigo-600 font-semibold text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 disabled:opacity-60"
+                    data-testid="find-candidates-button"
+                  >
+                    {isSaving || isSearching ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        {isSaving
+                          ? "Preparing search..."
+                          : "Finding Candidates..."}
+                      </>
+                    ) : (
+                      <>
+                        <Search className="mr-2 h-4 w-4" />
+                        {savedJobId
+                          ? "Update Job & Search Again"
+                          : "Save Job & Find Candidates"}
+                      </>
+                    )}
+                  </Button>
                 </div>
 
-                {!isJobDetailsValid && (
-                  <p className="mt-3 text-xs text-amber-300">
-                    Complete all required job details above (title, company, employment type, work
-                    arrangement) to continue.
+                {searchBlockedMessage && (
+                  <p
+                    className="mt-3 text-xs text-red-300"
+                    data-testid="search-limit-message"
+                  >
+                    {searchBlockedMessage} Limits are shared by everyone using
+                    these API keys.
                   </p>
                 )}
 
-                {queries && (
-                  <div className="mt-5 rounded-xl bg-white p-4 text-slate-900" data-testid="queries-review">
-                    <SearchQueries queries={queries} onChange={setQueries} />
-                    <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleSaveAndGenerate}
-                        disabled={isSaving || isSearching}
-                      >
-                        {isSaving ? "Regenerating..." : "Regenerate"}
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={handleStartSearch}
-                        disabled={isSearching || isSaving || queries.every((q) => !q.trim())}
-                        className="bg-indigo-600 font-semibold text-white hover:bg-indigo-500"
-                        data-testid="find-candidates-button"
-                      >
-                        {isSearching ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Finding Candidates...
-                          </>
-                        ) : (
-                          <>
-                            <Search className="mr-2 h-4 w-4" />
-                            Start Search
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </div>
+                {!isJobDetailsValid && (
+                  <p className="mt-3 text-xs text-amber-300">
+                    Complete all required job details above (title, company,
+                    employment type, work arrangement) to continue.
+                  </p>
                 )}
 
-                {isSearching && (
-                  <div className="mt-4 flex items-center gap-3 border-t border-white/10 pt-4 text-xs text-indigo-200" data-testid="search-progress">
-                    <Loader2 className="h-4 w-4 animate-spin text-indigo-400" />
-                    <span>
-                      {!runStatus || runStatus.status === "pending"
-                        ? "Starting the search..."
-                        : `Searching and scoring candidates · ${runStatus.candidates_found ?? 0} found so far`}
-                    </span>
-                  </div>
-                )}
+                {searchPhase &&
+                  searchPhase !== "complete" &&
+                  isProgressHidden && (
+                    <div
+                      className="mt-4 flex flex-wrap items-center gap-3 border-t border-white/10 pt-4 text-xs text-slate-300"
+                      data-testid="search-progress"
+                    >
+                      <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                      <span className="flex-1">
+                        Running in the background:{" "}
+                        <span className="font-semibold text-white">
+                          {
+                            SEARCH_STEPS[
+                              currentStepIndex(searchPhase, runStatus)
+                            ]?.title
+                          }
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsProgressHidden(false)}
+                        className="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-2.5 py-1 font-semibold text-white transition-colors hover:bg-white/20"
+                      >
+                        <Maximize2 className="h-3.5 w-3.5" />
+                        Show progress
+                      </button>
+                    </div>
+                  )}
 
                 {searchError && (
-                  <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/20 p-3 text-xs text-red-200" role="alert">
+                  <div
+                    className="mt-3 rounded-lg border border-red-500/30 bg-red-500/20 p-3 text-xs text-red-200"
+                    role="alert"
+                  >
                     {searchError}
                     {savedJobId && (
                       <button
@@ -992,58 +988,25 @@ export default function NewJobPage() {
         )}
       </div>
 
-      {/* 5. Success modal */}
-      {isSuccessModalOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm duration-200"
-        >
-          <div className="animate-in zoom-in-95 relative w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-2xl ring-1 ring-slate-900/10 duration-200 sm:p-8">
-            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 ring-8 ring-emerald-50">
-              <CheckCircle2 className="h-8 w-8" />
-            </div>
-
-            <h2 className="font-display text-2xl font-bold text-slate-900">Candidate Sourcing Complete!</h2>
-
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              Found{" "}
-              <span className="text-base font-bold text-slate-900">
-                {runStatus?.candidates_found ?? 0} candidates
-              </span>
-              {runStatus?.candidates_new ? ` (${runStatus.candidates_new} new to the database)` : ""} for{" "}
-              <span className="font-medium text-slate-900">{title || "this role"}</span>.
-            </p>
-
-            {selectedCompanyName && (
-              <p className="mt-1 text-xs text-slate-400">
-                Company: <span className="font-medium text-slate-600">{selectedCompanyName}</span>
-              </p>
-            )}
-
-            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsSuccessModalOpen(false)}
-                className="w-full text-slate-700 hover:bg-slate-50 sm:w-1/2"
-              >
-                Close
-              </Button>
-              <Button
-                type="button"
-                onClick={() => {
-                  setIsSuccessModalOpen(false);
-                  router.push(candidatesHref);
-                }}
-                className="w-full bg-indigo-600 font-medium text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700 sm:w-1/2"
-              >
-                Show Candidates
-                <ArrowRight className="ml-1.5 h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
+      {/* 4. Search loading screen, ending on a summary */}
+      {searchPhase && !isProgressHidden && (
+        <SearchProgress
+          phase={searchPhase}
+          progress={runStatus}
+          estimateMinutes={estimateMinutes}
+          startedAt={searchStartedAt}
+          candidateLimit={CANDIDATES_PER_RUN}
+          jobTitle={title.trim()}
+          location={searchLocation}
+          onHide={() => {
+            if (searchPhase === "complete") setSearchPhase(null);
+            else setIsProgressHidden(true);
+          }}
+          onViewCandidates={() => {
+            setSearchPhase(null);
+            router.push(candidatesHref);
+          }}
+        />
       )}
     </main>
   );

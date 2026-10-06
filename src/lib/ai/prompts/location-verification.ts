@@ -9,7 +9,9 @@ export const locationVerificationSchema = z.object({
   in_country: z.boolean().nullable(),
   evidence: z.string(),
 });
-export type LocationVerificationResult = z.infer<typeof locationVerificationSchema>;
+export type LocationVerificationResult = z.infer<
+  typeof locationVerificationSchema
+>;
 
 export interface LocationVerificationInput {
   name: string | null;
@@ -45,7 +47,12 @@ export async function verifyLocationWithAI(
   countryCode: string,
   context: CallContext = {},
 ): Promise<LocationVerificationResult & { callId: string | null }> {
-  if (!input.headline && !input.snippet && !input.locationLine && !input.currentCompany) {
+  if (
+    !input.headline &&
+    !input.snippet &&
+    !input.locationLine &&
+    !input.currentCompany
+  ) {
     return { in_country: null, evidence: "", callId: null };
   }
   const result = await runStructured({

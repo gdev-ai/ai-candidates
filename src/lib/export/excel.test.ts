@@ -116,6 +116,8 @@ describe("toExportRow", () => {
       job_id: "j",
       person_id: "p",
       search_run_id: null,
+      job_version_id: null,
+      version: null,
       name: "Omar",
       headline: null,
       current_title: "Engineer",

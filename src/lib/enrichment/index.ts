@@ -1,8 +1,25 @@
 import { extractLinkedInSlug, normalizeUrl } from "@/lib/candidates/identity";
-import { getApifyRemainingUsd, getDatasetItems, isApifyConfigured, type ApifyRun } from "@/lib/enrichment/apify";
-import { fetchHarvestProfile, isHarvestConfigured } from "@/lib/enrichment/harvestapi";
-import { isSupremeError, mapSupremeItem, type SupremeItem } from "@/lib/enrichment/mapSupreme";
-import { isFresh, markEnrichment, writeEnrichedProfile } from "@/lib/enrichment/persist";
+import {
+  getApifyRemainingUsd,
+  getDatasetItems,
+  isApifyConfigured,
+  type ApifyRun,
+} from "@/lib/enrichment/apify";
+import {
+  fetchHarvestProfile,
+  isHarvestConfigured,
+} from "@/lib/enrichment/harvestapi";
+import {
+  isSupremeError,
+  mapSupremeItem,
+  type SupremeItem,
+} from "@/lib/enrichment/mapSupreme";
+import {
+  isFresh,
+  markEnrichment,
+  writeEnrichedProfile,
+} from "@/lib/enrichment/persist";
+import { env } from "@/lib/env";
 import { createLogger } from "@/lib/logger";
 import { recordProviderCall } from "@/lib/providers/callLog";
 import { APIFY_SUPREME_USD_PER_PROFILE } from "@/lib/providers/pricing";
@@ -45,7 +62,8 @@ export async function selectForEnrichment(
       cached.push(person.id);
       continue;
     }
-    if (!person.identity_key.startsWith("linkedin:") || !person.profile_url) continue;
+    if (!person.identity_key.startsWith("linkedin:") || !person.profile_url)
+      continue;
     targets.push({ personId: person.id, url: person.profile_url });
   }
   return { targets, cached };
@@ -56,29 +74,45 @@ export type EnrichmentRoute = "apify" | "harvestapi" | "pending";
 /**
  * Budget guard: Apify while its monthly credit covers this batch plus the
  * reserve; otherwise HarvestAPI if configured; otherwise leave the people
- * `pending` for after the credit resets.
+ * `pending` for after the credit resets. ENRICHMENT_PROVIDER=harvestapi
+ * skips Apify entirely.
  */
-export async function chooseEnrichmentRoute(count: number): Promise<{ route: EnrichmentRoute; remainingUsd: number | null }> {
+export async function chooseEnrichmentRoute(
+  count: number,
+): Promise<{ route: EnrichmentRoute; remainingUsd: number | null }> {
   if (count === 0) return { route: "pending", remainingUsd: null };
+  if (env.ENRICHMENT_PROVIDER === "harvestapi" && isHarvestConfigured()) {
+    return { route: "harvestapi", remainingUsd: null };
+  }
   let remainingUsd: number | null = null;
   if (isApifyConfigured()) {
     try {
       remainingUsd = await getApifyRemainingUsd();
-      if (remainingUsd - count * APIFY_SUPREME_USD_PER_PROFILE >= APIFY_RESERVE_USD) {
+      if (
+        remainingUsd - count * APIFY_SUPREME_USD_PER_PROFILE >=
+        APIFY_RESERVE_USD
+      ) {
         return { route: "apify", remainingUsd };
       }
     } catch (error) {
       log.warn("Apify limits check failed", { error });
     }
   }
-  return { route: isHarvestConfigured() ? "harvestapi" : "pending", remainingUsd };
+  return {
+    route: isHarvestConfigured() ? "harvestapi" : "pending",
+    remainingUsd,
+  };
 }
 
 /** Maps dataset items back to the people we asked for, by `inputUrl`. */
 export function matchItemsToTargets(
   items: SupremeItem[],
   targets: EnrichmentTarget[],
-): { matched: { target: EnrichmentTarget; item: SupremeItem }[]; failed: EnrichmentTarget[]; missing: EnrichmentTarget[] } {
+): {
+  matched: { target: EnrichmentTarget; item: SupremeItem }[];
+  failed: EnrichmentTarget[];
+  missing: EnrichmentTarget[];
+} {
   const byUrl = new Map<string, EnrichmentTarget>();
   const bySlug = new Map<string, EnrichmentTarget>();
   for (const t of targets) {
@@ -91,7 +125,9 @@ export function matchItemsToTargets(
   const seen = new Set<string>();
   for (const item of items) {
     const input = item.inputUrl ?? "";
-    const target = byUrl.get(normalizeUrl(input)) ?? bySlug.get(extractLinkedInSlug(input) ?? "");
+    const target =
+      byUrl.get(normalizeUrl(input)) ??
+      bySlug.get(extractLinkedInSlug(input) ?? "");
     if (!target || seen.has(target.personId)) continue;
     seen.add(target.personId);
     if (isSupremeError(item)) failed.push(target);
@@ -119,7 +155,9 @@ export async function ingestSupremeRun(
   ctx: EnrichmentContext,
 ): Promise<IngestSummary> {
   const succeeded = run.status === "SUCCEEDED";
-  const items = run.defaultDatasetId ? await getDatasetItems(run.defaultDatasetId) : [];
+  const items = run.defaultDatasetId
+    ? await getDatasetItems(run.defaultDatasetId)
+    : [];
   const callId = await recordProviderCall({
     provider: "apify",
     purpose: "enrich",
@@ -132,7 +170,10 @@ export async function ingestSupremeRun(
     costUsd: run.usageTotalUsd,
     httpStatus: 200,
     error: succeeded ? null : `${run.status}: ${run.statusMessage ?? ""}`,
-    request: { actor: "supreme_coder~linkedin-profile-scraper", urls: targets.map((t) => t.url) },
+    request: {
+      actor: "supreme_coder~linkedin-profile-scraper",
+      urls: targets.map((t) => t.url),
+    },
     response: { run: run.raw, items },
   });
 
@@ -141,19 +182,45 @@ export async function ingestSupremeRun(
   const writeFailed: string[] = [];
   for (const { target, item } of matched) {
     try {
-      await writeEnrichedProfile(db, target.personId, mapSupremeItem(item), { providerCallId: callId, payload: item });
+      await writeEnrichedProfile(db, target.personId, mapSupremeItem(item), {
+        providerCallId: callId,
+        payload: item,
+      });
       enriched++;
     } catch (error) {
-      log.error("Failed to write enriched profile", { error, personId: target.personId });
+      log.error("Failed to write enriched profile", {
+        error,
+        personId: target.personId,
+      });
       writeFailed.push(target.personId);
     }
   }
-  await markEnrichment(db, writeFailed, "failed", "Could not save the enriched profile.");
-  await markEnrichment(db, failed.map((t) => t.personId), "not_found", "Profile could not be accessed.");
+  await markEnrichment(
+    db,
+    writeFailed,
+    "failed",
+    "Could not save the enriched profile.",
+  );
+  await markEnrichment(
+    db,
+    failed.map((t) => t.personId),
+    "not_found",
+    "Profile could not be accessed.",
+  );
   if (succeeded) {
-    await markEnrichment(db, missing.map((t) => t.personId), "not_found", "No result returned for this profile.");
+    await markEnrichment(
+      db,
+      missing.map((t) => t.personId),
+      "not_found",
+      "No result returned for this profile.",
+    );
   } else {
-    await markEnrichment(db, missing.map((t) => t.personId), "failed", `Apify run ${run.status}`);
+    await markEnrichment(
+      db,
+      missing.map((t) => t.personId),
+      "failed",
+      `Apify run ${run.status}`,
+    );
   }
   return {
     enriched,
@@ -195,7 +262,12 @@ export async function enrichWithHarvest(
         });
         summary.enriched++;
       } else {
-        await markEnrichment(db, [target.personId], "not_found", "Profile not found.");
+        await markEnrichment(
+          db,
+          [target.personId],
+          "not_found",
+          "Profile not found.",
+        );
         summary.notFound++;
       }
     } catch (error) {
@@ -210,11 +282,20 @@ export async function enrichWithHarvest(
         error: error instanceof Error ? error.message : String(error),
         request: { query: target.url },
       });
-      await markEnrichment(db, [target.personId], "failed", "Enrichment request failed.");
+      await markEnrichment(
+        db,
+        [target.personId],
+        "failed",
+        "Enrichment request failed.",
+      );
       summary.failed++;
     }
   }
   return summary;
 }
 
-export { markEnrichment, writeEnrichedProfile, isFresh } from "@/lib/enrichment/persist";
+export {
+  markEnrichment,
+  writeEnrichedProfile,
+  isFresh,
+} from "@/lib/enrichment/persist";

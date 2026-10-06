@@ -8,6 +8,7 @@ import type { JobCandidateListItem, MatchSummary } from "@/types/candidate";
  */
 const JOB_CANDIDATE_SELECT = `
   job_id, person_id, search_run_id, status, status_changed_at, found_at, pre_score, match_score, scored_at,
+  run:search_runs!job_candidates_search_run_id_fkey ( job_version_id ),
   person:people!job_candidates_person_id_fkey (
     full_name, headline, current_title, current_company, location_text, city,
     location_verified, photo_url, profile_url, open_to_work, experience_years, enrichment_status,
@@ -42,13 +43,24 @@ export async function loadJobCandidates(
   jobId: string,
   userId: string,
 ): Promise<{ data: JobCandidateListItem[]; error: unknown }> {
-  const [rowsResult, viewsResult] = await Promise.all([
-    supabase.from("job_candidates").select(JOB_CANDIDATE_SELECT).eq("job_id", jobId),
-    supabase.from("candidate_views").select("person_id").eq("job_id", jobId).eq("user_id", userId),
+  const [rowsResult, viewsResult, versionsResult] = await Promise.all([
+    supabase
+      .from("job_candidates")
+      .select(JOB_CANDIDATE_SELECT)
+      .eq("job_id", jobId),
+    supabase
+      .from("candidate_views")
+      .select("person_id")
+      .eq("job_id", jobId)
+      .eq("user_id", userId),
+    supabase.from("job_versions").select("id, version").eq("job_id", jobId),
   ]);
 
   if (rowsResult.error) return { data: [], error: rowsResult.error };
   const viewed = new Set((viewsResult.data ?? []).map((v) => v.person_id));
+  const versionNumber = new Map(
+    (versionsResult.data ?? []).map((v) => [v.id, v.version]),
+  );
 
   const data = (rowsResult.data ?? []).map((row): JobCandidateListItem => {
     const person = row.person;
@@ -57,6 +69,10 @@ export async function loadJobCandidates(
       job_id: row.job_id,
       person_id: row.person_id,
       search_run_id: row.search_run_id,
+      job_version_id: row.run?.job_version_id ?? null,
+      version: row.run?.job_version_id
+        ? (versionNumber.get(row.run.job_version_id) ?? null)
+        : null,
       name: person?.full_name ?? null,
       headline: person?.headline ?? null,
       current_title: person?.current_title ?? null,
@@ -87,7 +103,10 @@ export async function loadJobCandidates(
 export async function loadJobOwner(
   supabase: SourcingClient,
   jobId: string,
-): Promise<{ job: { id: string; owner_id: string; title: string } | null; error: unknown }> {
+): Promise<{
+  job: { id: string; owner_id: string; title: string } | null;
+  error: unknown;
+}> {
   const { data, error } = await supabase
     .from("jobs")
     .select("id, owner_id, title")

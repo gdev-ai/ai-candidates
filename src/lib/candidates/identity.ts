@@ -9,7 +9,9 @@ const COMPANY_SUFFIX =
   /\b(inc|incorporated|llc|ltd|limited|co|corp|corporation|gmbh|plc|group|holdings|company|s\.?a\.?e)\b\.?/gi;
 
 /** `/in/<slug>` from any LinkedIn URL (any subdomain, locale suffix, query). */
-export function extractLinkedInSlug(url: string | null | undefined): string | null {
+export function extractLinkedInSlug(
+  url: string | null | undefined,
+): string | null {
   if (!url) return null;
   const match = url.match(/linkedin\.com\/in\/([^/?#\s]+)/i);
   if (!match?.[1]) return null;
@@ -42,12 +44,19 @@ function stripDiacritics(value: string): string {
 }
 
 export function normalizeForMatching(value: string): string {
-  return stripDiacritics(value).trim().toLowerCase().replace(/[.,]/g, "").replace(/\s+/g, " ");
+  return stripDiacritics(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[.,]/g, "")
+    .replace(/\s+/g, " ");
 }
 
 export function normalizeCompanyForMatching(value: string): string {
   const normalized = normalizeForMatching(value);
-  return normalized.replace(COMPANY_SUFFIX, "").replace(/\s+/g, " ").trim() || normalized;
+  return (
+    normalized.replace(COMPANY_SUFFIX, "").replace(/\s+/g, " ").trim() ||
+    normalized
+  );
 }
 
 export function identityKey(input: {
@@ -78,9 +87,25 @@ export function isIndividualProfileUrl(url: string): boolean {
   return !NON_INDIVIDUAL_URL_PATTERNS.some((pattern) => pattern.test(url));
 }
 
-/** Our own company is never a sourced candidate's employer. */
-const OWN_COMPANY_VARIANTS = new Set(["g developments", "the g developments"]);
+/**
+ * Our group's companies (public.companies): people working at any of them
+ * are never sourced. Compared without spaces or punctuation, so "New Giza",
+ * "NEWGIZA" and "G Developments - ISC" all match.
+ */
+const OWN_COMPANY_KEYS = new Set([
+  "gdevelopments",
+  "thegdevelopments",
+  "gdevelopmentsisc",
+  "newgiza",
+  "ginvestments",
+  "gcommunities",
+  "glifestyle",
+]);
 
 export function isOwnCompany(company: string | null | undefined): boolean {
-  return company ? OWN_COMPANY_VARIANTS.has(normalizeCompanyForMatching(company)) : false;
+  return company
+    ? OWN_COMPANY_KEYS.has(
+        normalizeCompanyForMatching(company).replace(/[^\p{L}\p{N}]+/gu, ""),
+      )
+    : false;
 }

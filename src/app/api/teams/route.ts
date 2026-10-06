@@ -3,7 +3,10 @@ import { NextResponse } from "next/server";
 import { logActivity } from "@/lib/activity/log";
 import { requireRole } from "@/lib/auth/roles";
 import { withErrorHandling } from "@/lib/errors";
-import { assignTeamManager, InvalidManagerError } from "@/lib/teams/assignManager";
+import {
+  assignTeamManager,
+  InvalidManagerError,
+} from "@/lib/teams/assignManager";
 import { teamCreateSchema } from "@/types/team";
 
 /** POST (admin): create a team, optionally with its manager. */
@@ -16,7 +19,10 @@ export const POST = withErrorHandling(async (request: Request) => {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Request body must be valid JSON." },
+      { status: 400 },
+    );
   }
 
   const parsed = teamCreateSchema.safeParse(body);
@@ -34,7 +40,10 @@ export const POST = withErrorHandling(async (request: Request) => {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: "Failed to create team." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to create team." },
+      { status: 500 },
+    );
   }
 
   await logActivity(supabase, {

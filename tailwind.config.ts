@@ -59,7 +59,12 @@ const danger = {
 
 const config: Config = {
   darkMode: ["class"],
-  content: ["./src/app/**/*.{ts,tsx}", "./src/components/**/*.{ts,tsx}"],
+  content: [
+    "./src/app/**/*.{ts,tsx}",
+    "./src/components/**/*.{ts,tsx}",
+    // Shared class strings (e.g. MISSING_FIELD_CLASS) live in the types.
+    "./src/types/**/*.{ts,tsx}",
+  ],
   theme: {
     extend: {
       fontFamily: {

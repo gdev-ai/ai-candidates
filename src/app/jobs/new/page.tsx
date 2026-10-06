@@ -6,6 +6,8 @@ import {
   ChevronDown,
   ChevronUp,
   FileText,
+  Briefcase,
+  Check,
   Clock,
   Gauge,
   Loader2,
@@ -30,6 +32,7 @@ import {
   type SearchPhase,
 } from "@/components/jobs/SearchProgress";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
@@ -54,7 +57,41 @@ import {
   type RequirementsDraft,
 } from "@/types/job";
 
-type InputMode = "paste" | "upload";
+type InputMode = "paste" | "upload" | "portal";
+
+interface PortalJob {
+  id: string;
+  title: string;
+  company_id: string | null;
+  department: string | null;
+  location: string;
+  employment_type: string;
+  seniority_level: string;
+  summary: string;
+  responsibilities: string[];
+  requirements: string[];
+}
+
+/** The posting as plain text, in the shape the analyzer reads a pasted JD. */
+function portalJobToText(job: PortalJob): string {
+  const list = (heading: string, items: string[]) =>
+    items.length > 0
+      ? `\n\n${heading}:\n${items.map((i) => `- ${i}`).join("\n")}`
+      : "";
+  return (
+    [
+      `${job.title}${job.department ? ` (${job.department})` : ""}`,
+      job.location ? `Location: ${job.location}` : "",
+      `Employment type: ${job.employment_type}`,
+      `Seniority: ${job.seniority_level}`,
+      job.summary ? `\n${job.summary}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n") +
+    list("Responsibilities", job.responsibilities) +
+    list("Requirements", job.requirements)
+  );
+}
 
 const TERMINAL_RUN_STATUSES = new Set(["complete", "error", "cancelled"]);
 
@@ -124,6 +161,15 @@ export default function NewJobPage() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Careers portal postings (loaded the first time the tab is opened)
+  const [portalJobs, setPortalJobs] = useState<PortalJob[] | null>(null);
+  const [isLoadingPortalJobs, setIsLoadingPortalJobs] = useState(false);
+  const [portalJobsError, setPortalJobsError] = useState<string | null>(null);
+  const [portalQuery, setPortalQuery] = useState("");
+  const [selectedPortalJob, setSelectedPortalJob] = useState<PortalJob | null>(
+    null,
+  );
 
   // AI analysis -> editable requirements. The analysis itself is never
   // posted back: the server copies it from the logged call (analysisCallId).
@@ -241,6 +287,56 @@ export default function NewJobPage() {
     }
   }
 
+  useEffect(() => {
+    if (mode !== "portal" || portalJobs || portalJobsError) return;
+    const controller = new AbortController();
+    setIsLoadingPortalJobs(true);
+    fetch("/api/portal-jobs", { signal: controller.signal })
+      .then(async (res) => {
+        const data = await readJson(res);
+        if (!res.ok) {
+          setPortalJobsError(errorOf(data, "Failed to load portal jobs."));
+          return;
+        }
+        setPortalJobs((data.jobs as PortalJob[] | undefined) ?? []);
+      })
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setPortalJobsError("Failed to load portal jobs.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoadingPortalJobs(false);
+      });
+    return () => controller.abort();
+  }, [mode, portalJobs, portalJobsError]);
+
+  function handleSelectPortalJob(job: PortalJob) {
+    const text = portalJobToText(job);
+    if (text.trim().length < 50) {
+      toast.error(
+        "This posting has too little text to analyze. Paste a fuller description instead.",
+      );
+      return;
+    }
+    setSelectedPortalJob(job);
+    setDescription(text);
+    setUploadedFileName(null);
+    setTitle(job.title);
+    if (job.company_id) setCompanyId(job.company_id);
+    if ((EMPLOYMENT_TYPES as readonly string[]).includes(job.employment_type))
+      setEmploymentType(job.employment_type);
+    void handleAnalyze(text);
+  }
+
+  const filteredPortalJobs = (portalJobs ?? []).filter((j) => {
+    const q = portalQuery.trim().toLowerCase();
+    return (
+      !q ||
+      j.title.toLowerCase().includes(q) ||
+      (j.department ?? "").toLowerCase().includes(q)
+    );
+  });
+
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -294,15 +390,14 @@ export default function NewJobPage() {
       setAnalysisCallId(
         typeof data.analysisCallId === "string" ? data.analysisCallId : null,
       );
-      if (!title && analysis.job_title) setTitle(analysis.job_title);
+      if (analysis.job_title) setTitle((prev) => prev || analysis.job_title!);
       if (
-        !employmentType &&
         analysis.employment_type &&
         (EMPLOYMENT_TYPES as readonly string[]).includes(
           analysis.employment_type,
         )
       ) {
-        setEmploymentType(analysis.employment_type);
+        setEmploymentType((prev) => prev || analysis.employment_type!);
       }
       toast.success(
         "Requirements extracted from the job description.",
@@ -577,21 +672,25 @@ export default function NewJobPage() {
                   </CardTitle>
                   <CardDescription className="text-xs text-slate-500">
                     {isJdOpen
-                      ? "Upload a document or paste the raw job description"
-                      : uploadedFileName
-                        ? `File: ${uploadedFileName} (${uploadedFileSize})`
-                        : description
-                          ? `${description.slice(0, 60)}...`
-                          : "Empty job description"}
+                      ? "Upload a document, paste the raw job description, or pick a careers portal job"
+                      : mode === "portal" && selectedPortalJob
+                        ? `Careers portal: ${selectedPortalJob.title}`
+                        : uploadedFileName
+                          ? `File: ${uploadedFileName} (${uploadedFileSize})`
+                          : description
+                            ? `${description.slice(0, 60)}...`
+                            : "Empty job description"}
                   </CardDescription>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 {!isJdOpen && description && (
                   <Badge tone="good" className="text-xs font-normal">
-                    {uploadedFileName
-                      ? "File Attached"
-                      : `${description.length} chars`}
+                    {mode === "portal" && selectedPortalJob
+                      ? "Portal Job"
+                      : uploadedFileName
+                        ? "File Attached"
+                        : `${description.length} chars`}
                   </Badge>
                 )}
                 <Button
@@ -638,6 +737,19 @@ export default function NewJobPage() {
                 >
                   <FileText className="h-3.5 w-3.5" />
                   Paste Text
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("portal")}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+                    mode === "portal"
+                      ? "bg-white text-slate-900 shadow-xs"
+                      : "text-slate-500 hover:text-slate-900",
+                  )}
+                >
+                  <Briefcase className="h-3.5 w-3.5" />
+                  Careers Portal Job
                 </button>
               </div>
 
@@ -750,6 +862,74 @@ export default function NewJobPage() {
                       {extractError}
                     </p>
                   )}
+                </div>
+              ) : mode === "portal" ? (
+                <div className="flex flex-col gap-3" data-testid="portal-jobs">
+                  <Input
+                    value={portalQuery}
+                    onChange={(e) => setPortalQuery(e.target.value)}
+                    placeholder="Search open jobs by title or department..."
+                    className="bg-white text-sm"
+                  />
+                  {isLoadingPortalJobs && (
+                    <div className="flex items-center gap-2 text-xs font-medium text-indigo-600">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Loading open jobs...
+                    </div>
+                  )}
+                  {portalJobsError && (
+                    <p
+                      role="alert"
+                      className="text-xs font-medium text-red-600"
+                    >
+                      {portalJobsError}
+                    </p>
+                  )}
+                  {portalJobs && filteredPortalJobs.length === 0 && (
+                    <p className="text-xs text-slate-500">
+                      {portalJobs.length === 0
+                        ? "There are no open jobs on the careers portal."
+                        : "No open jobs match your search."}
+                    </p>
+                  )}
+                  <div className="flex max-h-72 flex-col gap-2 overflow-y-auto">
+                    {filteredPortalJobs.map((job) => {
+                      const selected = selectedPortalJob?.id === job.id;
+                      return (
+                        <button
+                          key={job.id}
+                          type="button"
+                          disabled={isAnalyzing}
+                          onClick={() => handleSelectPortalJob(job)}
+                          className={cn(
+                            "flex items-center justify-between gap-3 rounded-xl border p-3 text-left transition-all disabled:opacity-60",
+                            selected
+                              ? "border-indigo-300 bg-indigo-50/50"
+                              : "border-slate-200 hover:border-indigo-300 hover:bg-slate-50/80",
+                          )}
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-slate-900">
+                              {job.title}
+                            </p>
+                            <p className="truncate text-xs text-slate-500">
+                              {[
+                                job.department,
+                                job.location,
+                                job.employment_type,
+                                job.seniority_level,
+                              ]
+                                .filter(Boolean)
+                                .join(" • ")}
+                            </p>
+                          </div>
+                          {selected && (
+                            <Check className="h-4 w-4 shrink-0 text-indigo-600" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
                 /* Paste Text Mode */

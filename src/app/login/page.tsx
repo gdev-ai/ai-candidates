@@ -18,10 +18,7 @@ import {
   reportAuthEvent,
   signInWithMicrosoft,
   signInWithPassword,
-  signUpWithPassword,
 } from "@/lib/supabase/auth";
-
-type Mode = "login" | "signup";
 
 const NOT_ALLOWED_MESSAGE =
   "Your account doesn't have access. Ask an admin to invite you.";
@@ -39,7 +36,6 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [mode, setMode] = useState<Mode>("login");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -51,8 +47,13 @@ function LoginForm() {
     } else if (errorParam === "pending_approval") {
       setMessage(PENDING_MESSAGE);
     } else if (errorParam === "link_failed") {
+      // `detail` is the provider's own reason (e.g. Microsoft returned no
+      // email); shown as text, never as markup.
+      const detail = searchParams.get("detail");
       setError(
-        "That sign-in link is invalid or has expired. Please log in again.",
+        detail
+          ? `Sign-in failed: ${detail.slice(0, 300)}`
+          : "That sign-in link is invalid or has expired. Please log in again.",
       );
     }
   }, [searchParams]);
@@ -79,23 +80,13 @@ function LoginForm() {
     const email = String(formData.get("email") ?? "");
     const password = String(formData.get("password") ?? "");
 
-    const { error: authError } =
-      mode === "login"
-        ? await signInWithPassword(email, password)
-        : await signUpWithPassword(email, password);
+    const { error: authError } = await signInWithPassword(email, password);
 
     setIsSubmitting(false);
 
     if (authError) {
       setError(authError.message);
-      if (mode === "login") reportAuthEvent({ event: "login_failed", email });
-      return;
-    }
-
-    if (mode === "signup") {
-      setMessage(
-        "Account created. Check your email to confirm, then log in. If you weren't invited, an admin will need to approve your access first.",
-      );
+      reportAuthEvent({ event: "login_failed", email });
       return;
     }
 
@@ -108,11 +99,9 @@ function LoginForm() {
     <main className="relative flex min-h-screen items-center justify-center bg-black p-4 text-white">
       <Card className="animate-page-enter w-full max-w-sm border-white/20">
         <CardHeader>
-          <CardTitle>{mode === "login" ? "Log in" : "Sign up"}</CardTitle>
+          <CardTitle>Log in</CardTitle>
           <CardDescription>
-            {mode === "login"
-              ? "Use your HR Portal email and password."
-              : "Create an account to get started."}
+            Use your HR Portal email and password, or sign in with Microsoft.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -130,9 +119,7 @@ function LoginForm() {
               placeholder="Password"
               required
               minLength={6}
-              autoComplete={
-                mode === "login" ? "current-password" : "new-password"
-              }
+              autoComplete="current-password"
             />
             {error && (
               <p role="alert" className="text-sm text-destructive">
@@ -156,25 +143,7 @@ function LoginForm() {
               Sign in with Microsoft
             </Button>
             <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting
-                ? "Please wait..."
-                : mode === "login"
-                  ? "Log in"
-                  : "Sign up"}
-            </Button>
-            <Button
-              type="button"
-              variant="link"
-              className="w-full"
-              onClick={() => {
-                setMode(mode === "login" ? "signup" : "login");
-                setError(null);
-                setMessage(null);
-              }}
-            >
-              {mode === "login"
-                ? "Need an account? Sign up"
-                : "Already have an account? Log in"}
+              {isSubmitting ? "Please wait..." : "Log in"}
             </Button>
           </CardFooter>
         </form>

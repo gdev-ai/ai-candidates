@@ -5,17 +5,6 @@ export async function signInWithPassword(email: string, password: string) {
   return supabase.auth.signInWithPassword({ email, password });
 }
 
-export async function signUpWithPassword(email: string, password: string) {
-  const supabase = createClient();
-  // The auth project is shared with HR Portal, whose Site URL is the default
-  // confirmation target — send this app's confirmations back here instead.
-  return supabase.auth.signUp({
-    email,
-    password,
-    options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-  });
-}
-
 /**
  * Microsoft (Entra ID) sign-in. Supabase sends the user back to
  * /auth/callback, which exchanges the code and checks membership.

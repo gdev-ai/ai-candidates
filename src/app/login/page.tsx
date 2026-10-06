@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import {
   reportAuthEvent,
+  signInWithMicrosoft,
   signInWithPassword,
   signUpWithPassword,
 } from "@/lib/supabase/auth";
@@ -50,9 +51,25 @@ function LoginForm() {
     } else if (errorParam === "pending_approval") {
       setMessage(PENDING_MESSAGE);
     } else if (errorParam === "link_failed") {
-      setError("That sign-in link is invalid or has expired. Please log in again.");
+      setError(
+        "That sign-in link is invalid or has expired. Please log in again.",
+      );
     }
   }, [searchParams]);
+
+  async function handleMicrosoft() {
+    setError(null);
+    setMessage(null);
+    setIsSubmitting(true);
+    const { error: authError } = await signInWithMicrosoft(
+      searchParams.get("redirectTo"),
+    );
+    // On success the browser is already navigating to Microsoft.
+    if (authError) {
+      setIsSubmitting(false);
+      setError(authError.message);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -115,7 +132,9 @@ function LoginForm() {
               placeholder="Password"
               required
               minLength={6}
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              autoComplete={
+                mode === "login" ? "current-password" : "new-password"
+              }
             />
             {error && (
               <p role="alert" className="text-sm text-destructive">
@@ -129,6 +148,15 @@ function LoginForm() {
             )}
           </CardContent>
           <CardFooter className="flex flex-col gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              disabled={isSubmitting}
+              onClick={handleMicrosoft}
+            >
+              Sign in with Microsoft
+            </Button>
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting
                 ? "Please wait..."

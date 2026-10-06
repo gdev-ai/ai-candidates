@@ -19,6 +19,12 @@ const LINKS = [
   { href: "/reports", label: "Reports" },
 ];
 
+// Optional: the link is hidden when unset (local dev). Trailing slash tolerated.
+const HR_PORTAL_URL = process.env.NEXT_PUBLIC_HR_PORTAL_URL?.trim().replace(
+  /\/+$/,
+  "",
+);
+
 const TEAM_LINK = { href: "/manager", label: "Team" };
 const ADMIN_LINK = { href: "/admin", label: "Admin" };
 
@@ -111,7 +117,7 @@ export function DashboardNav() {
                   href={link.href}
                   aria-current={isActive ? "page" : undefined}
                   className={cn(
-                    "relative py-4 text-sm transition-colors after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:origin-left after:bg-foreground after:transition-transform after:duration-200",
+                    "relative py-4 text-[13px] transition-colors after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:origin-left after:bg-foreground after:transition-transform after:duration-200",
                     isActive
                       ? "font-medium text-foreground after:scale-x-100"
                       : "text-muted-foreground after:scale-x-0 hover:text-foreground hover:after:scale-x-100",
@@ -139,6 +145,14 @@ export function DashboardNav() {
           >
             <UserCircle className="h-5 w-5" aria-hidden="true" />
           </Link>
+          {HR_PORTAL_URL && (
+            <a
+              href={`${HR_PORTAL_URL}/admin`}
+              className="px-2 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Back to HR Portal
+            </a>
+          )}
           <LogoutButton />
         </div>
       </div>

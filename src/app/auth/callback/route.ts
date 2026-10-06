@@ -4,11 +4,13 @@ import { logActivity } from "@/lib/activity/log";
 import { ensureMember } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 
-/** Target of email confirmation links (see signUpWithPassword). */
+/** Target of email confirmation links (see signUpWithPassword) and the Microsoft sign-in redirect. */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
+  const method =
+    searchParams.get("method") === "microsoft" ? "microsoft" : "email_link";
 
   if (!code) {
     return NextResponse.redirect(`${origin}/login?error=link_failed`);
@@ -24,7 +26,8 @@ export async function GET(request: Request) {
   const member = await ensureMember(supabase);
   if (member?.status !== "active") {
     await supabase.auth.signOut();
-    const reason = member?.status === "pending" ? "pending_approval" : "not_allowed";
+    const reason =
+      member?.status === "pending" ? "pending_approval" : "not_allowed";
     return NextResponse.redirect(`${origin}/login?error=${reason}`);
   }
 
@@ -33,11 +36,17 @@ export async function GET(request: Request) {
     action: "auth.login",
     entityType: "auth",
     entityId: data.user.id,
-    description: "Signed in from an email link",
-    metadata: { method: "email_link" },
+    description:
+      method === "microsoft"
+        ? "Signed in with Microsoft"
+        : "Signed in from an email link",
+    metadata: { method },
   });
 
   // Same-origin paths only ("//host" would leave the site).
-  const safePath = redirectTo.startsWith("/") && !redirectTo.startsWith("//") ? redirectTo : "/dashboard";
+  const safePath =
+    redirectTo.startsWith("/") && !redirectTo.startsWith("//")
+      ? redirectTo
+      : "/dashboard";
   return NextResponse.redirect(`${origin}${safePath}`);
 }

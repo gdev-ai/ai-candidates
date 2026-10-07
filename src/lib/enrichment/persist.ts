@@ -7,9 +7,29 @@ import type { Json } from "@/types/database.types";
 /** Profiles enriched within this window are reused (global cache). */
 export const ENRICHMENT_TTL_DAYS = 90;
 
-export function isFresh(person: { enrichment_status: string; enriched_at: string | null }, now = Date.now()): boolean {
-  if (person.enrichment_status !== "enriched" || !person.enriched_at) return false;
-  return now - Date.parse(person.enriched_at) < ENRICHMENT_TTL_DAYS * 86_400_000;
+/** Provider photo URLs are signed and expire after about 2 weeks; refetch before then. */
+export const PHOTO_TTL_DAYS = 10;
+
+export function isFresh(
+  person: {
+    enrichment_status: string;
+    enriched_at: string | null;
+    photo_url?: string | null;
+    photo_fetched_at?: string | null;
+  },
+  now = Date.now(),
+): boolean {
+  if (person.enrichment_status !== "enriched" || !person.enriched_at)
+    return false;
+  if (now - Date.parse(person.enriched_at) >= ENRICHMENT_TTL_DAYS * 86_400_000)
+    return false;
+  // A stored photo link that has probably expired makes the profile stale.
+  if (person.photo_url && person.photo_fetched_at) {
+    return (
+      now - Date.parse(person.photo_fetched_at) < PHOTO_TTL_DAYS * 86_400_000
+    );
+  }
+  return true;
 }
 
 const CHILD_TABLES = [
@@ -19,7 +39,9 @@ const CHILD_TABLES = [
   "person_languages",
 ] as const;
 
-async function check<T extends { error: unknown }>(promise: PromiseLike<T>): Promise<T> {
+async function check<T extends { error: unknown }>(
+  promise: PromiseLike<T>,
+): Promise<T> {
   const result = await promise;
   if (result.error) throw result.error;
   return result;
@@ -34,9 +56,17 @@ async function freeUniqueIds(
   personId: string,
   profile: EnrichedProfile,
 ): Promise<{ memberId: string | null; objectUrn: string | null }> {
-  const claimed = async (column: "linkedin_member_id" | "linkedin_object_urn", value: string | null) => {
+  const claimed = async (
+    column: "linkedin_member_id" | "linkedin_object_urn",
+    value: string | null,
+  ) => {
     if (!value) return null;
-    const { data } = await db.from("people").select("id").eq(column, value).neq("id", personId).limit(1);
+    const { data } = await db
+      .from("people")
+      .select("id")
+      .eq(column, value)
+      .neq("id", personId)
+      .limit(1);
     return data && data.length > 0 ? null : value;
   };
   return {
@@ -68,19 +98,24 @@ export async function writeEnrichedProfile(
   const { data: existingRow } = await check(
     db
       .from("people")
-      .select("input_slugs, full_name, headline, current_title, current_company, location_text, country_code")
+      .select(
+        "input_slugs, full_name, headline, current_title, current_company, location_text, country_code",
+      )
       .eq("id", personId)
       .single(),
   );
   if (!existingRow) throw new Error(`Person ${personId} not found`);
   const existing = existingRow;
-  const { data: overrides } = await check(db.from("person_overrides").select("field").eq("person_id", personId));
+  const { data: overrides } = await check(
+    db.from("person_overrides").select("field").eq("person_id", personId),
+  );
   const overridden = new Set((overrides ?? []).map((o) => o.field));
 
   const inputSlug = extractLinkedInSlug(profile.inputUrl);
   const slugs = new Set(existing.input_slugs ?? []);
   if (inputSlug) slugs.add(inputSlug);
-  if (profile.publicIdentifier) slugs.add(profile.publicIdentifier.toLowerCase());
+  if (profile.publicIdentifier)
+    slugs.add(profile.publicIdentifier.toLowerCase());
 
   const experienceYears = experienceYearsFromRanges(profile.experiences);
   const now = new Date().toISOString();
@@ -139,7 +174,8 @@ export async function writeEnrichedProfile(
       update.location_evidence = profile.locationText ?? profile.countryCode;
     }
   }
-  for (const field of overridden) delete (update as Record<string, unknown>)[field];
+  for (const field of overridden)
+    delete (update as Record<string, unknown>)[field];
   for (const [key, value] of Object.entries(update)) {
     if (value === undefined) delete (update as Record<string, unknown>)[key];
   }
@@ -147,35 +183,53 @@ export async function writeEnrichedProfile(
 
   // Replace this source's rows; other sources' rows stay.
   for (const table of CHILD_TABLES) {
-    await check(db.from(table).delete().eq("person_id", personId).eq("source", profile.source));
+    await check(
+      db
+        .from(table)
+        .delete()
+        .eq("person_id", personId)
+        .eq("source", profile.source),
+    );
   }
-  await check(db.from("person_skills").delete().eq("person_id", personId).eq("source", profile.source));
+  await check(
+    db
+      .from("person_skills")
+      .delete()
+      .eq("person_id", personId)
+      .eq("source", profile.source),
+  );
 
   const source = profile.source;
   if (profile.experiences.length) {
-    const rows: Insert<"person_experiences">[] = profile.experiences.map((e, i) => ({
-      ...e,
-      person_id: personId,
-      sort_order: i,
-      source,
-    }));
+    const rows: Insert<"person_experiences">[] = profile.experiences.map(
+      (e, i) => ({
+        ...e,
+        person_id: personId,
+        sort_order: i,
+        source,
+      }),
+    );
     await check(db.from("person_experiences").insert(rows));
   }
   if (profile.education.length) {
-    const rows: Insert<"person_education">[] = profile.education.map((e, i) => ({
-      ...e,
-      person_id: personId,
-      sort_order: i,
-      source,
-    }));
+    const rows: Insert<"person_education">[] = profile.education.map(
+      (e, i) => ({
+        ...e,
+        person_id: personId,
+        sort_order: i,
+        source,
+      }),
+    );
     await check(db.from("person_education").insert(rows));
   }
   if (profile.certifications.length) {
-    const rows: Insert<"person_certifications">[] = profile.certifications.map((c) => ({
-      ...c,
-      person_id: personId,
-      source,
-    }));
+    const rows: Insert<"person_certifications">[] = profile.certifications.map(
+      (c) => ({
+        ...c,
+        person_id: personId,
+        source,
+      }),
+    );
     await check(db.from("person_certifications").insert(rows));
   }
   if (profile.languages.length) {
@@ -193,10 +247,18 @@ export async function writeEnrichedProfile(
       const key = s.name.trim().toLowerCase();
       if (!key || seen.has(key)) continue;
       seen.add(key);
-      rows.push({ person_id: personId, name: s.name.trim(), endorsements: s.endorsements, is_top: s.is_top, source });
+      rows.push({
+        person_id: personId,
+        name: s.name.trim(),
+        endorsements: s.endorsements,
+        is_top: s.is_top,
+        source,
+      });
     }
     // PK is (person_id, name): provider data wins over another source's same-name row.
-    await check(db.from("person_skills").upsert(rows, { onConflict: "person_id,name" }));
+    await check(
+      db.from("person_skills").upsert(rows, { onConflict: "person_id,name" }),
+    );
   }
 
   await check(
@@ -218,6 +280,9 @@ export async function markEnrichment(
 ): Promise<void> {
   if (personIds.length === 0) return;
   await check(
-    db.from("people").update({ enrichment_status: status, enrichment_error: error }).in("id", personIds),
+    db
+      .from("people")
+      .update({ enrichment_status: status, enrichment_error: error })
+      .in("id", personIds),
   );
 }

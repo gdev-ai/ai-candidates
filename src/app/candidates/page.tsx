@@ -779,6 +779,14 @@ function CandidatesTable({
                       >
                         {Math.round(candidate.match_score)}%
                       </Badge>
+                    ) : candidate.enrichment_status === "pending" ? (
+                      <Badge
+                        tone="warning"
+                        className="whitespace-nowrap font-normal"
+                        title="The monthly enrichment budget is used up, so this profile (and its photo) hasn't been read. Score it again once the budget resets."
+                      >
+                        Waiting for enrichment budget
+                      </Badge>
                     ) : (
                       <Badge
                         tone="neutral"

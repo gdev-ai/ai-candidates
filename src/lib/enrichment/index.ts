@@ -52,7 +52,9 @@ export async function selectForEnrichment(
   if (personIds.length === 0) return { targets: [], cached: [] };
   const { data, error } = await db
     .from("people")
-    .select("id, profile_url, identity_key, enrichment_status, enriched_at")
+    .select(
+      "id, profile_url, identity_key, enrichment_status, enriched_at, photo_url, photo_fetched_at",
+    )
     .in("id", personIds);
   if (error) throw error;
   const targets: EnrichmentTarget[] = [];

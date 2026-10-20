@@ -4,6 +4,7 @@ import {
   History,
   Loader,
   ShieldCheck,
+  Sparkles,
   Target,
   UserCheck,
   UserPlus,
@@ -12,6 +13,7 @@ import {
 import { redirect } from "next/navigation";
 
 import { AccessManagement } from "@/components/admin/access-management";
+import { AnnouncementsManager } from "@/components/admin/announcements-manager";
 import { CreateTeamForm } from "@/components/admin/create-team-form";
 import { TeamsOverview } from "@/components/admin/teams-overview";
 import { UserManagement } from "@/components/admin/user-management";
@@ -200,6 +202,22 @@ export default async function AdminDashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        <Card className="border-slate-200 shadow-sm">
+          <CardHeader className="border-b border-slate-100 pb-3">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+              <Sparkles className="h-4 w-4 text-indigo-600" />
+              Updates
+            </CardTitle>
+            <CardDescription className="text-xs text-slate-500">
+              Share fixes and improvements in everyone&apos;s What&apos;s new
+              menu
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <AnnouncementsManager />
+          </CardContent>
+        </Card>
 
         <Card className="border-slate-200 shadow-sm">
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">

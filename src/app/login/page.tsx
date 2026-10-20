@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, type FormEvent } from "react";
+import { Loader2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { Brandmark } from "@/components/brand/brandmark";
@@ -38,7 +39,25 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Which sign-in is in flight. Stays set through the redirect to the
+  // dashboard, so the button keeps showing progress until the page changes.
+  const [pending, setPending] = useState<"password" | "microsoft" | null>(null);
+  const isSubmitting = pending !== null;
+  // Until the page is interactive, a click would submit the form natively
+  // instead of through handleSubmit, so the buttons stay disabled.
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    setIsReady(true);
+  }, []);
+
+  // A native submit from an older build put credentials in the query string;
+  // drop them from the address bar and this history entry.
+  useEffect(() => {
+    if (searchParams.has("password") || searchParams.has("email")) {
+      router.replace("/login");
+    }
+  }, [searchParams, router]);
 
   useEffect(() => {
     const errorParam = searchParams.get("error");
@@ -61,11 +80,11 @@ function LoginForm() {
   async function handleMicrosoft() {
     setError(null);
     setMessage(null);
-    setIsSubmitting(true);
+    setPending("microsoft");
     const { error: authError } = await signInWithMicrosoft();
     // On success the browser is already navigating to Microsoft.
     if (authError) {
-      setIsSubmitting(false);
+      setPending(null);
       setError(authError.message);
     }
   }
@@ -74,7 +93,7 @@ function LoginForm() {
     event.preventDefault();
     setError(null);
     setMessage(null);
-    setIsSubmitting(true);
+    setPending("password");
 
     const formData = new FormData(event.currentTarget);
     const email = String(formData.get("email") ?? "");
@@ -82,16 +101,16 @@ function LoginForm() {
 
     const { error: authError } = await signInWithPassword(email, password);
 
-    setIsSubmitting(false);
-
     if (authError) {
+      setPending(null);
       setError(authError.message);
       reportAuthEvent({ event: "login_failed", email });
       return;
     }
 
-    await reportAuthEvent({ event: "login" });
-    router.push("/");
+    // Fire-and-forget: a client-side navigation doesn't cancel the request.
+    void reportAuthEvent({ event: "login" });
+    router.replace("/dashboard");
     router.refresh();
   }
 
@@ -104,7 +123,8 @@ function LoginForm() {
             Use your HR Portal email and password, or sign in with Microsoft.
           </CardDescription>
         </CardHeader>
-        <form onSubmit={handleSubmit}>
+        {/* method="post": even a native submit never puts the password in the URL. */}
+        <form method="post" onSubmit={handleSubmit}>
           <CardContent className="flex flex-col gap-4">
             <Input
               type="email"
@@ -137,13 +157,31 @@ function LoginForm() {
               type="button"
               variant="outline"
               className="w-full"
-              disabled={isSubmitting}
+              disabled={!isReady || isSubmitting}
               onClick={handleMicrosoft}
             >
-              Sign in with Microsoft
+              {pending === "microsoft" ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                  Redirecting to Microsoft…
+                </>
+              ) : (
+                "Sign in with Microsoft"
+              )}
             </Button>
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Please wait..." : "Log in"}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={!isReady || isSubmitting}
+            >
+              {pending === "password" ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                  Signing you in…
+                </>
+              ) : (
+                "Log in"
+              )}
             </Button>
           </CardFooter>
         </form>

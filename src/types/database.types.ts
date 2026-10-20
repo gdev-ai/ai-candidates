@@ -795,6 +795,73 @@ export type Database = {
   }
   sourcing: {
     Tables: {
+      announcement_reads: {
+        Row: {
+          seen_at: string
+          user_id: string
+        }
+        Insert: {
+          seen_at?: string
+          user_id: string
+        }
+        Update: {
+          seen_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_reads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "members"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      announcements: {
+        Row: {
+          body: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          link: string | null
+          link_label: string | null
+          published_at: string
+          tag: string
+          title: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          link?: string | null
+          link_label?: string | null
+          published_at?: string
+          tag?: string
+          title: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          link?: string | null
+          link_label?: string | null
+          published_at?: string
+          tag?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       activity_log: {
         Row: {
           action: string

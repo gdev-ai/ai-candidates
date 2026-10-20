@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Badge, matchScoreTone } from "@/components/ui/badge";
+import { ClickableRow } from "@/components/ui/clickable-row";
 import { EmptyCell } from "@/components/ui/empty-cell";
 import { ROLE_LABELS } from "@/lib/auth/roleDefinitions";
 import { formatRelativeTime } from "@/lib/dates/formatRelativeTime";
@@ -35,8 +36,9 @@ export function UserPerformanceTable({
         </thead>
         <tbody>
           {users.map((user) => (
-            <tr
+            <Row
               key={user.id}
+              href={linkToMember ? `/manager/team/${user.id}` : null}
               className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60"
             >
               <td className="p-3">
@@ -78,10 +80,18 @@ export function UserPerformanceTable({
               </td>
               <td className="p-3 text-slate-500">{formatRelativeTime(user.lastSignInAt)}</td>
               <td className="p-3 text-slate-500">{formatRelativeTime(user.lastActivityAt)}</td>
-            </tr>
+            </Row>
           ))}
         </tbody>
       </table>
     </div>
   );
+}
+
+/** Opens the member's page when there is one; a plain row otherwise. */
+function Row({
+  href,
+  ...props
+}: React.HTMLAttributes<HTMLTableRowElement> & { href: string | null }) {
+  return href ? <ClickableRow href={href} {...props} /> : <tr {...props} />;
 }

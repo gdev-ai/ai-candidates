@@ -5,6 +5,18 @@ import { extractAnalysisOutput } from "./analysis";
 const ANALYSIS = { job_title: "Dev", required_skills: ["React"] };
 
 describe("extractAnalysisOutput", () => {
+  it("reads a Claude Messages response, skipping thinking blocks", () => {
+    expect(
+      extractAnalysisOutput({
+        type: "message",
+        content: [
+          { type: "thinking", thinking: "" },
+          { type: "text", text: JSON.stringify(ANALYSIS) },
+        ],
+      }),
+    ).toEqual(ANALYSIS);
+  });
+
   it("reads output_parsed", () => {
     expect(extractAnalysisOutput({ output_parsed: ANALYSIS })).toEqual(
       ANALYSIS,

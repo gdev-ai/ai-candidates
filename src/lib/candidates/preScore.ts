@@ -1,5 +1,6 @@
 import {
   cosineSimilarity,
+  EMBEDDING_DIMENSIONS,
   embedTexts,
   fromPgVector,
   toPgVector,
@@ -12,10 +13,23 @@ export const UNCERTAIN_EXTRA = 5;
 /** Snippets shorter than this tell us too little to trust the pre-score. */
 const THIN_SNIPPET_CHARS = 80;
 
-/** Maps embedding cosine similarity (≈0.2–0.7 for this model) onto 0–100. */
+/**
+ * Maps gte-small cosine similarity onto 0–100. Its job↔profile similarities
+ * sit in a narrow ≈0.82–0.90 band; 0.775–0.91 was fitted on 198 real pairs
+ * (2026-10-20) so scores keep the spread the earlier OpenAI pre-scores had.
+ */
+const SIMILARITY_FLOOR = 0.775;
+const SIMILARITY_SPAN = 0.135;
+
 export function similarityToScore(similarity: number): number {
-  const scaled = ((similarity - 0.2) / 0.5) * 100;
+  const scaled = ((similarity - SIMILARITY_FLOOR) / SIMILARITY_SPAN) * 100;
   return Math.round(Math.min(100, Math.max(0, scaled)) * 100) / 100;
+}
+
+/** A cached vector from another embedding model counts as missing. */
+function storedVector(value: string | null | undefined): number[] | null {
+  const vector = fromPgVector(value);
+  return vector?.length === EMBEDDING_DIMENSIONS ? vector : null;
 }
 
 export function jobEmbeddingText(job: {
@@ -133,7 +147,7 @@ export async function preScoreRun(
     .single();
   if (jobError) throw jobError;
 
-  let jobVector = fromPgVector(job.embedding);
+  let jobVector = storedVector(job.embedding);
   if (!jobVector) {
     const [vector] = await embedTexts(
       [
@@ -165,7 +179,7 @@ export async function preScoreRun(
   const candidates = rows ?? [];
   if (candidates.length === 0) return { scored: 0, shortlist: [] };
 
-  const missing = candidates.filter((r) => !fromPgVector(r.people.embedding));
+  const missing = candidates.filter((r) => !storedVector(r.people.embedding));
   const fresh = await embedTexts(
     missing.map((r) => personEmbeddingText(r.people)),
     ctx,
@@ -188,7 +202,7 @@ export async function preScoreRun(
   const updates: { job_id: string; person_id: string; pre_score: number }[] =
     [];
   for (const r of candidates) {
-    const vector = vectors.get(r.person_id) ?? fromPgVector(r.people.embedding);
+    const vector = vectors.get(r.person_id) ?? storedVector(r.people.embedding);
     if (!vector) continue;
     const preScore = similarityToScore(cosineSimilarity(jobVector, vector));
     updates.push({

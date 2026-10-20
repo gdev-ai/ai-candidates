@@ -1,41 +1,39 @@
 import { DashboardNav } from "@/components/dashboard/nav";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  LoadingRegion,
+  Skeleton,
+  StatSkeleton,
+  TableSkeleton,
+} from "@/components/ui/skeleton";
 
-function SkeletonBlock({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-md bg-muted ${className}`} />;
-}
-
+/** Shared by the admin, manager and reports routes. */
 export default function AdminLoading() {
   return (
     <main className="min-h-screen bg-slate-50/70">
       <DashboardNav />
-      <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-        <SkeletonBlock className="h-36 w-full rounded-2xl" />
+      <LoadingRegion
+        label="Loading…"
+        className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8"
+      >
+        <Skeleton className="h-36 w-full rounded-2xl" />
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="pb-2">
-                <SkeletonBlock className="h-4 w-24" />
-              </CardHeader>
-              <CardContent>
-                <SkeletonBlock className="h-7 w-16" />
-              </CardContent>
-            </Card>
+            <StatSkeleton key={i} />
           ))}
         </div>
-        {Array.from({ length: 3 }).map((_, i) => (
+        {[6, 5].map((rows, i) => (
           <Card key={i}>
-            <CardHeader>
-              <SkeletonBlock className="h-5 w-40" />
+            <CardHeader className="flex flex-col gap-1.5">
+              <Skeleton className="h-5 w-44" />
+              <Skeleton className="h-3 w-64" />
             </CardHeader>
-            <CardContent className="flex flex-col gap-2">
-              <SkeletonBlock className="h-4 w-full" />
-              <SkeletonBlock className="h-4 w-full" />
-              <SkeletonBlock className="h-4 w-3/4" />
+            <CardContent>
+              <TableSkeleton rows={rows} columns={7} />
             </CardContent>
           </Card>
         ))}
-      </div>
+      </LoadingRegion>
     </main>
   );
 }

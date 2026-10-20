@@ -133,7 +133,6 @@ export async function matchCandidates(
     searchRunId?: string | null;
     /** The job version the score is against (recorded on match_results). */
     jobVersionId?: string | null;
-    bulk?: boolean;
     skipScoredSince?: string | null;
   },
 ): Promise<MatchSummary> {
@@ -159,7 +158,6 @@ export async function matchCandidates(
       const person = await loadMatchingPerson(db, personId);
       if (!person) throw new Error("person not found");
       const scored = await scoreCandidate(job, person, {
-        bulk: input.bulk,
         context: {
           jobId: job.id,
           personId,

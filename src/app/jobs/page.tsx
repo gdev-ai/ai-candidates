@@ -15,6 +15,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { EmptyCell } from "@/components/ui/empty-cell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ClickableRow } from "@/components/ui/clickable-row";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import {
   SENIORITY_LABELS,
   type JobListItem,
@@ -101,7 +103,7 @@ export default function JobsPage() {
           <CardContent className="flex flex-col gap-4">
             <JobFilters value={filters} onChange={handleFiltersChange} />
             {isLoading ? (
-              <p className="text-sm text-muted-foreground">Loading jobs...</p>
+              <TableSkeleton rows={PAGE_SIZE} columns={7} label="Loading jobs…" />
             ) : error ? (
               <p role="alert" className="text-sm text-destructive">
                 {error}
@@ -148,8 +150,9 @@ export default function JobsPage() {
                     </thead>
                     <tbody>
                       {jobs.map((job) => (
-                        <tr
+                        <ClickableRow
                           key={job.id}
+                          href={`/candidates?jobId=${job.id}`}
                           className="border-b border-border/70 last:border-0 hover:bg-accent/40"
                           data-testid="job-row"
                         >
@@ -180,7 +183,7 @@ export default function JobsPage() {
                               {job.candidate_count === 1 ? "" : "s"}
                             </Link>
                           </td>
-                        </tr>
+                        </ClickableRow>
                       ))}
                     </tbody>
                   </table>

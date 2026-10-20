@@ -1,5 +1,4 @@
-import { APIError } from "openai";
-import { zodTextFormat } from "openai/helpers/zod";
+import Anthropic from "@anthropic-ai/sdk";
 import type { z } from "zod";
 
 import {
@@ -8,13 +7,15 @@ import {
   AIRefusalError,
   AIResponseValidationError,
 } from "@/lib/ai/AIProvider";
-import { getChatModel, getOpenAIClient } from "@/lib/ai/client";
+import { getAnthropicClient, getChatModel } from "@/lib/ai/client";
+import { toOutputSchema } from "@/lib/ai/jsonSchema";
 import {
   recordProviderCall,
   type ProviderPurpose,
 } from "@/lib/providers/callLog";
-import { openAICostUsd } from "@/lib/providers/pricing";
+import { anthropicCostUsd } from "@/lib/providers/pricing";
 
+/** "none" turns thinking off (Haiku); the rest map to output_config.effort. */
 export type ReasoningEffort = "none" | "low" | "medium" | "high";
 
 /** Links a call to what it was for, in provider_calls. */
@@ -27,21 +28,18 @@ export interface CallContext {
 
 export interface StructuredCallOptions<S extends z.ZodType> {
   purpose: ProviderPurpose;
-  /** Strict-mode compatible: every field required, no defaults/optionals. */
+  /** Every field required, no defaults/optionals. */
   schema: S;
   schemaName: string;
   instructions: string;
   input: string;
   effort: ReasoningEffort;
+  /** Caps thinking and the answer together. */
   maxOutputTokens: number;
   promptVersion: string;
-  /** Only sent with effort "none" — any other effort rejects it with a 400. */
-  temperature?: number;
-  /** "flex" for bulk work: half price, slower; falls back to default on 429. */
-  serviceTier?: "flex" | "default";
   /**
-   * Default tier only: abort a call that runs longer than this and retry
-   * it once. Cuts rare 90s+ stragglers that hold up a whole batch.
+   * Abort a call that runs longer than this and retry it once. Cuts rare
+   * 90s+ stragglers that hold up a whole batch.
    */
   timeoutMs?: number;
   context?: CallContext;
@@ -56,77 +54,76 @@ export interface StructuredResult<T> {
   costUsd: number | null;
 }
 
-const FLEX_TIMEOUT_MS = 15 * 60_000;
-
-interface UsageShape {
-  input_tokens?: number;
-  output_tokens?: number;
-  input_tokens_details?: { cached_tokens?: number };
-  output_tokens_details?: { reasoning_tokens?: number };
-}
-
-interface ResponseShape {
-  id?: string;
-  model?: string;
-  status?: string;
-  service_tier?: string | null;
-  incomplete_details?: { reason?: string } | null;
-  usage?: UsageShape | null;
-  output?: { type: string; content?: { type: string; refusal?: string }[] }[];
-  output_parsed?: unknown;
-}
-
-function findRefusal(response: ResponseShape): string | null {
-  for (const item of response.output ?? []) {
-    if (item.type !== "message") continue;
-    for (const part of item.content ?? []) {
-      if (part.type === "refusal") return part.refusal ?? "refused";
-    }
+/**
+ * Thinking can only be switched off on Haiku; elsewhere "none" runs at low
+ * effort with adaptive thinking.
+ */
+function thinkingParams(model: string, effort: ReasoningEffort) {
+  if (effort === "none") {
+    return model.startsWith("claude-haiku")
+      ? {
+          thinking: { type: "disabled" as const },
+          output_config: { effort: "low" as const },
+        }
+      : { output_config: { effort: "low" as const } };
   }
-  return null;
+  return { output_config: { effort } };
+}
+
+function responseText(message: Anthropic.Message): string {
+  return message.content
+    .filter((block): block is Anthropic.TextBlock => block.type === "text")
+    .map((block) => block.text)
+    .join("");
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
- * One structured OpenAI call through the Responses API (§8.1): strict JSON
- * schema, explicit reasoning effort and output cap, `store: false`, low
- * verbosity. Every attempt — success, refusal, truncation, schema mismatch
- * or HTTP error — is written to provider_calls with tokens and cost.
- * Truncated or refused answers throw and are not retried here.
+ * One structured Claude call through the Messages API: JSON-schema
+ * structured output, explicit effort and output cap. Every attempt —
+ * success, refusal, truncation, schema mismatch or HTTP error — is written
+ * to provider_calls with tokens and cost. Truncated or refused answers
+ * throw and are not retried here.
  */
 export async function runStructured<S extends z.ZodType>(
   options: StructuredCallOptions<S>,
 ): Promise<StructuredResult<z.infer<S>>> {
-  const client = getOpenAIClient();
+  const client = getAnthropicClient();
   const model = options.model ?? getChatModel();
-  const flex = options.serviceTier === "flex";
+  const thinking = thinkingParams(model, options.effort);
 
   const body = {
     model,
-    instructions: options.instructions,
-    input: options.input,
-    text: {
-      format: zodTextFormat(options.schema, options.schemaName),
-      verbosity: "low" as const,
+    max_tokens: options.maxOutputTokens,
+    system: options.instructions,
+    messages: [{ role: "user" as const, content: options.input }],
+    ...thinking,
+    output_config: {
+      ...thinking.output_config,
+      format: {
+        type: "json_schema" as const,
+        schema: toOutputSchema(options.schema),
+      },
     },
-    reasoning: { effort: options.effort },
-    max_output_tokens: options.maxOutputTokens,
-    store: false,
-    ...(options.effort === "none" && options.temperature !== undefined
-      ? { temperature: options.temperature }
-      : {}),
   };
   const requestLog = {
     model,
     effort: options.effort,
-    max_output_tokens: options.maxOutputTokens,
+    max_tokens: options.maxOutputTokens,
     schema: options.schemaName,
-    service_tier: flex ? "flex" : "default",
     instructions: options.instructions,
     input: options.input,
   };
   const ctx = options.context ?? {};
   const base = {
-    provider: "openai" as const,
+    provider: "anthropic" as const,
     purpose: options.purpose,
     jobId: ctx.jobId,
     personId: ctx.personId,
@@ -138,74 +135,66 @@ export async function runStructured<S extends z.ZodType>(
   };
 
   const startedAt = Date.now();
-  let response: ResponseShape;
+  let response: Anthropic.Message;
   let requestId: string | null = null;
   try {
-    const call = async (useFlex: boolean) =>
-      client.responses
-        .parse(
-          useFlex ? { ...body, service_tier: "flex" as const } : body,
-          useFlex
-            ? { timeout: FLEX_TIMEOUT_MS, maxRetries: 0 }
-            : options.timeoutMs
-              ? { timeout: options.timeoutMs, maxRetries: 1 }
-              : undefined,
-        )
-        .withResponse();
-    let result;
-    try {
-      result = await call(flex);
-    } catch (error) {
-      // Flex capacity is best-effort: a 429 means "no flex capacity now".
-      if (flex && error instanceof APIError && error.status === 429) {
-        result = await call(false);
-      } else {
-        throw error;
-      }
-    }
-    response = result.data as unknown as ResponseShape;
+    const result = await client.messages
+      .create(
+        body,
+        options.timeoutMs
+          ? { timeout: options.timeoutMs, maxRetries: 1 }
+          : undefined,
+      )
+      .withResponse();
+    response = result.data;
     requestId = result.request_id ?? null;
   } catch (error) {
     await recordProviderCall({
       ...base,
       status: "error",
       latencyMs: Date.now() - startedAt,
-      httpStatus: error instanceof APIError ? (error.status ?? null) : null,
+      httpStatus:
+        error instanceof Anthropic.APIError ? (error.status ?? null) : null,
       providerRequestId:
-        error instanceof APIError ? (error.requestID ?? null) : null,
+        error instanceof Anthropic.APIError ? (error.requestID ?? null) : null,
       error: error instanceof Error ? error.message : String(error),
     });
-    throw new AIProviderError("openai", error);
+    throw new AIProviderError("anthropic", error);
   }
 
-  const usage = response.usage ?? {};
-  const inputTokens = usage.input_tokens ?? 0;
+  const usage = response.usage;
+  const uncachedTokens = usage.input_tokens ?? 0;
+  const cacheReadTokens = usage.cache_read_input_tokens ?? 0;
+  const cacheWriteTokens = usage.cache_creation_input_tokens ?? 0;
   const outputTokens = usage.output_tokens ?? 0;
-  const cachedTokens = usage.input_tokens_details?.cached_tokens ?? 0;
   const servedModel = response.model ?? model;
-  const costUsd = openAICostUsd(
-    servedModel,
-    { inputTokens, cachedTokens, outputTokens },
-    response.service_tier,
-  );
+  const costUsd = anthropicCostUsd(servedModel, {
+    inputTokens: uncachedTokens,
+    cacheReadTokens,
+    cacheWriteTokens,
+    outputTokens,
+  });
   const metrics = {
     ...base,
     model: servedModel,
     providerRequestId: requestId ?? response.id ?? null,
-    finishReason:
-      response.incomplete_details?.reason ?? response.status ?? null,
-    promptTokens: inputTokens,
+    finishReason: response.stop_reason ?? null,
+    promptTokens: uncachedTokens + cacheReadTokens + cacheWriteTokens,
     completionTokens: outputTokens,
-    cachedTokens,
-    reasoningTokens: usage.output_tokens_details?.reasoning_tokens ?? 0,
+    cachedTokens: cacheReadTokens,
+    // Thinking is billed inside output_tokens; the API doesn't split it out.
+    reasoningTokens: null,
     costUsd,
     latencyMs: Date.now() - startedAt,
     httpStatus: 200,
     response,
   };
 
-  if (response.status === "incomplete") {
-    const reason = response.incomplete_details?.reason ?? null;
+  if (
+    response.stop_reason === "max_tokens" ||
+    response.stop_reason === "model_context_window_exceeded"
+  ) {
+    const reason = response.stop_reason;
     await recordProviderCall({
       ...metrics,
       status: "truncated",
@@ -214,17 +203,20 @@ export async function runStructured<S extends z.ZodType>(
     throw new AIIncompleteResponseError(options.schemaName, reason);
   }
 
-  const refusal = findRefusal(response);
-  if (refusal) {
+  if (response.stop_reason === "refusal") {
+    const details = response.stop_details;
+    const refusal = details?.explanation ?? details?.category ?? "refused";
     await recordProviderCall({ ...metrics, status: "refused", error: refusal });
     throw new AIRefusalError(options.schemaName, refusal);
   }
 
-  const parsed = options.schema.safeParse(response.output_parsed);
-  if (response.output_parsed == null || !parsed.success) {
-    const issue = parsed.success
-      ? "no parsed output"
-      : parsed.error.issues[0]?.message;
+  const raw = parseJson(responseText(response));
+  const parsed = options.schema.safeParse(raw);
+  if (raw === undefined || !parsed.success) {
+    const issue =
+      raw === undefined || parsed.success
+        ? "no parsed output"
+        : parsed.error.issues[0]?.message;
     await recordProviderCall({
       ...metrics,
       status: "error",

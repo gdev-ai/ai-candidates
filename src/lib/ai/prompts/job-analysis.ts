@@ -37,7 +37,7 @@ export async function analyzeJobDescription(
     instructions: INSTRUCTIONS,
     input: buildJobAnalysisInput(description),
     effort: "low",
-    maxOutputTokens: 4000,
+    maxOutputTokens: 8000,
     promptVersion: JOB_ANALYSIS_PROMPT_VERSION,
     context,
   });

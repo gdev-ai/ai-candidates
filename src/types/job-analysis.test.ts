@@ -1,6 +1,6 @@
-import { zodTextFormat } from "openai/helpers/zod";
 import { describe, expect, it } from "vitest";
 
+import { toOutputSchema } from "@/lib/ai/jsonSchema";
 import {
   analysisToRequirements,
   jobAnalysisSchema,
@@ -30,18 +30,21 @@ describe("jobAnalysisSchema", () => {
   it("has no city/location and restricts seniority to the jobs enum", () => {
     expect(Object.keys(jobAnalysisSchema.shape)).not.toContain("city");
     expect(Object.keys(jobAnalysisSchema.shape)).not.toContain("location");
-    expect(jobAnalysisSchema.safeParse({ ...analysis, seniority: "Senior" }).success).toBe(false);
+    expect(
+      jobAnalysisSchema.safeParse({ ...analysis, seniority: "Senior" }).success,
+    ).toBe(false);
     expect(jobAnalysisSchema.safeParse(analysis).success).toBe(true);
   });
 
   it("converts to a strict JSON schema (every field required)", () => {
     for (const schema of [jobAnalysisSchema, matchOutputSchema]) {
-      const format = zodTextFormat(schema, "x") as unknown as {
-        strict: boolean;
-        schema: { required: string[]; properties: Record<string, unknown> };
+      const out = toOutputSchema(schema) as {
+        required: string[];
+        properties: Record<string, unknown>;
+        additionalProperties: boolean;
       };
-      expect(format.strict).toBe(true);
-      expect(format.schema.required.sort()).toEqual(Object.keys(format.schema.properties).sort());
+      expect(out.additionalProperties).toBe(false);
+      expect(out.required.sort()).toEqual(Object.keys(out.properties).sort());
     }
   });
 });

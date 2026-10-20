@@ -4,6 +4,10 @@ import { loadPipelineRow } from "@/app/api/candidates/[id]/_lib/pipeline";
 import { logActivity } from "@/lib/activity/log";
 import { requireUser } from "@/lib/api/requireUser";
 import { describeOwnership, forbidUnlessOwner } from "@/lib/auth/ownership";
+import {
+  MY_FEEDBACK_EMBED,
+  toScoreFeedback,
+} from "@/lib/candidates/scoreFeedback";
 import { withErrorHandling } from "@/lib/errors";
 import { createLogger } from "@/lib/logger";
 import { getDisplayName } from "@/lib/users/displayName";
@@ -89,7 +93,7 @@ export const GET = withErrorHandling(
       supabase
         .from("match_results")
         .select(
-          "id, match_score, skills_score, experience_score, location_score, education_score, seniority_score, summary, items, weights, model, prompt_version, created_at",
+          `id, match_score, skills_score, experience_score, location_score, education_score, seniority_score, summary, items, weights, model, prompt_version, created_at, ${MY_FEEDBACK_EMBED}` as const,
         )
         .eq("job_id", jobId)
         .eq("person_id", personId)
@@ -158,10 +162,13 @@ export const GET = withErrorHandling(
         match_score: row.match_score,
         scored_at: row.scored_at,
       },
-      matches: (matches.data ?? []).map((m): MatchResultRecord => ({
-        ...m,
-        items: Array.isArray(m.items) ? (m.items as MatchItem[]) : [],
-      })),
+      matches: (matches.data ?? []).map(
+        ({ score_feedback, ...m }): MatchResultRecord => ({
+          ...m,
+          items: Array.isArray(m.items) ? (m.items as MatchItem[]) : [],
+          my_feedback: toScoreFeedback(score_feedback),
+        }),
+      ),
       notes: (notes.data ?? []).map((n) => ({
         id: n.id,
         note: n.note,

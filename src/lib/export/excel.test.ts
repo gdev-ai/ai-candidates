@@ -146,6 +146,7 @@ describe("toExportRow", () => {
         seniority_score: null,
         summary: "Good",
         created_at: "2026-01-02T00:00:00Z",
+        my_feedback: null,
       },
       viewed: true,
     };

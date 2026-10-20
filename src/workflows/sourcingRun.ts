@@ -24,8 +24,6 @@ const QUERY_CONCURRENCY = 3;
 const MATCH_CHUNK = 5;
 /** Match chunks scored at the same time (each chunk runs 3 calls in parallel). */
 const MATCH_PARALLEL_CHUNKS = 3;
-/** Above this many, matching uses the cheaper but slower flex tier. */
-const FLEX_THRESHOLD = 25;
 const HARVEST_CHUNK = 3;
 /** Poll Apify every 5s for up to 2 minutes. */
 const MAX_APIFY_POLLS = 24;
@@ -91,11 +89,15 @@ export async function sourcingRunWorkflow(
     const shortlist = await preScoreStep(ctx, maxCandidates);
 
     const enriched = await enrichPeople(ctx, shortlist);
-    const { scored, strongMatches } = await scorePeople(ctx, shortlist);
 
     // Everyone in-country stays on the job, scored or not; only people
-    // abroad or at our own company are removed.
-    await dropIneligibleStep(ctx);
+    // enrichment showed to be abroad or at our own company are removed —
+    // before scoring, so no AI call is spent on someone who is then dropped.
+    const dropped = new Set(await dropIneligibleStep(ctx));
+    const { scored, strongMatches } = await scorePeople(
+      ctx,
+      shortlist.filter((id) => !dropped.has(id)),
+    );
 
     await finalizeStep(ctx, { queryErrors, enriched, scored, strongMatches });
     return { status: "complete" as const, scored, strongMatches };
@@ -153,7 +155,6 @@ async function scorePeople(
 ): Promise<{ scored: number; strongMatches: number }> {
   let scored = 0;
   let strongMatches = 0;
-  const bulk = personIds.length > FLEX_THRESHOLD;
   const chunks: string[][] = [];
   for (let i = 0; i < personIds.length; i += MATCH_CHUNK)
     chunks.push(personIds.slice(i, i + MATCH_CHUNK));
@@ -161,7 +162,7 @@ async function scorePeople(
     const results = await Promise.all(
       chunks
         .slice(i, i + MATCH_PARALLEL_CHUNKS)
-        .map((chunk) => matchStep(ctx, chunk, bulk)),
+        .map((chunk) => matchStep(ctx, chunk)),
     );
     for (const result of results) {
       scored += result.scored;

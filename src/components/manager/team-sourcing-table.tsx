@@ -2,6 +2,7 @@ import { Search } from "lucide-react";
 import Link from "next/link";
 
 import { Badge, matchScoreTone, runStatusTone } from "@/components/ui/badge";
+import { ClickableRow } from "@/components/ui/clickable-row";
 import { Button } from "@/components/ui/button";
 import { EmptyCell } from "@/components/ui/empty-cell";
 import { formatRelativeTime } from "@/lib/dates/formatRelativeTime";
@@ -53,8 +54,9 @@ export function TeamSourcingTable({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr
+            <ClickableRow
               key={row.runId}
+              href={`/candidates?jobId=${row.jobId}&runId=${row.runId}`}
               className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60"
               data-testid="team-sourcing-row"
             >
@@ -116,7 +118,7 @@ export function TeamSourcingTable({
                   <Link href={`/candidates?jobId=${row.jobId}&runId=${row.runId}`}>View</Link>
                 </Button>
               </td>
-            </tr>
+            </ClickableRow>
           ))}
         </tbody>
       </table>

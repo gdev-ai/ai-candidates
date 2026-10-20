@@ -18,15 +18,26 @@ function parseObject(text: unknown): JsonObject | null {
 
 /**
  * Pulls the parsed job analysis out of a provider_calls.response payload.
- * Accepts, in order: an `output_parsed` object, an `output_text` JSON
- * string, the Responses API `output[].content[]` text parts, or a response
- * that already is the analysis object. Returns null when nothing usable is
- * there — the caller then refuses the analysisCallId rather than store junk.
+ * Accepts, in order: a Claude Messages response (its `content[]` text
+ * blocks), an `output_parsed` object, an `output_text` JSON string, the
+ * OpenAI Responses API `output[].content[]` text parts (calls logged before
+ * the move to Claude), or a response that already is the analysis object.
+ * Returns null when nothing usable is there — the caller then refuses the
+ * analysisCallId rather than store junk.
  */
 export function extractAnalysisOutput(
   response: Json | null | undefined,
 ): JsonObject | null {
   if (!isObject(response)) return null;
+
+  if (Array.isArray(response.content)) {
+    const text = response.content
+      .filter((block) => isObject(block) && block.type === "text")
+      .map((block) => (block as JsonObject).text)
+      .filter((part): part is string => typeof part === "string")
+      .join("");
+    return parseObject(text);
+  }
 
   if (isObject(response.output_parsed)) return response.output_parsed;
 

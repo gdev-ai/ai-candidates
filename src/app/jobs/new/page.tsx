@@ -56,6 +56,7 @@ import {
   type AnalysisLike,
   type RequirementsDraft,
 } from "@/types/job";
+import { notifySearchStarted } from "@/components/dashboard/search-run-watcher";
 
 type InputMode = "paste" | "upload" | "portal";
 
@@ -510,10 +511,12 @@ export default function NewJobPage() {
       toast.error("Failed to save the job or generate queries.");
     } finally {
       setIsSaving(false);
+      // Every failure above returns early; close the progress screen so the
+      // error is visible instead of a search stuck at "Plan the search".
+      if (!(jobId && generated)) setSearchPhase(null);
     }
 
     if (jobId && generated) await startSearch(jobId, generated);
-    else setSearchPhase(null);
   }
 
   async function pollRun(currentRunId: string) {
@@ -603,6 +606,7 @@ export default function NewJobPage() {
         return;
       }
       setRunId(run.id);
+      notifySearchStarted();
       await pollRun(run.id);
     } catch {
       setSearchError("An unexpected error occurred during candidate sourcing.");

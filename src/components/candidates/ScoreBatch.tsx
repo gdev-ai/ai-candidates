@@ -7,6 +7,7 @@ import { toast } from "@/components/ui/toast";
 import { refreshCredits } from "@/components/usage/useCredits";
 import type { RunProgress } from "@/lib/jobs/runProgress";
 import { cn } from "@/lib/utils";
+import { notifySearchStarted } from "@/components/dashboard/search-run-watcher";
 
 const POLL_MS = 2000;
 const TERMINAL = new Set(["complete", "error", "cancelled"]);
@@ -21,15 +22,17 @@ export interface ActiveBatch {
  * A job's scoring batch: start one (next 10 unscored, or selected people),
  * follow its progress, and call `onScored` whenever more people get a
  * score so the table can refresh. Picks up a batch still running after a
- * reload.
+ * reload. A null `jobId` (the cross-job list) disables it.
  */
-export function useScoreBatch(jobId: string, onScored: () => void) {
+export function useScoreBatch(jobId: string | null, onScored: () => void) {
   const [batch, setBatch] = useState<ActiveBatch | null>(null);
   const [starting, setStarting] = useState(false);
   const onScoredRef = useRef(onScored);
   onScoredRef.current = onScored;
 
   useEffect(() => {
+    setBatch(null);
+    if (!jobId) return;
     let cancelled = false;
     fetch(`/api/jobs/${jobId}/score`)
       .then((res) => (res.ok ? res.json() : null))
@@ -107,6 +110,7 @@ export function useScoreBatch(jobId: string, onScored: () => void) {
 
   const start = useCallback(
     async (body: { personIds?: string[]; versionId?: string }) => {
+      if (!jobId) return false;
       setStarting(true);
       try {
         const res = await fetch(`/api/jobs/${jobId}/score`, {
@@ -123,6 +127,7 @@ export function useScoreBatch(jobId: string, onScored: () => void) {
           toast.error(data.error ?? "Couldn't start scoring.", "Scoring");
           return false;
         }
+        notifySearchStarted();
         // The batch's people come back with its first status poll; until
         // then, show the selection (if any) as being scored.
         setBatch({

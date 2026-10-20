@@ -1,5 +1,4 @@
-import { APIError } from "openai";
-import type OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -7,13 +6,14 @@ import {
   AIIncompleteResponseError,
   AIProviderError,
   AIRefusalError,
+  AIResponseValidationError,
 } from "@/lib/ai/AIProvider";
-import { setOpenAIClientForTesting } from "@/lib/ai/client";
+import { setAnthropicClientForTesting } from "@/lib/ai/client";
 import { runStructured } from "@/lib/ai/structured";
 import { recordProviderCall } from "@/lib/providers/callLog";
 
 vi.mock("@/lib/env", () => ({
-  env: { OPENAI_API_KEY: "test", OPENAI_MODEL: undefined },
+  env: { ANTHROPIC_API_KEY: "test", ANTHROPIC_MODEL: undefined },
 }));
 vi.mock("@/lib/providers/callLog", () => ({
   recordProviderCall: vi.fn(async () => "call-1"),
@@ -26,35 +26,40 @@ const schema = z.object({
 
 function response(overrides: Record<string, unknown> = {}) {
   return {
-    id: "resp_1",
-    model: "gpt-5.6-luna",
-    status: "completed",
-    service_tier: "default",
-    incomplete_details: null,
+    id: "msg_1",
+    type: "message",
+    role: "assistant",
+    model: "claude-haiku-5-5",
+    stop_reason: "end_turn",
+    stop_details: null,
     usage: {
       input_tokens: 1000,
       output_tokens: 100,
-      input_tokens_details: { cached_tokens: 0 },
-      output_tokens_details: { reasoning_tokens: 40 },
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
     },
-    output: [
-      { type: "message", content: [{ type: "output_text", text: "{}" }] },
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify({ in_country: true, evidence: "Cairo, Egypt" }),
+      },
     ],
-    output_parsed: { in_country: true, evidence: "Cairo, Egypt" },
     ...overrides,
   };
 }
 
 function fakeClient(
-  parse: (body: Record<string, unknown>, opts?: unknown) => unknown,
+  create: (body: Record<string, unknown>, opts?: unknown) => unknown,
 ) {
   const fn = vi.fn((body: Record<string, unknown>, opts?: unknown) => ({
     withResponse: async () => {
-      const data = await parse(body, opts);
+      const data = await create(body, opts);
       return { data, request_id: "req_1" };
     },
   }));
-  setOpenAIClientForTesting({ responses: { parse: fn } } as unknown as OpenAI);
+  setAnthropicClientForTesting({
+    messages: { create: fn },
+  } as unknown as Anthropic);
   return fn;
 }
 
@@ -69,78 +74,110 @@ const base = {
 };
 
 beforeEach(() => vi.mocked(recordProviderCall).mockClear());
-afterEach(() => setOpenAIClientForTesting(null));
+afterEach(() => setAnthropicClientForTesting(null));
 
 describe("runStructured", () => {
-  it("sends the §8.1 request shape and logs tokens + cost", async () => {
-    const parse = fakeClient(() => response());
+  it("sends a structured-output request and logs tokens + cost", async () => {
+    const create = fakeClient(() => response());
     const result = await runStructured({
       ...base,
-      effort: "none",
-      temperature: 0,
+      effort: "low",
       context: { userId: "u1" },
     });
 
     expect(result).toMatchObject({
       data: { in_country: true },
       callId: "call-1",
-      model: "gpt-5.6-luna",
+      model: "claude-haiku-5-5",
     });
-    const body = parse.mock.calls[0]?.[0] as Record<string, unknown>;
+    const body = create.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(body).toMatchObject({
-      model: "gpt-5.6-luna",
-      store: false,
-      max_output_tokens: 300,
-      reasoning: { effort: "none" },
-      temperature: 0,
-      text: { verbosity: "low" },
+      model: "claude-haiku-5-5",
+      max_tokens: 300,
+      system: "x",
+      messages: [{ role: "user", content: "y" }],
+      output_config: { effort: "low", format: { type: "json_schema" } },
     });
+    expect(body).not.toHaveProperty("thinking");
     const logged = vi.mocked(recordProviderCall).mock.calls[0]?.[0];
     expect(logged).toMatchObject({
       status: "ok",
-      provider: "openai",
+      provider: "anthropic",
       purpose: "location_check",
       userId: "u1",
       providerRequestId: "req_1",
+      finishReason: "end_turn",
       promptTokens: 1000,
       completionTokens: 100,
-      reasoningTokens: 40,
       promptVersion: "v1",
     });
-    expect(logged?.costUsd).toBeCloseTo((1000 * 0.2 + 100 * 1.2) / 1_000_000);
+    expect(logged?.costUsd).toBeCloseTo((1000 * 0.1 + 100 * 0.5) / 1_000_000);
   });
 
-  it("never sends temperature with a reasoning effort", async () => {
-    const parse = fakeClient(() => response());
-    await runStructured({ ...base, effort: "low", temperature: 0.2 });
-    expect(parse.mock.calls[0]?.[0]).not.toHaveProperty("temperature");
+  it("turns thinking off for effort none on Haiku", async () => {
+    const create = fakeClient(() => response());
+    await runStructured({ ...base, effort: "none" });
+    expect(create.mock.calls[0]?.[0]).toMatchObject({
+      thinking: { type: "disabled" },
+      output_config: { effort: "low" },
+    });
+  });
+
+  it("keeps thinking on for effort none on models that can't disable it", async () => {
+    const create = fakeClient(() => response({ model: "claude-opus-5-5" }));
+    await runStructured({ ...base, effort: "none", model: "claude-opus-5-5" });
+    expect(create.mock.calls[0]?.[0]).not.toHaveProperty("thinking");
+  });
+
+  it("prices cache reads and writes", async () => {
+    fakeClient(() =>
+      response({
+        usage: {
+          input_tokens: 1000,
+          output_tokens: 0,
+          cache_read_input_tokens: 10_000,
+          cache_creation_input_tokens: 2000,
+        },
+      }),
+    );
+    await runStructured({ ...base, effort: "low" });
+    const logged = vi.mocked(recordProviderCall).mock.calls[0]?.[0];
+    expect(logged).toMatchObject({
+      promptTokens: 13_000,
+      cachedTokens: 10_000,
+    });
+    expect(logged?.costUsd).toBeCloseTo(
+      (1000 * 0.1 + 10_000 * 0.01 + 2000 * 0.125) / 1_000_000,
+    );
   });
 
   it("records a truncated response and throws without retrying", async () => {
-    const parse = fakeClient(() =>
+    const create = fakeClient(() =>
       response({
-        status: "incomplete",
-        incomplete_details: { reason: "max_output_tokens" },
-        output_parsed: null,
+        stop_reason: "max_tokens",
+        content: [{ type: "text", text: '{"in_country": tr' }],
       }),
     );
     await expect(
       runStructured({ ...base, effort: "low" }),
     ).rejects.toBeInstanceOf(AIIncompleteResponseError);
-    expect(parse).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledTimes(1);
     expect(vi.mocked(recordProviderCall).mock.calls[0]?.[0]).toMatchObject({
       status: "truncated",
-      finishReason: "max_output_tokens",
+      finishReason: "max_tokens",
     });
   });
 
   it("records a refusal", async () => {
     fakeClient(() =>
       response({
-        output: [
-          { type: "message", content: [{ type: "refusal", refusal: "no" }] },
-        ],
-        output_parsed: null,
+        stop_reason: "refusal",
+        stop_details: {
+          type: "refusal",
+          category: null,
+          explanation: "declined",
+        },
+        content: [],
       }),
     );
     await expect(
@@ -148,36 +185,42 @@ describe("runStructured", () => {
     ).rejects.toBeInstanceOf(AIRefusalError);
     expect(vi.mocked(recordProviderCall).mock.calls[0]?.[0]).toMatchObject({
       status: "refused",
+      error: "declined",
+    });
+  });
+
+  it("rejects output that doesn't match the schema", async () => {
+    fakeClient(() =>
+      response({ content: [{ type: "text", text: '{"in_country": "yes"}' }] }),
+    );
+    await expect(
+      runStructured({ ...base, effort: "low" }),
+    ).rejects.toBeInstanceOf(AIResponseValidationError);
+    expect(vi.mocked(recordProviderCall).mock.calls[0]?.[0]).toMatchObject({
+      status: "error",
     });
   });
 
   it("logs HTTP errors as AIProviderError", async () => {
     fakeClient(() => {
-      throw new APIError(500, undefined, "boom", new Headers());
+      throw new Anthropic.APIError(500, undefined, "boom", new Headers());
     });
     await expect(
       runStructured({ ...base, effort: "low" }),
     ).rejects.toBeInstanceOf(AIProviderError);
     expect(vi.mocked(recordProviderCall).mock.calls[0]?.[0]).toMatchObject({
       status: "error",
+      provider: "anthropic",
       httpStatus: 500,
     });
   });
 
-  it("uses flex for bulk calls and falls back to the default tier on 429", async () => {
-    const parse = fakeClient((body) => {
-      if (body.service_tier === "flex")
-        throw new APIError(429, undefined, "no capacity", new Headers());
-      return response();
+  it("passes a per-call timeout with one retry", async () => {
+    const create = fakeClient(() => response());
+    await runStructured({ ...base, effort: "low", timeoutMs: 40_000 });
+    expect(create.mock.calls[0]?.[1]).toEqual({
+      timeout: 40_000,
+      maxRetries: 1,
     });
-    const result = await runStructured({
-      ...base,
-      effort: "low",
-      serviceTier: "flex",
-    });
-    expect(result.data.in_country).toBe(true);
-    expect(parse).toHaveBeenCalledTimes(2);
-    expect(parse.mock.calls[0]?.[1]).toMatchObject({ maxRetries: 0 });
-    expect(parse.mock.calls[1]?.[0]).not.toHaveProperty("service_tier");
   });
 });

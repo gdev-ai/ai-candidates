@@ -1,29 +1,35 @@
 /**
  * Price table for every paid provider call, so provider_calls.cost_usd is a
  * real measured number (docs/db-redesign.md §2.4, §5). Prices are USD and
- * were taken from the providers' pricing pages on 2026-09-30 / 2026-10-04.
+ * were taken from the providers' pricing pages on 2026-09-30 / 2026-10-04
+ * (Claude: 2026-10-20).
  */
 
 interface TokenPrice {
   /** USD per 1M uncached input tokens. */
   input: number;
-  /** USD per 1M cached input tokens. */
-  cachedInput: number;
-  /** USD per 1M output tokens (reasoning tokens are billed as output). */
+  /** USD per 1M output tokens (thinking is billed as output). */
   output: number;
+  /**
+   * Prompts above `from` total input tokens are billed at these rates for
+   * the whole request.
+   */
+  longContext?: { from: number; input: number; output: number };
 }
 
-// Cached-input prices that the pricing page doesn't list separately use the
-// usual 10%-of-input rate.
-export const OPENAI_PRICING: Record<string, TokenPrice> = {
-  "gpt-5.6-luna": { input: 0.2, cachedInput: 0.02, output: 1.2 },
-  "gpt-6-luna": { input: 0.1, cachedInput: 0.01, output: 0.5 },
-  "gpt-5.6-terra": { input: 2, cachedInput: 0.2, output: 12 },
-  "text-embedding-3-small": { input: 0.02, cachedInput: 0.02, output: 0 },
-};
+/** Cache reads cost 0.1x the input rate; 5-minute cache writes 1.25x. */
+const CACHE_READ_MULTIPLIER = 0.1;
+const CACHE_WRITE_MULTIPLIER = 1.25;
 
-/** Flex processing is billed at half the standard rate. */
-export const FLEX_DISCOUNT = 0.5;
+export const ANTHROPIC_PRICING: Record<string, TokenPrice> = {
+  "claude-haiku-5-5": {
+    input: 0.1,
+    output: 0.5,
+    longContext: { from: 100_000, input: 0.5, output: 2.5 },
+  },
+  "claude-sonnet-5-5": { input: 2, output: 10 },
+  "claude-opus-5-5": { input: 4, output: 20 },
+};
 
 /** Serper: prepaid credits, $1 per 1,000 (1 credit per 10-result page). */
 export const SERPER_USD_PER_CREDIT = 0.001;
@@ -36,35 +42,45 @@ export const APIFY_RUN_START_USD = 0.0001;
 export const HARVESTAPI_USD_PER_PROFILE = 0.0064;
 
 function priceFor(model: string): TokenPrice | null {
-  if (OPENAI_PRICING[model]) return OPENAI_PRICING[model];
-  // Responses can report a dated snapshot ("gpt-5.6-luna-2026-08-01").
-  const base = Object.keys(OPENAI_PRICING)
+  if (ANTHROPIC_PRICING[model]) return ANTHROPIC_PRICING[model];
+  // Tolerate a dated snapshot id ("claude-haiku-5-5-20261001").
+  const base = Object.keys(ANTHROPIC_PRICING)
     .sort((a, b) => b.length - a.length)
     .find((name) => model.startsWith(`${name}-`));
-  return base ? (OPENAI_PRICING[base] ?? null) : null;
+  return base ? (ANTHROPIC_PRICING[base] ?? null) : null;
 }
 
 export interface TokenUsage {
+  /** Uncached input tokens (the API's `input_tokens`). */
   inputTokens: number;
-  cachedTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
   outputTokens: number;
 }
 
-/** USD cost of one OpenAI call, or null for a model missing from the table. */
-export function openAICostUsd(
+/** USD cost of one Claude call, or null for a model missing from the table. */
+export function anthropicCostUsd(
   model: string,
   usage: TokenUsage,
-  serviceTier?: string | null,
 ): number | null {
   const price = priceFor(model);
   if (!price) return null;
-  const cached = Math.min(usage.cachedTokens ?? 0, usage.inputTokens);
-  const uncached = usage.inputTokens - cached;
+  const cacheRead = usage.cacheReadTokens ?? 0;
+  const cacheWrite = usage.cacheWriteTokens ?? 0;
+  const promptTokens = usage.inputTokens + cacheRead + cacheWrite;
+  const long =
+    price.longContext && promptTokens > price.longContext.from
+      ? price.longContext
+      : null;
+  const input = long?.input ?? price.input;
+  const output = long?.output ?? price.output;
   const usd =
-    (uncached * price.input + cached * price.cachedInput + usage.outputTokens * price.output) /
+    (usage.inputTokens * input +
+      cacheRead * input * CACHE_READ_MULTIPLIER +
+      cacheWrite * input * CACHE_WRITE_MULTIPLIER +
+      usage.outputTokens * output) /
     1_000_000;
-  const discounted = serviceTier === "flex" ? usd * FLEX_DISCOUNT : usd;
-  return roundUsd(discounted);
+  return roundUsd(usd);
 }
 
 /**
@@ -75,7 +91,9 @@ export function openAICostUsd(
  * the real charge stays ≤ n × $0.005 + start.
  */
 export function apifyMaxChargeUsd(profileCount: number): number {
-  return roundUsd((profileCount + 1) * APIFY_SUPREME_USD_PER_PROFILE + APIFY_RUN_START_USD);
+  return roundUsd(
+    (profileCount + 1) * APIFY_SUPREME_USD_PER_PROFILE + APIFY_RUN_START_USD,
+  );
 }
 
 /** provider_calls.cost_usd is numeric(12,6). */

@@ -8,7 +8,13 @@ import type { Json } from "@/types/database.types";
 
 /** Mirrors the provider_calls check constraints. */
 export type ProviderName =
-  "openai" | "serper" | "serpapi" | "exa" | "apify" | "harvestapi";
+  | "anthropic"
+  | "supabase"
+  | "serper"
+  | "serpapi"
+  | "exa"
+  | "apify"
+  | "harvestapi";
 export type ProviderPurpose =
   | "search"
   | "enrich"

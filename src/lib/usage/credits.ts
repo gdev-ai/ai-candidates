@@ -52,7 +52,7 @@ export interface UsageWindow {
 export type QuotaStatus = "ok" | "low" | "out" | "unknown";
 
 export interface ProviderQuota {
-  provider: "serper" | "apify" | "harvestapi" | "openai";
+  provider: "serper" | "apify" | "harvestapi" | "anthropic";
   label: string;
   /** What the provider does in a search. */
   role: "search" | "enrich" | "ai";

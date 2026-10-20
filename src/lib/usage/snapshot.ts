@@ -198,9 +198,9 @@ async function providerQuotas(
 ): Promise<ProviderQuota[]> {
   const showHarvest =
     isHarvestConfigured() && env.ENRICHMENT_PROVIDER !== "apify";
-  const [harvestSpent, openaiSpent] = await Promise.all([
+  const [harvestSpent, claudeSpent] = await Promise.all([
     showHarvest ? spentUsd(db, tenant, "harvestapi") : 0,
-    env.OPENAI_API_KEY ? spentUsd(db, tenant, "openai", monthStart) : 0,
+    env.ANTHROPIC_API_KEY ? spentUsd(db, tenant, "anthropic", monthStart) : 0,
   ]);
   const quotas: ProviderQuota[] = [];
   const profiles = perSearch.profiles || CANDIDATES_PER_RUN;
@@ -277,11 +277,11 @@ async function providerQuotas(
     });
   }
 
-  if (env.OPENAI_API_KEY) {
-    const spent = openaiSpent;
+  if (env.ANTHROPIC_API_KEY) {
+    const spent = claudeSpent;
     quotas.push({
-      provider: "openai",
-      label: "OpenAI",
+      provider: "anthropic",
+      label: "Claude",
       role: "ai",
       status: "ok",
       left: `${formatUsd(spent)} this month`,

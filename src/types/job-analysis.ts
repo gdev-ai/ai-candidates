@@ -19,7 +19,7 @@ export type JobEmploymentType = (typeof JOB_EMPLOYMENT_TYPES)[number];
 
 /**
  * AI job-analysis output. Strict-mode compatible (every field required, no
- * defaults), so it doubles as the OpenAI response schema. `city`/`location`
+ * defaults), so it doubles as the Claude structured-output schema. `city`/`location`
  * are deliberately absent: the recruiter picks the city, never the AI.
  */
 export const jobAnalysisSchema = z.object({

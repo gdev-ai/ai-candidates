@@ -58,9 +58,9 @@ describe("serpApiLocation", () => {
 
 describe("pre-score shortlist", () => {
   it("maps similarity onto 0–100", () => {
-    expect(similarityToScore(0.1)).toBe(0);
-    expect(similarityToScore(0.45)).toBe(50);
-    expect(similarityToScore(0.9)).toBe(100);
+    expect(similarityToScore(0.5)).toBe(0);
+    expect(similarityToScore(0.8425)).toBe(50);
+    expect(similarityToScore(0.95)).toBe(100);
   });
 
   it("takes the top N plus up to M thin-snippet extras, never confirmed-foreign", () => {

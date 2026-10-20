@@ -411,7 +411,6 @@ harvestStep.maxRetries = 0;
 export async function matchStep(
   ctx: RunContext,
   personIds: string[],
-  bulk: boolean,
 ): Promise<{ scored: number; failed: number; strongMatches: number }> {
   "use step";
   await setStage(ctx.runId, "scoring");
@@ -421,7 +420,6 @@ export async function matchStep(
     userId: ctx.userId,
     searchRunId: ctx.runId,
     jobVersionId: ctx.jobVersionId,
-    bulk,
     skipScoredSince: ctx.startedAt,
   });
   return {
@@ -437,10 +435,11 @@ export async function matchStep(
  * currently working at our own company. Everyone else stays, scored or not
  * — unscored extras are still in-country people the search paid for. Links
  * from earlier runs keep their own search_run_id and are never touched.
+ * Runs between enrichment and scoring, so nobody it drops is AI-scored;
+ * returns the dropped ids.
  */
-export async function dropIneligibleStep(ctx: RunContext): Promise<number> {
+export async function dropIneligibleStep(ctx: RunContext): Promise<string[]> {
   "use step";
-  await setStage(ctx.runId, "finalizing");
   const db = createServiceClient();
   const { data, error } = await db
     .from("job_candidates")
@@ -469,7 +468,7 @@ export async function dropIneligibleStep(ctx: RunContext): Promise<number> {
       .in("person_id", drop.slice(i, i + 200));
     if (deleteError) throw deleteError;
   }
-  return drop.length;
+  return drop;
 }
 
 export interface RunOutcome {

@@ -1,9 +1,14 @@
+import {
+  MY_FEEDBACK_EMBED,
+  toScoreFeedback,
+} from "@/lib/candidates/scoreFeedback";
 import type { SourcingClient } from "@/lib/supabase/types";
 import type { JobCandidateListItem, MatchSummary } from "@/types/candidate";
 
 /**
  * One query: the job's pipeline rows with the global person, their skills
- * and the latest match (via job_candidates.latest_match_id). Explicit
+ * and the latest match (via job_candidates.latest_match_id) with the
+ * caller's own rating of it (RLS hides others' ratings). Explicit
  * columns only — people/raw payload columns stay out of list reads.
  */
 const JOB_CANDIDATE_SELECT = `
@@ -16,9 +21,10 @@ const JOB_CANDIDATE_SELECT = `
   ),
   latest_match:match_results!job_candidates_latest_match_id_fkey (
     id, match_score, skills_score, experience_score, location_score, education_score,
-    seniority_score, summary, created_at
+    seniority_score, summary, created_at,
+    ${MY_FEEDBACK_EMBED}
   )
-`;
+` as const;
 
 interface SkillRow {
   name: string;
@@ -43,28 +49,66 @@ export async function loadJobCandidates(
   jobId: string,
   userId: string,
 ): Promise<{ data: JobCandidateListItem[]; error: unknown }> {
+  return loadCandidatesForJobs(supabase, [jobId], userId);
+}
+
+/** PostgREST caps a response (1000 rows by default), so rows are paged. */
+const ROW_PAGE_SIZE = 1000;
+
+/**
+ * The pipeline rows of several jobs at once (the cross-job candidates
+ * list). A person found for two jobs appears once per job.
+ */
+export async function loadCandidatesForJobs(
+  supabase: SourcingClient,
+  jobIds: string[],
+  userId: string,
+): Promise<{ data: JobCandidateListItem[]; error: unknown }> {
+  if (jobIds.length === 0) return { data: [], error: null };
+
+  async function loadRows() {
+    const rows = [];
+    for (let from = 0; ; from += ROW_PAGE_SIZE) {
+      const { data, error } = await supabase
+        .from("job_candidates")
+        .select(JOB_CANDIDATE_SELECT)
+        .in("job_id", jobIds)
+        .order("job_id")
+        .order("person_id")
+        .range(from, from + ROW_PAGE_SIZE - 1);
+      if (error) return { rows: [], error };
+      rows.push(...(data ?? []));
+      if ((data ?? []).length < ROW_PAGE_SIZE) return { rows, error: null };
+    }
+  }
+
   const [rowsResult, viewsResult, versionsResult] = await Promise.all([
-    supabase
-      .from("job_candidates")
-      .select(JOB_CANDIDATE_SELECT)
-      .eq("job_id", jobId),
+    loadRows(),
     supabase
       .from("candidate_views")
-      .select("person_id")
-      .eq("job_id", jobId)
+      .select("job_id, person_id")
+      .in("job_id", jobIds)
       .eq("user_id", userId),
-    supabase.from("job_versions").select("id, version").eq("job_id", jobId),
+    supabase.from("job_versions").select("id, version").in("job_id", jobIds),
   ]);
 
   if (rowsResult.error) return { data: [], error: rowsResult.error };
-  const viewed = new Set((viewsResult.data ?? []).map((v) => v.person_id));
+  const viewed = new Set(
+    (viewsResult.data ?? []).map((v) => `${v.job_id}:${v.person_id}`),
+  );
   const versionNumber = new Map(
     (versionsResult.data ?? []).map((v) => [v.id, v.version]),
   );
 
-  const data = (rowsResult.data ?? []).map((row): JobCandidateListItem => {
+  const data = rowsResult.rows.map((row): JobCandidateListItem => {
     const person = row.person;
-    const match = row.latest_match as MatchSummary | null;
+    const { score_feedback, ...latest } = row.latest_match ?? {};
+    const match: MatchSummary | null = row.latest_match
+      ? {
+          ...(latest as Omit<MatchSummary, "my_feedback">),
+          my_feedback: toScoreFeedback(score_feedback),
+        }
+      : null;
     return {
       job_id: row.job_id,
       person_id: row.person_id,
@@ -92,7 +136,7 @@ export async function loadJobCandidates(
       match_score: row.match_score ?? match?.match_score ?? null,
       scored_at: row.scored_at,
       match,
-      viewed: viewed.has(row.person_id),
+      viewed: viewed.has(`${row.job_id}:${row.person_id}`),
     };
   });
 

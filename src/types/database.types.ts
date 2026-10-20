@@ -1936,6 +1936,54 @@ export type Database = {
           },
         ]
       }
+      score_feedback: {
+        Row: {
+          comment: string | null
+          created_at: string
+          direction: string | null
+          id: string
+          match_id: string
+          rating: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          direction?: string | null
+          id?: string
+          match_id: string
+          rating: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          direction?: string | null
+          id?: string
+          match_id?: string
+          rating?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "score_feedback_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "match_results"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "score_feedback_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       search_hits: {
         Row: {
           created_at: string

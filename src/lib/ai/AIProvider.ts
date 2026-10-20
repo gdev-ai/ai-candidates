@@ -1,5 +1,5 @@
 /**
- * Errors raised by the OpenAI layer. `errors.ts` maps AIProviderError and
+ * Errors raised by the AI layer (Claude and embeddings). `errors.ts` maps AIProviderError and
  * AIResponseValidationError (and so their subclasses) to safe 502s.
  */
 

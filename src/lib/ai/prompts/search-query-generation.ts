@@ -75,7 +75,7 @@ export async function generateSearchQueries(
     instructions: INSTRUCTIONS,
     input: buildQueryGenerationInput(input),
     effort: "low",
-    maxOutputTokens: 2000,
+    maxOutputTokens: 4000,
     promptVersion: QUERY_GEN_PROMPT_VERSION,
     context,
   });

@@ -1,3 +1,4 @@
+import { getMatchModel } from "@/lib/ai/client";
 import { runStructured, type CallContext } from "@/lib/ai/structured";
 import { countryName } from "@/lib/search/queryBuilder";
 import {
@@ -214,7 +215,7 @@ export interface ScoredMatch {
 export async function scoreCandidate(
   job: MatchingJob,
   person: MatchingPerson,
-  options: { context?: CallContext; bulk?: boolean } = {},
+  options: { context?: CallContext; model?: string } = {},
 ): Promise<ScoredMatch> {
   const result = await runStructured({
     purpose: "match",
@@ -223,12 +224,13 @@ export async function scoreCandidate(
     instructions: INSTRUCTIONS,
     input: buildMatchInput(job, person),
     effort: "low",
-    maxOutputTokens: 3000,
+    // Thinking shares this cap; long profiles needed more than 3000 on Claude.
+    maxOutputTokens: 8000,
     promptVersion: MATCH_PROMPT_VERSION,
-    serviceTier: options.bulk ? "flex" : "default",
     // Typical calls take ~15-20s; retry the rare one that hangs.
     timeoutMs: MATCH_TIMEOUT_MS,
     context: options.context,
+    model: options.model ?? getMatchModel(),
   });
   const out = {
     ...result.data,

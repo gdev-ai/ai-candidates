@@ -19,7 +19,7 @@ export function tenantKey(): string {
     return cached;
   }
   const keys = [
-    ["openai", env.OPENAI_API_KEY],
+    ["anthropic", env.ANTHROPIC_API_KEY],
     ["serper", env.SERPER_API_KEY],
     ["serpapi", env.SERPAPI_API_KEY],
     ["exa", env.EXA_API_KEY],

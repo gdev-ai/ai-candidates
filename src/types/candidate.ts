@@ -25,6 +25,19 @@ export type NormalizedCandidate = z.infer<typeof normalizedCandidateSchema>;
 // (job, person) in job_candidates / match_results / candidate_notes.
 // ---------------------------------------------------------------------------
 
+export const SCORE_RATINGS = ["up", "down"] as const;
+export type ScoreRating = (typeof SCORE_RATINGS)[number];
+export const SCORE_DIRECTIONS = ["too_high", "too_low"] as const;
+export type ScoreDirection = (typeof SCORE_DIRECTIONS)[number];
+
+/** The caller's own rating of one AI score (sourcing.score_feedback). */
+export interface ScoreFeedback {
+  rating: ScoreRating;
+  /** Which way a thumbs-down score is off; null when unsaid. */
+  direction: ScoreDirection | null;
+  comment: string | null;
+}
+
 export interface MatchSummary {
   id: string;
   match_score: number;
@@ -35,6 +48,8 @@ export interface MatchSummary {
   seniority_score: number | null;
   summary: string | null;
   created_at: string;
+  /** The caller's rating of this score, if they gave one. */
+  my_feedback: ScoreFeedback | null;
 }
 
 /** One row of GET /api/jobs/[id]/candidates. */
@@ -66,6 +81,11 @@ export interface JobCandidateListItem {
   scored_at: string | null;
   match: MatchSummary | null;
   viewed: boolean;
+}
+
+/** One row of GET /api/candidates: a pipeline row plus its job's title. */
+export interface CandidateListItem extends JobCandidateListItem {
+  job_title: string;
 }
 
 export interface MatchItem {

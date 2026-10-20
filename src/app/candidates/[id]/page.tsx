@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 
+import { ScoreFeedback } from "@/components/candidates/ScoreFeedback";
+import { StatusPath } from "@/components/candidates/StatusPath";
 import { DashboardNav } from "@/components/dashboard/nav";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge, matchScoreTone } from "@/components/ui/badge";
@@ -12,15 +14,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyCell } from "@/components/ui/empty-cell";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  CardSkeleton,
+  LoadingRegion,
+  Skeleton,
+} from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
-import { CANDIDATE_STATUSES } from "@/lib/candidates/statuses";
 import { cn } from "@/lib/utils";
 import type {
   CandidateDetailResponse,
@@ -97,7 +96,7 @@ function MatchCard({ matches }: { matches: MatchResultRecord[] }) {
           <p className="text-muted-foreground">Not scored for this job yet.</p>
         ) : (
           <>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4">
               <span
                 className={cn(
                   "flex h-16 w-16 shrink-0 items-center justify-center rounded-full font-display text-xl font-semibold",
@@ -113,6 +112,9 @@ function MatchCard({ matches }: { matches: MatchResultRecord[] }) {
                 <p className="text-muted-foreground">
                   Scored {new Date(latest.created_at).toLocaleString()} · {latest.model}
                 </p>
+              </div>
+              <div className="ml-auto">
+                <ScoreFeedback matchId={latest.id} initial={latest.my_feedback} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -279,14 +281,7 @@ function CandidateProfileContent() {
     );
   }
 
-  if (isLoading) {
-    return (
-      <main className="min-h-screen">
-        <DashboardNav />
-        <p className="p-4 text-sm text-muted-foreground">Loading candidate...</p>
-      </main>
-    );
-  }
+  if (isLoading) return <CandidateProfileSkeleton />;
 
   if (error || !data) {
     return (
@@ -395,29 +390,18 @@ function CandidateProfileContent() {
             <CardTitle className="font-display text-xl">Pipeline status</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2 text-sm">
-            {!data.can_edit ? (
-              <p data-testid="status-readonly">
-                <span className="font-medium">{pipeline.status}</span>
-                <span className="text-muted-foreground">
-                  {" "}
-                  · only {data.owner_name ?? "the owner"} can change this
-                </span>
-              </p>
-            ) : (
-              <Select value={pipeline.status} onValueChange={handleStatusChange} disabled={isUpdatingStatus}>
-                <SelectTrigger className="w-[200px]" data-testid="status-select">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CANDIDATE_STATUSES.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {status}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            <StatusPath
+              status={pipeline.status}
+              onChange={handleStatusChange}
+              busy={isUpdatingStatus}
+              readOnly={!data.can_edit}
+            />
             <p className="text-xs text-muted-foreground">
+              {!data.can_edit && (
+                <span data-testid="status-readonly">
+                  Only {data.owner_name ?? "the owner"} can change this ·{" "}
+                </span>
+              )}
               Found {new Date(pipeline.found_at).toLocaleDateString()}
               {pipeline.status_changed_at &&
                 ` · status changed ${new Date(pipeline.status_changed_at).toLocaleString()}`}
@@ -586,7 +570,59 @@ function CandidateProfileSkeleton() {
   return (
     <main className="min-h-screen">
       <DashboardNav />
-      <p className="p-4 text-sm text-muted-foreground">Loading candidate...</p>
+      <LoadingRegion
+        label="Loading candidate…"
+        className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-6 sm:py-8"
+      >
+        <Skeleton className="h-4 w-56" />
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-16 w-16 shrink-0 rounded-full" />
+                <div className="flex flex-col gap-2">
+                  <Skeleton className="h-7 w-52" />
+                  <Skeleton className="h-4 w-64" />
+                  <Skeleton className="h-3.5 w-40" />
+                </div>
+              </div>
+              <Skeleton className="h-10 w-52" />
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <div className="flex gap-2">
+              <Skeleton className="h-5 w-28 rounded-full" />
+              <Skeleton className="h-5 w-24 rounded-full" />
+              <Skeleton className="h-5 w-32 rounded-full" />
+            </div>
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6" />
+          </CardContent>
+        </Card>
+        <CardSkeleton lines={1} />
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-44" />
+          </CardHeader>
+          <CardContent className="flex flex-col gap-5">
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-16 w-16 shrink-0 rounded-full" />
+              <div className="flex flex-col gap-2">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-3.5 w-48" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-14" />
+              ))}
+            </div>
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-2/3" />
+          </CardContent>
+        </Card>
+        <CardSkeleton lines={4} />
+      </LoadingRegion>
     </main>
   );
 }

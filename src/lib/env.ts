@@ -19,8 +19,15 @@ const envSchema = z.object({
       message: "SEARCH_PROVIDER must be one of: mock, serpapi, serper, exa",
     })
     .default("mock"),
-  OPENAI_API_KEY: z.string().optional(),
-  OPENAI_MODEL: z.string().optional(),
+  ANTHROPIC_API_KEY: z.string().optional(),
+  // Only for an organization-level key that isn't scoped to a workspace.
+  ANTHROPIC_WORKSPACE_ID: z.preprocess(
+    blankToUndefined,
+    z.string().trim().optional(),
+  ),
+  ANTHROPIC_MODEL: z.string().optional(),
+  // Candidate scoring only; falls back to ANTHROPIC_MODEL.
+  ANTHROPIC_MATCH_MODEL: z.string().optional(),
   SERPAPI_API_KEY: z.string().optional(),
   SERPER_API_KEY: z.string().optional(),
   EXA_API_KEY: z.string().optional(),

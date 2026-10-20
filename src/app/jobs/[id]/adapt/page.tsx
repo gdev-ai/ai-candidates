@@ -31,6 +31,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  CardSkeleton,
+  LoadingRegion,
+  Skeleton,
+} from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 import { refreshCredits, useCredits } from "@/components/usage/useCredits";
 import {
@@ -55,6 +60,7 @@ import {
   type RequirementsDraft,
   type Seniority,
 } from "@/types/job";
+import { notifySearchStarted } from "@/components/dashboard/search-run-watcher";
 
 const TERMINAL = new Set(["complete", "error", "cancelled"]);
 
@@ -321,6 +327,7 @@ export default function AdaptSearchPage() {
       }
       setPhase("running");
       setSubmitting(false);
+      notifySearchStarted();
       await poll(run.id);
     } catch {
       toast.error("Something went wrong starting the search.");
@@ -370,10 +377,32 @@ export default function AdaptSearchPage() {
             {loadError}
           </p>
         ) : !job || !draft ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            Loading the job…
-          </div>
+          <LoadingRegion label="Loading the job…" className="flex flex-col gap-6">
+            <Card className="border-slate-200 shadow-sm">
+              <CardHeader className="border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-9 w-9 rounded-lg" />
+                  <div className="flex flex-col gap-1.5">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-3 w-64" />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 gap-5 pt-6 sm:grid-cols-2">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="flex flex-col gap-2">
+                    <Skeleton className="h-3.5 w-24" />
+                    <Skeleton className="h-9 w-full" />
+                  </div>
+                ))}
+                <div className="flex flex-col gap-2 sm:col-span-2">
+                  <Skeleton className="h-3.5 w-28" />
+                  <Skeleton className="h-28 w-full" />
+                </div>
+              </CardContent>
+            </Card>
+            <CardSkeleton lines={4} />
+          </LoadingRegion>
         ) : !job.can_edit ? (
           <p className="text-sm text-muted-foreground">
             Only the job&apos;s owner can adapt its search.

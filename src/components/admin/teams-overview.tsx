@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { TeamManagerSelect } from "@/components/admin/team-manager-select";
 import { Badge, matchScoreTone } from "@/components/ui/badge";
+import { ClickableRow } from "@/components/ui/clickable-row";
 import { EmptyCell } from "@/components/ui/empty-cell";
 import type { AdminTeamRow } from "@/lib/admin/getAdminDashboardData";
 
@@ -44,7 +45,11 @@ export function TeamsOverview({
         </thead>
         <tbody>
           {teams.map((team) => (
-            <tr key={team.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
+            <ClickableRow
+              key={team.id}
+              href={`/manager?teamId=${team.id}`}
+              className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60"
+            >
               <td className="p-3">
                 <Link
                   href={`/manager?teamId=${team.id}`}
@@ -80,7 +85,7 @@ export function TeamsOverview({
                   <EmptyCell />
                 )}
               </td>
-            </tr>
+            </ClickableRow>
           ))}
         </tbody>
       </table>

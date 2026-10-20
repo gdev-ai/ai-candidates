@@ -8,6 +8,7 @@ import React, {
   useEffect,
 } from "react";
 import { CheckCircle2, AlertTriangle, XCircle, Info, X } from "lucide-react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 export type ToastType = "success" | "error" | "warning" | "info";
@@ -17,7 +18,10 @@ export interface ToastItem {
   title?: string;
   message: string;
   type?: ToastType;
+  /** Milliseconds; 0 keeps the toast until it's dismissed. */
   duration?: number;
+  /** A link button under the message, e.g. "View results". */
+  action?: { label: string; href: string };
 }
 
 interface ToastContextType {
@@ -62,6 +66,13 @@ export const toast = {
   },
 };
 
+/** A toast with every option (persistent, with an action link). */
+export function showToast(item: Omit<ToastItem, "id">): string {
+  if (globalAddToast) return globalAddToast(item);
+  console.info("[Toast]", item.title ?? "", item.message);
+  return "";
+}
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
@@ -75,9 +86,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       title,
       type = "info",
       duration = 4000,
+      action,
     }: Omit<ToastItem, "id">) => {
       const id = Math.random().toString(36).substring(2, 9);
-      setToasts((prev) => [...prev, { id, message, title, type, duration }]);
+      setToasts((prev) => [
+        ...prev,
+        { id, message, title, type, duration, action },
+      ]);
 
       if (duration > 0) {
         setTimeout(() => {
@@ -172,6 +187,15 @@ export function Toaster() {
             <div className="flex-1 text-sm">
               {t.title && <div className="font-semibold mb-0.5">{t.title}</div>}
               <div className="text-sm/relaxed opacity-90">{t.message}</div>
+              {t.action && (
+                <Link
+                  href={t.action.href}
+                  onClick={() => removeToast(t.id)}
+                  className="mt-2.5 inline-flex items-center rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                >
+                  {t.action.label}
+                </Link>
+              )}
             </div>
             <button
               onClick={() => removeToast(t.id)}

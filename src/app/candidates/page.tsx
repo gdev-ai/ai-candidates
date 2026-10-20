@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { DashboardNav } from "@/components/dashboard/nav";
 import {
@@ -29,20 +29,15 @@ import {
   ScoringBadge,
   useScoreBatch,
 } from "@/components/candidates/ScoreBatch";
+import { ScoreFeedback } from "@/components/candidates/ScoreFeedback";
 import { SkillsCell } from "@/components/candidates/SkillsCell";
 import { VersionDetails } from "@/components/jobs/VersionDetails";
 import { ExportButton } from "@/components/jobs/ExportButton";
-import {
-  DEFAULT_JOB_FILTERS,
-  JobFilters,
-  buildJobQueryString,
-  hasActiveJobFilters,
-  type JobFilterState,
-} from "@/components/jobs/JobFilters";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge, matchScoreTone } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ClickableRow } from "@/components/ui/clickable-row";
 import {
   Select,
   SelectContent,
@@ -50,6 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton, TableSkeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 import { CANDIDATE_STATUSES } from "@/lib/candidates/statuses";
 import type { JobVersionSummary } from "@/lib/jobs/versions";
@@ -62,6 +58,14 @@ import {
 } from "@/types/job";
 
 const PAGE_SIZE = 10;
+
+/** Rows of the cross-job list also carry their job's title. */
+type CandidateRow = JobCandidateListItem & { job_title?: string };
+
+/** A person can be in several jobs, so rows are keyed by both. */
+function rowKey(row: Pick<CandidateRow, "job_id" | "person_id">): string {
+  return `${row.job_id}:${row.person_id}`;
+}
 
 function buildRunFilterQueryString(
   filters: CandidateFilterState,
@@ -108,223 +112,10 @@ function formatDateTime(value: string): string {
   })}`;
 }
 
-function JobPicker() {
-  const [jobs, setJobs] = useState<JobListItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  const [filters, setFilters] = useState<JobFilterState>(DEFAULT_JOB_FILTERS);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setIsLoading(true);
-    setLoadError(null);
-    fetch(`/api/jobs?${buildJobQueryString(filters)}&limit=100`, {
-      signal: controller.signal,
-    })
-      .then(async (res) => {
-        const data = await res.json();
-        if (!res.ok) {
-          setLoadError(data.error ?? "Failed to load jobs.");
-          return;
-        }
-        setJobs(data.jobs ?? []);
-      })
-      .catch((err) => {
-        if (err instanceof DOMException && err.name === "AbortError") return;
-        setLoadError("Failed to load jobs.");
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setIsLoading(false);
-      });
-    return () => controller.abort();
-  }, [filters]);
-
-  async function handleDeleteJob(jobId: string) {
-    setDeleteError(null);
-    setDeletingId(jobId);
-    try {
-      const res = await fetch(`/api/jobs/${jobId}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) {
-        const msg = data.error ?? "Failed to delete job.";
-        setDeleteError(msg);
-        toast.error(msg, "Delete Failed");
-        return;
-      }
-      setJobs((prev) => prev.filter((job) => job.id !== jobId));
-      toast.success("Job and its listing removed.", "Job Deleted");
-    } catch {
-      setDeleteError("Failed to delete job.");
-      toast.error("Failed to delete job.");
-    } finally {
-      setDeletingId(null);
-      setPendingDeleteId(null);
-    }
-  }
-
-  const filtersUi = <JobFilters value={filters} onChange={setFilters} />;
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col gap-4">
-        {filtersUi}
-        <p className="text-sm text-muted-foreground">Loading jobs...</p>
-      </div>
-    );
-  }
-
-  if (loadError) {
-    return (
-      <div className="flex flex-col gap-4">
-        {filtersUi}
-        <p role="alert" className="text-sm text-destructive">
-          {loadError}
-        </p>
-      </div>
-    );
-  }
-
-  if (jobs.length === 0) {
-    return (
-      <div className="flex flex-col gap-4">
-        {filtersUi}
-        <div className="flex flex-col items-center gap-3 py-10 text-center">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-accent-foreground">
-            <Briefcase className="h-6 w-6" aria-hidden="true" />
-          </span>
-          {hasActiveJobFilters(filters) ? (
-            <p className="text-sm text-muted-foreground">
-              No jobs match these filters.
-            </p>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No jobs yet.{" "}
-              <Link
-                href="/jobs/new"
-                className="font-medium text-primary underline"
-              >
-                Create a job
-              </Link>{" "}
-              to start finding candidates.
-            </p>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-3" data-testid="job-picker">
-      {filtersUi}
-      {deleteError && (
-        <p role="alert" className="text-sm text-destructive">
-          {deleteError}
-        </p>
-      )}
-      {jobs.map((job) => (
-        <div
-          key={job.id}
-          className="flex flex-col gap-3 rounded-lg border border-border p-4 transition-colors hover:border-primary/40 hover:bg-accent/30 sm:flex-row sm:items-center sm:justify-between"
-          data-testid="job-picker-row"
-        >
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
-              <Briefcase className="h-4 w-4" aria-hidden="true" />
-            </span>
-            <div className="min-w-0">
-              <p className="truncate font-medium text-foreground">
-                {job.title}
-              </p>
-              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                <span>{formatDateTime(job.created_at)}</span>
-                {job.company_name && (
-                  <>
-                    <span aria-hidden="true">·</span>
-                    <span>{job.company_name}</span>
-                  </>
-                )}
-                <span aria-hidden="true">·</span>
-                <span>{job.city ?? "Egypt"}</span>
-                <span aria-hidden="true">·</span>
-                <span>
-                  {job.candidate_count} candidate
-                  {job.candidate_count === 1 ? "" : "s"}
-                </span>
-                {job.employment_type && (
-                  <>
-                    <span aria-hidden="true">·</span>
-                    <span>{job.employment_type}</span>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {pendingDeleteId === job.id ? (
-            <div className="flex shrink-0 items-center justify-end gap-1.5">
-              <span className="text-xs text-muted-foreground">
-                Delete this job?
-              </span>
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                disabled={deletingId === job.id}
-                onClick={() => handleDeleteJob(job.id)}
-                data-testid="confirm-delete-job"
-              >
-                {deletingId === job.id ? "Deleting..." : "Confirm"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={deletingId === job.id}
-                onClick={() => setPendingDeleteId(null)}
-              >
-                Cancel
-              </Button>
-            </div>
-          ) : (
-            <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
-              <Button
-                asChild
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-              >
-                <Link href={`/candidates?jobId=${job.id}`}>
-                  <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-                  View
-                </Link>
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-destructive"
-                onClick={() => setPendingDeleteId(job.id)}
-                aria-label={`Delete ${job.title}`}
-                data-testid="delete-job-button"
-              >
-                <Trash2 className="h-4 w-4" aria-hidden="true" />
-              </Button>
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // `readOnly`: viewing someone else's file (e.g. as their manager). Edit
 // controls are hidden; the API rejects edits regardless.
+// `jobId`: null lists candidates across all the caller's jobs (no scoring,
+// versions or export there; those are per job).
 // `runId`: limit the list to the people one search run found (a sourcing
 // file opened from the dashboard). Null shows the job's whole pipeline.
 function CandidatesTable({
@@ -335,7 +126,7 @@ function CandidatesTable({
   onVersionChange,
   readOnly,
 }: {
-  jobId: string;
+  jobId: string | null;
   runId: string | null;
   versionId: string | null;
   /** Offered as a filter; omitted while a search run is pinned. */
@@ -343,7 +134,7 @@ function CandidatesTable({
   onVersionChange: (versionId: string | null) => void;
   readOnly: boolean;
 }) {
-  const [candidates, setCandidates] = useState<JobCandidateListItem[]>([]);
+  const [candidates, setCandidates] = useState<CandidateRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<CandidateFilterState>(
@@ -373,7 +164,10 @@ function CandidatesTable({
     if (refreshToken === 0) setIsLoading(true);
     setError(null);
     const query = buildQueryString(filters, page, runId, versionId);
-    fetch(`/api/jobs/${jobId}/candidates?${query}`, {
+    const url = jobId
+      ? `/api/jobs/${jobId}/candidates?${query}`
+      : `/api/candidates?${query}`;
+    fetch(url, {
       signal: controller.signal,
     })
       .then(async (res) => {
@@ -400,19 +194,19 @@ function CandidatesTable({
   useEffect(() => {
     setSelected(new Set());
     setPage(1);
-  }, [versionId, runId]);
+  }, [jobId, versionId, runId]);
 
   function handleFiltersChange(updated: CandidateFilterState) {
     setFilters(updated);
     setPage(1);
   }
 
-  async function handleStatusChange(personId: string, status: string) {
+  async function handleStatusChange(row: CandidateRow, status: string) {
     setStatusError(null);
-    setUpdatingStatusId(personId);
+    setUpdatingStatusId(rowKey(row));
     try {
       const res = await fetch(
-        `/api/candidates/${personId}/status?jobId=${jobId}`,
+        `/api/candidates/${row.person_id}/status?jobId=${row.job_id}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -428,7 +222,7 @@ function CandidatesTable({
       }
       setCandidates((prev) =>
         prev.map((candidate) =>
-          candidate.person_id === personId
+          rowKey(candidate) === rowKey(row)
             ? { ...candidate, status }
             : candidate,
         ),
@@ -442,13 +236,14 @@ function CandidatesTable({
     }
   }
 
-  async function handleDeleteCandidate(personId: string) {
+  async function handleDeleteCandidate(row: CandidateRow) {
     setDeleteError(null);
-    setDeletingId(personId);
+    setDeletingId(rowKey(row));
     try {
-      const res = await fetch(`/api/candidates/${personId}?jobId=${jobId}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `/api/candidates/${row.person_id}?jobId=${row.job_id}`,
+        { method: "DELETE" },
+      );
       const data = await res.json();
       if (!res.ok) {
         const msg = data.error ?? "Failed to delete candidate.";
@@ -457,7 +252,7 @@ function CandidatesTable({
         return;
       }
       setCandidates((prev) =>
-        prev.filter((candidate) => candidate.person_id !== personId),
+        prev.filter((candidate) => rowKey(candidate) !== rowKey(row)),
       );
       setTotal((prev) => Math.max(0, prev - 1));
       toast.success("Candidate removed from this job.", "Candidate Removed");
@@ -508,6 +303,7 @@ function CandidatesTable({
     await start(versionId ? { versionId } : {});
   }
 
+  const canScore = !readOnly && jobId !== null;
   const nextCount = Math.min(CANDIDATES_PER_RUN, unscored);
   const busy = starting || Boolean(batch);
 
@@ -527,7 +323,12 @@ function CandidatesTable({
     return (
       <div className="flex flex-col gap-4">
         {filtersUi}
-        <p className="text-sm text-muted-foreground">Loading candidates...</p>
+        <TableSkeleton
+          rows={PAGE_SIZE}
+          columns={jobId ? 4 : 5}
+          avatar
+          label="Loading candidates…"
+        />
       </div>
     );
   }
@@ -547,7 +348,7 @@ function CandidatesTable({
     <div className="flex flex-col gap-4">
       {filtersUi}
 
-      {!readOnly && total > 0 && (
+      {canScore && total > 0 && (
         <div className="flex flex-wrap items-center gap-3">
           {selected.size > 0 ? (
             <div
@@ -639,7 +440,7 @@ function CandidatesTable({
           >
             <thead>
               <tr className="border-b border-border bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                {!readOnly && (
+                {canScore && (
                   <th className="w-10 p-3">
                     <input
                       type="checkbox"
@@ -652,6 +453,7 @@ function CandidatesTable({
                   </th>
                 )}
                 <th className="p-3 font-medium">Candidate</th>
+                {!jobId && <th className="p-3 font-medium">Job</th>}
                 <th className="hidden p-3 font-medium md:table-cell">Skills</th>
                 <th className="p-3 font-medium">Match</th>
                 <th className="p-3 font-medium">Status</th>
@@ -662,8 +464,9 @@ function CandidatesTable({
             </thead>
             <tbody>
               {candidates.map((candidate) => (
-                <tr
-                  key={candidate.person_id}
+                <ClickableRow
+                  key={rowKey(candidate)}
+                  href={`/candidates/${candidate.person_id}?jobId=${candidate.job_id}`}
                   className={cn(
                     "border-b border-border/70 last:border-0 hover:bg-accent/40 even:bg-muted/20",
                     selected.has(candidate.person_id) &&
@@ -671,7 +474,7 @@ function CandidatesTable({
                   )}
                   data-testid="candidate-row"
                 >
-                  {!readOnly && (
+                  {canScore && (
                     <td className="p-3">
                       <input
                         type="checkbox"
@@ -691,7 +494,7 @@ function CandidatesTable({
                   <td className="p-3 align-top">
                     <div className="flex items-start gap-3">
                       <Link
-                        href={`/candidates/${candidate.person_id}?jobId=${jobId}`}
+                        href={`/candidates/${candidate.person_id}?jobId=${candidate.job_id}`}
                         className="shrink-0"
                         tabIndex={-1}
                         aria-hidden="true"
@@ -704,7 +507,7 @@ function CandidatesTable({
                       </Link>
                       <div className="min-w-0">
                         <Link
-                          href={`/candidates/${candidate.person_id}?jobId=${jobId}`}
+                          href={`/candidates/${candidate.person_id}?jobId=${candidate.job_id}`}
                           className="flex items-center gap-1.5 font-medium text-foreground no-underline transition-colors hover:text-primary focus-visible:text-primary"
                         >
                           <span className="truncate">
@@ -765,6 +568,17 @@ function CandidatesTable({
                       </div>
                     </div>
                   </td>
+                  {!jobId && (
+                    <td className="p-3 align-top">
+                      <Link
+                        href={`/candidates?jobId=${candidate.job_id}`}
+                        className="line-clamp-2 max-w-[180px] text-xs text-muted-foreground no-underline transition-colors hover:text-primary"
+                        title="Show only this job's candidates"
+                      >
+                        {candidate.job_title || "—"}
+                      </Link>
+                    </td>
+                  )}
                   <td className="hidden p-3 align-top md:table-cell">
                     <SkillsCell skills={candidate.skills} />
                   </td>
@@ -773,12 +587,21 @@ function CandidatesTable({
                     batch?.progress?.status !== "complete" ? (
                       <ScoringBadge />
                     ) : candidate.match_score !== null ? (
-                      <Badge
-                        tone={matchScoreTone(candidate.match_score)}
-                        title={candidate.match?.summary ?? undefined}
-                      >
-                        {Math.round(candidate.match_score)}%
-                      </Badge>
+                      <div className="flex flex-col items-start gap-1">
+                        <Badge
+                          tone={matchScoreTone(candidate.match_score)}
+                          title={candidate.match?.summary ?? undefined}
+                        >
+                          {Math.round(candidate.match_score)}%
+                        </Badge>
+                        {candidate.match && (
+                          <ScoreFeedback
+                            variant="compact"
+                            matchId={candidate.match.id}
+                            initial={candidate.match.my_feedback}
+                          />
+                        )}
+                      </div>
                     ) : candidate.enrichment_status === "pending" ? (
                       <Badge
                         tone="warning"
@@ -806,9 +629,9 @@ function CandidatesTable({
                       <Select
                         value={candidate.status}
                         onValueChange={(status) =>
-                          handleStatusChange(candidate.person_id, status)
+                          handleStatusChange(candidate, status)
                         }
-                        disabled={updatingStatusId === candidate.person_id}
+                        disabled={updatingStatusId === rowKey(candidate)}
                       >
                         <SelectTrigger
                           className="h-8 w-[128px] text-xs"
@@ -827,7 +650,7 @@ function CandidatesTable({
                     )}
                   </td>
                   <td className="p-3 text-right align-top">
-                    {pendingDeleteId === candidate.person_id ? (
+                    {pendingDeleteId === rowKey(candidate) ? (
                       <div className="flex items-center justify-end gap-1.5">
                         <span className="text-xs text-muted-foreground">
                           Remove?
@@ -836,13 +659,11 @@ function CandidatesTable({
                           type="button"
                           variant="destructive"
                           size="sm"
-                          disabled={deletingId === candidate.person_id}
-                          onClick={() =>
-                            handleDeleteCandidate(candidate.person_id)
-                          }
+                          disabled={deletingId === rowKey(candidate)}
+                          onClick={() => handleDeleteCandidate(candidate)}
                           data-testid="confirm-delete-candidate"
                         >
-                          {deletingId === candidate.person_id
+                          {deletingId === rowKey(candidate)
                             ? "Deleting..."
                             : "Confirm"}
                         </Button>
@@ -850,7 +671,7 @@ function CandidatesTable({
                           type="button"
                           variant="outline"
                           size="sm"
-                          disabled={deletingId === candidate.person_id}
+                          disabled={deletingId === rowKey(candidate)}
                           onClick={() => setPendingDeleteId(null)}
                         >
                           Cancel
@@ -889,7 +710,7 @@ function CandidatesTable({
                           data-testid="view-candidate-button"
                         >
                           <Link
-                            href={`/candidates/${candidate.person_id}?jobId=${jobId}`}
+                            href={`/candidates/${candidate.person_id}?jobId=${candidate.job_id}`}
                           >
                             <Eye className="h-4 w-4" aria-hidden="true" />
                           </Link>
@@ -901,7 +722,7 @@ function CandidatesTable({
                             size="icon"
                             className="text-muted-foreground hover:text-destructive"
                             onClick={() =>
-                              setPendingDeleteId(candidate.person_id)
+                              setPendingDeleteId(rowKey(candidate))
                             }
                             aria-label={`Remove ${candidate.name ?? "candidate"} from this job`}
                             data-testid="delete-candidate-button"
@@ -912,7 +733,7 @@ function CandidatesTable({
                       </div>
                     )}
                   </td>
-                </tr>
+                </ClickableRow>
               ))}
             </tbody>
           </table>
@@ -927,10 +748,12 @@ function CandidatesTable({
           Page {page} of {totalPages} ({total} total)
         </p>
         <div className="flex gap-2">
-          <ExportButton
-            jobId={jobId}
-            queryString={buildRunFilterQueryString(filters, runId, versionId)}
-          />
+          {jobId && (
+            <ExportButton
+              jobId={jobId}
+              queryString={buildRunFilterQueryString(filters, runId, versionId)}
+            />
+          )}
           <Button
             type="button"
             variant="outline"
@@ -955,6 +778,65 @@ function CandidatesTable({
   );
 }
 
+interface JobOption {
+  id: string;
+  title: string;
+  candidates: number;
+}
+
+const ALL_JOBS_VALUE = "all";
+
+/** Narrows the list to one job; "All jobs" shows every job's candidates. */
+function JobSelect({
+  jobs,
+  value,
+  currentTitle,
+  onChange,
+}: {
+  jobs: JobOption[];
+  value: string | null;
+  /** Keeps a job outside the list (e.g. a teammate's) selectable. */
+  currentTitle: string | null;
+  onChange: (jobId: string | null) => void;
+}) {
+  const options =
+    value && !jobs.some((j) => j.id === value)
+      ? [
+          { id: value, title: currentTitle ?? "This job", candidates: -1 },
+          ...jobs,
+        ]
+      : jobs;
+  return (
+    <Select
+      value={value ?? ALL_JOBS_VALUE}
+      onValueChange={(v) => onChange(v === ALL_JOBS_VALUE ? null : v)}
+    >
+      <SelectTrigger className="h-9 w-[240px]" data-testid="filter-job">
+        <span className="flex min-w-0 items-center gap-2">
+          <Briefcase
+            className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <span className="truncate">
+            <SelectValue />
+          </span>
+        </span>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={ALL_JOBS_VALUE}>All jobs</SelectItem>
+        {options.map((j) => (
+          <SelectItem key={j.id} value={j.id}>
+            {j.title}
+            {j.candidates >= 0 && (
+              <span className="text-muted-foreground"> · {j.candidates}</span>
+            )}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 interface JobMeta {
   title: string | null;
   canEdit: boolean;
@@ -976,6 +858,33 @@ function CandidatesPageContent() {
   const [companies, setCompanies] = useState<Map<string, string>>(
     () => new Map(),
   );
+  const router = useRouter();
+  const [jobOptions, setJobOptions] = useState<JobOption[]>([]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/jobs?limit=100", { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { jobs?: JobListItem[] } | null) =>
+        setJobOptions(
+          (data?.jobs ?? []).map((j) => ({
+            id: j.id,
+            title: j.title,
+            candidates: j.candidate_count,
+          })),
+        ),
+      )
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+
+  function selectJob(id: string | null) {
+    setVersionId(null);
+    setShowRunOnly(true);
+    router.replace(id ? `/candidates?jobId=${id}` : "/candidates", {
+      scroll: false,
+    });
+  }
 
   useEffect(() => {
     if (!jobId) {
@@ -1055,120 +964,113 @@ function CandidatesPageContent() {
           </p>
         </div>
 
-        {!jobId ? (
-          <Card>
-            <CardHeader>
+        <Card>
+          <CardHeader>
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <CardTitle className="font-display text-xl">
-                Select a job
+                {!jobId ? (
+                  "All candidates"
+                ) : (
+                  <>
+                    Candidates for{" "}
+                    {job ? (
+                      job.title
+                    ) : jobLoadFailed ? (
+                      "this job"
+                    ) : (
+                      <Skeleton className="inline-block h-5 w-48 translate-y-0.5" />
+                    )}
+                  </>
+                )}
               </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <JobPicker />
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <CardTitle className="font-display text-xl">
-                  Candidates for{" "}
-                  {job ? (
-                    job.title
-                  ) : jobLoadFailed ? (
-                    "this job"
-                  ) : (
-                    <span
-                      aria-label="Loading"
-                      className="text-muted-foreground"
-                    >
-                      …
-                    </span>
-                  )}
-                </CardTitle>
-                <div className="flex flex-wrap items-center gap-2">
-                  {versions.length > 0 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowVersions(true)}
-                      data-testid="version-details-button"
-                    >
-                      <History
+              <div className="flex flex-wrap items-center gap-2">
+                <JobSelect
+                  jobs={jobOptions}
+                  value={jobId}
+                  currentTitle={job?.title ?? null}
+                  onChange={selectJob}
+                />
+                {jobId && versions.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowVersions(true)}
+                    data-testid="version-details-button"
+                  >
+                    <History
+                      className="mr-1.5 h-3.5 w-3.5"
+                      aria-hidden="true"
+                    />
+                    Versions
+                  </Button>
+                )}
+                {jobId && job?.canEdit && (
+                  <Button asChild size="sm" data-testid="adapt-search-button">
+                    <Link href={`/jobs/${jobId}/adapt`}>
+                      <SlidersHorizontal
                         className="mr-1.5 h-3.5 w-3.5"
                         aria-hidden="true"
                       />
-                      Versions
-                    </Button>
-                  )}
-                  {job?.canEdit && (
-                    <Button asChild size="sm" data-testid="adapt-search-button">
-                      <Link href={`/jobs/${jobId}/adapt`}>
-                        <SlidersHorizontal
-                          className="mr-1.5 h-3.5 w-3.5"
-                          aria-hidden="true"
-                        />
-                        Adapt search
-                      </Link>
-                    </Button>
-                  )}
-                </div>
+                      Adapt search
+                    </Link>
+                  </Button>
+                )}
               </div>
-              {job && !job.canEdit && (
-                <p
-                  className="mt-2 inline-flex w-fit items-center gap-2 rounded-lg bg-indigo-50 px-3 py-1.5 text-sm text-indigo-800"
-                  data-testid="readonly-banner"
+            </div>
+            {jobId && job && !job.canEdit && (
+              <p
+                className="mt-2 inline-flex w-fit items-center gap-2 rounded-lg bg-indigo-50 px-3 py-1.5 text-sm text-indigo-800"
+                data-testid="readonly-banner"
+              >
+                <Eye className="h-4 w-4" aria-hidden="true" />
+                Viewing {job.ownerName
+                  ? `${job.ownerName}'s`
+                  : "a teammate's"}{" "}
+                sourcing file · read-only
+              </p>
+            )}
+          </CardHeader>
+          <CardContent>
+            {jobId && runId && showRunOnly && (
+              <p
+                className="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
+                data-testid="run-filter-banner"
+              >
+                Showing candidates found by this search run.
+                <button
+                  type="button"
+                  onClick={() => setShowRunOnly(false)}
+                  className="font-medium text-primary underline underline-offset-2"
                 >
-                  <Eye className="h-4 w-4" aria-hidden="true" />
-                  Viewing{" "}
-                  {job.ownerName ? `${job.ownerName}'s` : "a teammate's"}{" "}
-                  sourcing file · read-only
-                </p>
-              )}
-            </CardHeader>
-            <CardContent>
-              {/* Read-only until the job loads, so edit controls never flash for a viewer. */}
-              {runId && showRunOnly && (
-                <p
-                  className="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
-                  data-testid="run-filter-banner"
-                >
-                  Showing candidates found by this search run.
-                  <button
-                    type="button"
-                    onClick={() => setShowRunOnly(false)}
-                    className="font-medium text-primary underline underline-offset-2"
-                  >
-                    Show all candidates for this job
-                  </button>
-                </p>
-              )}
-              <CandidatesTable
-                jobId={jobId}
-                runId={runId && showRunOnly ? runId : null}
-                versionId={runId && showRunOnly ? null : versionId}
-                versions={runId && showRunOnly ? [] : versions}
-                onVersionChange={setVersionId}
-                readOnly={!job?.canEdit}
+                  Show all candidates for this job
+                </button>
+              </p>
+            )}
+            {/* Read-only until the job loads, so edit controls never flash for a viewer. */}
+            <CandidatesTable
+              jobId={jobId}
+              runId={jobId && runId && showRunOnly ? runId : null}
+              versionId={runId && showRunOnly ? null : versionId}
+              versions={!jobId || (runId && showRunOnly) ? [] : versions}
+              onVersionChange={setVersionId}
+              readOnly={jobId ? !job?.canEdit : false}
+            />
+            {jobId && showVersions && versions.length > 0 && (
+              <VersionDetails
+                versions={versions}
+                initialVersionId={versionId}
+                companyName={(id) => (id ? (companies.get(id) ?? null) : null)}
+                onClose={() => setShowVersions(false)}
+                onShowCandidates={(id) => {
+                  setShowRunOnly(false);
+                  setVersionId(id);
+                  setShowVersions(false);
+                }}
               />
-              {showVersions && versions.length > 0 && (
-                <VersionDetails
-                  versions={versions}
-                  initialVersionId={versionId}
-                  companyName={(id) =>
-                    id ? (companies.get(id) ?? null) : null
-                  }
-                  onClose={() => setShowVersions(false)}
-                  onShowCandidates={(id) => {
-                    setShowRunOnly(false);
-                    setVersionId(id);
-                    setShowVersions(false);
-                  }}
-                />
-              )}
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </CardContent>
+        </Card>
       </div>
     </main>
   );
@@ -1179,10 +1081,33 @@ function CandidatesPageSkeleton() {
     <main className="min-h-screen">
       <DashboardNav />
       <div className="animate-page-enter mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
-        <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
-          Candidates
-        </h1>
-        <p className="text-sm text-muted-foreground">Loading...</p>
+        <div>
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
+            Candidates
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Review, score, and shortlist sourced candidates.
+          </p>
+        </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
+            <Skeleton className="h-6 w-56" />
+            <Skeleton className="h-9 w-52" />
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-wrap gap-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-9 w-36" />
+              ))}
+            </div>
+            <TableSkeleton
+              rows={PAGE_SIZE}
+              columns={5}
+              avatar
+              label="Loading candidates…"
+            />
+          </CardContent>
+        </Card>
       </div>
     </main>
   );

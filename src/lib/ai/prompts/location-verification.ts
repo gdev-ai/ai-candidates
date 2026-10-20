@@ -62,8 +62,7 @@ export async function verifyLocationWithAI(
     instructions: instructions(countryName(countryCode)),
     input: buildLocationInput(input),
     effort: "none",
-    temperature: 0,
-    maxOutputTokens: 300,
+    maxOutputTokens: 500,
     promptVersion: LOCATION_PROMPT_VERSION,
     context,
   });

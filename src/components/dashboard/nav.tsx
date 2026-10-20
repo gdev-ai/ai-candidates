@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { Brandmark } from "@/components/brand/brandmark";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
+import { SearchRunWatcher } from "@/components/dashboard/search-run-watcher";
 import { CreditsMeter } from "@/components/usage/CreditsMeter";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -93,6 +94,7 @@ export function DashboardNav() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75">
+      <SearchRunWatcher />
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-8 gap-y-2 px-4 sm:px-6">
         <div className="flex flex-wrap items-center gap-x-8">
           <Link

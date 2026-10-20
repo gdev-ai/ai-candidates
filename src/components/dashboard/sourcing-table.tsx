@@ -2,6 +2,7 @@ import { Search } from "lucide-react";
 import Link from "next/link";
 
 import { Badge, runStatusTone } from "@/components/ui/badge";
+import { ClickableRow } from "@/components/ui/clickable-row";
 import { Button } from "@/components/ui/button";
 import { EmptyCell } from "@/components/ui/empty-cell";
 import type { UnifiedSourcingRow } from "@/lib/dashboard/getDashboardData";
@@ -41,8 +42,9 @@ export function SourcingTable({ rows }: { rows: UnifiedSourcingRow[] }) {
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr
+            <ClickableRow
               key={row.runId}
+              href={`/candidates?jobId=${row.jobId}&runId=${row.runId}`}
               className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60"
               data-testid="sourcing-row"
             >
@@ -71,7 +73,7 @@ export function SourcingTable({ rows }: { rows: UnifiedSourcingRow[] }) {
                   <Link href={`/candidates?jobId=${row.jobId}&runId=${row.runId}`}>View</Link>
                 </Button>
               </td>
-            </tr>
+            </ClickableRow>
           ))}
         </tbody>
       </table>
